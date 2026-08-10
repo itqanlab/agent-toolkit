@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.DS_Store
+Thumbs.db
+*.bak-*
+.venv/
+__pycache__/
+*.pyc
+
+# scratch / local experiments — never publish
+scratch/
+tmp/
