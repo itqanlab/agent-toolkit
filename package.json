@@ -1,0 +1,21 @@
+{
+  "name": "@itqan/skills-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Monorepo root. Not published. Exists so MCP servers under mcp/* can be published independently as npm workspaces.",
+  "license": "MIT",
+  "workspaces": [
+    "mcp/*"
+  ],
+  "scripts": {
+    "install:skills": "bash scripts/install.sh",
+    "detect": "bash scripts/install.sh --detect",
+    "validate": "bash scripts/validate.sh && claude plugin validate .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "husky": "^9.1.7"
+  }
+}
