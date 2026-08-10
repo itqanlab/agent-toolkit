@@ -1,0 +1,14 @@
+{
+  "name": "watch-video",
+  "displayName": "Watch Video",
+  "version": "1.0.0",
+  "description": "Let the agent watch a video — downloads any URL or local file, pulls captions, extracts frames the agent can Read. yt-dlp + ffmpeg, no API key.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/skills/tree/main/skills/watch-video",
+  "repository": "https://github.com/itqanlab/skills",
+  "license": "MIT",
+  "keywords": ["video", "youtube", "tiktok", "transcript", "frames", "ffmpeg", "yt-dlp"]
+}
