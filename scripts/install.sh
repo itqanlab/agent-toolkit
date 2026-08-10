@@ -200,7 +200,7 @@ fi
 
 if [ "$WANT_CLAUDE" -eq 0 ] && [ "$WANT_PROJECT" -eq 0 ] && [ -z "$EXPLICIT_TARGET" ]; then
   echo "Claude Code does not read $NEUTRAL. Its native channel is better anyway:"
-  echo "  /plugin marketplace add itqanlab/skills"
+  echo "  /plugin marketplace add itqanlab/agent-toolkit"
   echo "Or copy into ~/.claude/skills with: $0 --claude"
 fi
 exit 0

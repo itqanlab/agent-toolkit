@@ -28,7 +28,7 @@ None of these require a manifest, registration, or enablement step. Dropping a v
 **Claude Code is the one holdout.** It reads only `~/.claude/skills/`, `.claude/skills/`, and installed plugins. It gets its own native channel instead — the plugin marketplace in this repo, which is strictly better there: versioned installs, one-command updates, and the ability to bundle agents, hooks and MCP servers alongside the skill.
 
 ```
-/plugin marketplace add itqanlab/skills
+/plugin marketplace add itqanlab/agent-toolkit
 ```
 
 `./scripts/install.sh --claude` is the fallback for anyone who would rather copy into `~/.claude/skills/` than register a marketplace. Because each skill folder carries a `.claude-plugin/plugin.json`, Claude Code loads a folder dropped there as a plugin named `<name>@skills-dir`, so it keeps full plugin capability either way. That file is stripped when installing to the neutral path, where other agents have no use for it.

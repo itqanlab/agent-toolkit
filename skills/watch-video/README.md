@@ -9,8 +9,8 @@ No API key. Nothing leaves your machine except the download itself.
 ## Install
 
 ```
-/plugin marketplace add itqanlab/skills
-/plugin install watch-video@itqan-skills
+/plugin marketplace add itqanlab/agent-toolkit
+/plugin install watch-video@itqan
 ```
 
 ## Requirements

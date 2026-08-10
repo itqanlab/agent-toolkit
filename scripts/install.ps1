@@ -154,6 +154,6 @@ if ($detected.Count -gt 0) {
 
 if (-not $Claude -and -not $Project -and -not $Target) {
   Write-Host "Claude Code does not read $neutral. Its native channel is better anyway:"
-  Write-Host '  /plugin marketplace add itqanlab/skills'
+  Write-Host '  /plugin marketplace add itqanlab/agent-toolkit'
   Write-Host '  Or copy into ~\.claude\skills with: .\scripts\install.ps1 -Claude'
 }

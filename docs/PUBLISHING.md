@@ -1,8 +1,14 @@
 # Publishing
 
-One repo serves every channel. Nothing here needs a repo per tool.
+One repo serves every channel and every component type. Nothing here needs a repo per tool.
 
-The reason it works is that `skills/<name>/` is simultaneously a conformant [Agent Skills](https://agentskills.io) directory and a Claude Code plugin directory. Vendor packaging sits in `.claude-plugin/`, which every other agent ignores.
+| Component | Channel | Reaches |
+| :-- | :-- | :-- |
+| Skills (`skills/`) | Neutral path, plus the marketplace | All 8 agents |
+| Plugins (`plugins/`) | Marketplace | Claude Code |
+| MCP servers (`mcp/`) | npm, plus optional marketplace entry | Any MCP client |
+
+The reason a single directory can serve two audiences is that `skills/<name>/` is simultaneously a conformant [Agent Skills](https://agentskills.io) directory and a Claude Code plugin directory. Vendor packaging sits in `.claude-plugin/`, which every other agent ignores.
 
 ## 1. Any conformant agent — the vendor-neutral path
 
@@ -11,7 +17,7 @@ Cursor, Gemini CLI and other conformant agents read `~/.agents/skills/` (user le
 So distribution is just the repo:
 
 ```bash
-git clone https://github.com/itqanlab/skills && cd skills
+git clone https://github.com/itqanlab/agent-toolkit && cd agent-toolkit
 ./scripts/install.sh      # or .\scripts\install.ps1 on Windows
 ```
 
@@ -31,16 +37,16 @@ git push
 Users then run:
 
 ```
-/plugin marketplace add itqanlab/skills
-/plugin install watch-video@itqan-skills
+/plugin marketplace add itqanlab/agent-toolkit
+/plugin install watch-video@itqan
 ```
 
 Notes that matter:
 
-- A user can register only **one** marketplace per name. `itqan-skills` must therefore hold every plugin — which is exactly why this is a monorepo.
+- A user can register only **one** marketplace per name. `itqan` must therefore hold every plugin — which is exactly why this is a monorepo.
 - `/plugin install` **copies** into `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. It is not a live reference to your working tree, so repo edits do not appear until you bump the version and run `/plugin marketplace update`.
 - Relative `source` paths resolve against a local clone of the marketplace, so they work for git and local-directory sources. They break if someone adds the marketplace by direct URL to the raw `marketplace.json`, because only that one file is fetched. Distribute the repo, not the file.
-- Marketplace names that impersonate Anthropic are blocked, and a set of official names is reserved. `itqan-skills` is safe.
+- Marketplace names that impersonate Anthropic are blocked, and a set of official names is reserved — `agent-skills` among them. `itqan` is safe.
 - `claude plugin tag` creates a `{name}--v{version}` git tag and checks that `plugin.json` and the marketplace entry agree on the version. Use it for releases.
 
 ## 3. Skill indexes and community catalogs

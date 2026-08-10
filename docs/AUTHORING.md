@@ -54,9 +54,21 @@ The `metadata.pluginRoot` shorthand for marketplace sources is documented upstre
 
 Plugin manifests cannot reference paths containing `..` — the validator blocks it as path traversal. That is precisely why the skill directory and the plugin directory are the same directory.
 
-## Multi-skill plugins
+## Choosing where a component goes
 
-A single-skill plugin puts `SKILL.md` at the plugin root, which is what makes one directory serve both the spec and Claude Code. If a plugin must ship several related skills, it needs a `skills/<skill-name>/` subdirectory instead, and the plugin root stops being a valid standalone skill directory. Prefer one skill per directory and accept that constraint only when the skills genuinely cannot stand apart.
+| You have | Put it in |
+| :-- | :-- |
+| One skill, scripts only | `skills/<name>/` |
+| Several related skills | `plugins/<name>/skills/` |
+| A skill plus a subagent, hook, or command | `plugins/<name>/` |
+| An MCP server users install via `/plugin` | `plugins/<name>/` with `.mcp.json` |
+| A standalone MCP server published to npm | `mcp/<name>/` |
+
+Default to `skills/<name>/`. A single-skill plugin puts `SKILL.md` at the plugin root, which is what makes one directory serve both the open standard and Claude Code — it stays a valid Agent Skills directory that all eight agents can read.
+
+Move to `plugins/<name>/` only when the bundle needs components the standard has no concept of. Subagents, hooks and commands are **Claude Code specific**; other agents ignore them entirely. So express a capability as a skill whenever instructions plus a script can do the job, and reserve Claude-only components for things that genuinely cannot be — a hook that must fire on a tool event, or a subagent that needs its own context window.
+
+Note that `scripts/install.sh` only walks `skills/` at the repo root. A skill bundled inside `plugins/<name>/skills/` is therefore not installed for other agents automatically, which is another reason to keep portable skills at the top level.
 
 ## Versioning
 

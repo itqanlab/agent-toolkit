@@ -45,7 +45,7 @@ Rules: lowercase type, kebab-case scope, no capitalised subject, no trailing ful
 
 Both are installed by `npm install`. Bypass only when you mean it: `git commit --no-verify`.
 
-## Adding a skill
+## Adding a component
 
 Full rules in [docs/AUTHORING.md](docs/AUTHORING.md). The mechanical bar:
 

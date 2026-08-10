@@ -1,11 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "itqan-skills",
-  "description": "Agnostic, reusable Claude Code skills and plugins — no project or brand coupling.",
+  "name": "itqan",
+  "description": "Itqan Lab agent toolkit — portable skills, MCP servers, subagents, hooks and commands. No project or brand coupling.",
   "owner": {
     "name": "Itqan Lab",
     "email": "hello@itqanlab.com",
-    "url": "https://github.com/itqanlab/skills"
+    "url": "https://github.com/itqanlab/agent-toolkit"
   },
   "plugins": [
     {
@@ -17,8 +17,8 @@
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/skills/tree/main/skills/watch-video",
-      "repository": "https://github.com/itqanlab/skills",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/watch-video",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "media",
       "keywords": ["video", "youtube", "tiktok", "transcript", "frames", "ffmpeg", "yt-dlp"],

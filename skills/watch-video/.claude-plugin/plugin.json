@@ -7,8 +7,8 @@
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"
   },
-  "homepage": "https://github.com/itqanlab/skills/tree/main/skills/watch-video",
-  "repository": "https://github.com/itqanlab/skills",
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/watch-video",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
   "license": "MIT",
   "keywords": ["video", "youtube", "tiktok", "transcript", "frames", "ffmpeg", "yt-dlp"]
 }

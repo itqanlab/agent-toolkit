@@ -1,8 +1,9 @@
 <div align="center">
 
-# 🧰 itqan-skills
+# 🧰 Itqan Agent Toolkit
 
-**Portable [Agent Skills](https://agentskills.io) — one directory, eight agents.**
+**Portable tooling for AI coding agents.**
+Skills · MCP servers · Plugins — one repo, eight agents.
 
 [![Spec](https://img.shields.io/badge/Agent_Skills-conformant-5A67D8)](https://agentskills.io/specification)
 [![Agents](https://img.shields.io/badge/agents-8-2F855A)](docs/COMPATIBILITY.md)
@@ -12,7 +13,19 @@
 
 ---
 
-## 📦 Skills
+## 📦 What's inside
+
+| | Component | Portable to | Lives in |
+| :-: | :-- | :-- | :-- |
+| 🧠 | **Skills** | All 8 agents | [`skills/`](skills) |
+| 🔌 | **MCP servers** | Any MCP client | [`mcp/`](mcp) |
+| 🧩 | **Plugins** — multi-skill bundles, subagents, hooks, commands | Claude Code | [`plugins/`](plugins) |
+
+Skills are the flagship: written to the open standard, they work everywhere unchanged. Subagents and hooks have no cross-agent equivalent, so they ship as Claude Code plugins.
+
+---
+
+## 🧠 Skills
 
 | Skill | Does | Needs |
 | :-- | :-- | :-- |
@@ -25,14 +38,14 @@
 **Claude Code**
 
 ```
-/plugin marketplace add itqanlab/skills
-/plugin install watch-video@itqan-skills
+/plugin marketplace add itqanlab/agent-toolkit
+/plugin install watch-video@itqan
 ```
 
 **Everything else** — writes to `~/.agents/skills/`, the vendor-neutral path
 
 ```bash
-git clone https://github.com/itqanlab/skills && cd skills
+git clone https://github.com/itqanlab/agent-toolkit && cd agent-toolkit
 ./scripts/install.sh              # macOS · Linux
 .\scripts\install.ps1             # Windows
 ```
@@ -62,7 +75,7 @@ Prints per-agent coverage when it finishes.
 | 🟡 | **Amp** | `~/.agents/skills/` |
 | 🦆 | **Goose** | `~/.agents/skills/` |
 
-Seven read the neutral path. Claude Code is the sole exception and gets the marketplace, which is better there anyway — versioned, updatable, and able to bundle agents, hooks and MCP servers.
+Seven read the neutral path. Claude Code is the sole exception and gets the marketplace, which is better there anyway — versioned, updatable, and able to bundle subagents, hooks and MCP servers.
 
 Verified paths, precedence and sources → [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 
@@ -70,7 +83,7 @@ Verified paths, precedence and sources → [docs/COMPATIBILITY.md](docs/COMPATIB
 
 ## 🗂 Layout
 
-The skill directory **is** the Claude plugin directory. One copy, no build step, no per-agent variants.
+A single-skill directory **is** its own Claude plugin. One copy, no build step, no per-agent variants.
 
 ```
 skills/<name>/
@@ -81,8 +94,10 @@ skills/<name>/
 ```
 
 ```
-.claude-plugin/marketplace.json   Claude marketplace catalog
+skills/                           portable skills
+plugins/                          multi-component Claude Code bundles
 mcp/                              MCP servers, npm workspaces
+.claude-plugin/marketplace.json   marketplace catalog — id: itqan
 scripts/                          install · validate
 docs/                             COMPATIBILITY · AUTHORING · PUBLISHING
 ```
@@ -101,7 +116,7 @@ Checks spec `name`/`description` rules, name↔directory match, referenced scrip
 
 ## 🤝 Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) — commit format, hooks, the bar for a new skill.
+[CONTRIBUTING.md](CONTRIBUTING.md) — commit format, hooks, the bar for a new component.
 
 ```
 ✨ feat(watch-video): add --lang flag for non-English captions
