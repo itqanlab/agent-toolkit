@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "itqan-skills",
+  "description": "Agnostic, reusable Claude Code skills and plugins — no project or brand coupling.",
+  "owner": {
+    "name": "Itqan Lab",
+    "email": "hello@itqanlab.com",
+    "url": "https://github.com/itqanlab/skills"
+  },
+  "plugins": [
+    {
+      "name": "watch-video",
+      "source": "./skills/watch-video",
+      "description": "Let the agent watch a video — downloads any URL or local file, pulls captions, extracts frames the agent can Read. yt-dlp + ffmpeg, no API key.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/skills/tree/main/skills/watch-video",
+      "repository": "https://github.com/itqanlab/skills",
+      "license": "MIT",
+      "category": "media",
+      "keywords": ["video", "youtube", "tiktok", "transcript", "frames", "ffmpeg", "yt-dlp"],
+      "tags": ["video", "analysis", "media", "no-api-key"]
+    }
+  ]
+}
