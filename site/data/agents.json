@@ -1,0 +1,95 @@
+{
+  "verified": "2026-08-11",
+  "neutral": "~/.agents/skills/",
+  "agents": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "vendor": "Anthropic",
+      "neutral": false,
+      "channel": "marketplace",
+      "install": "/plugin marketplace add itqanlab/agent-toolkit",
+      "userPaths": ["~/.claude/skills/"],
+      "projectPaths": [".claude/skills/"],
+      "note": "Reads only its own directories and installed plugins. Gets the marketplace instead, which is better here anyway: versioned installs and one-command updates.",
+      "docs": "https://code.claude.com/docs/en/skills"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "vendor": "OpenAI",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "/etc/codex/skills"],
+      "projectPaths": [".agents/skills (cwd, parent, repo root)"],
+      "note": "Walks up from the working directory. Follows symlinked skill folders.",
+      "docs": "https://learn.chatgpt.com/docs/build-skills"
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "vendor": "Anysphere",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.cursor/skills/", "~/.claude/skills/", "~/.codex/skills/"],
+      "projectPaths": [".agents/skills/", ".cursor/skills/", ".claude/skills/", ".codex/skills/"],
+      "note": "Also discovers skills in nested project subdirectories.",
+      "docs": "https://cursor.com/docs/context/skills"
+    },
+    {
+      "id": "gemini-cli",
+      "name": "Gemini CLI",
+      "vendor": "Google",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.gemini/skills/"],
+      "projectPaths": [".agents/skills/", ".gemini/skills/"],
+      "note": "The neutral path takes precedence over the vendor path at both levels.",
+      "docs": "https://geminicli.com/docs/cli/skills/"
+    },
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot",
+      "vendor": "GitHub",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.copilot/skills/"],
+      "projectPaths": [".agents/skills/", ".github/skills/", ".claude/skills/"],
+      "note": "Same discovery in VS Code agent mode.",
+      "docs": "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills"
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "vendor": "SST",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.config/opencode/skills/", "~/.claude/skills/"],
+      "projectPaths": [".agents/skills/", ".opencode/skills/", ".claude/skills/"],
+      "note": "Walks up from the working directory to the git worktree root.",
+      "docs": "https://opencode.ai/docs/skills/"
+    },
+    {
+      "id": "amp",
+      "name": "Amp",
+      "vendor": "Sourcegraph",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.config/agents/skills/", "~/.config/amp/skills/"],
+      "projectPaths": [".agents/skills/", ".claude/skills/"],
+      "note": "Uses the first skill with a given frontmatter name, in documented precedence order.",
+      "docs": "https://ampcode.com/manual"
+    },
+    {
+      "id": "goose",
+      "name": "Goose",
+      "vendor": "Block",
+      "neutral": true,
+      "channel": "neutral",
+      "userPaths": ["~/.agents/skills/", "~/.config/goose/skills/", "~/.claude/skills/"],
+      "projectPaths": [".agents/skills/", ".goose/skills/", ".claude/skills/"],
+      "note": "Treats the neutral path as the recommended standard; vendor paths are fallbacks.",
+      "docs": "https://goose-docs.ai/docs/guides/context-engineering/using-skills/"
+    }
+  ]
+}

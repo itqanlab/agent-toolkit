@@ -1,0 +1,66 @@
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'skills/**'
+      - 'plugins/**'
+      - 'mcp/**'
+      - '.claude-plugin/marketplace.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Open Graph cards are authored as SVG and rasterised here, so a new skill
+      # gets its own share image with no binary committed to the repo.
+      - name: Install SVG rasteriser
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+
+      - name: Build
+        run: node site/build.mjs
+
+      - name: Render Open Graph images
+        working-directory: site/dist
+        run: |
+          for f in og*.svg; do
+            rsvg-convert -w 1200 -h 630 "$f" -o "${f%.svg}.png"
+          done
+          ls -1 og*.png
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
