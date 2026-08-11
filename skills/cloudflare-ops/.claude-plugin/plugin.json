@@ -1,0 +1,21 @@
+{
+  "name": "cloudflare-ops",
+  "description": "Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions, and the token is never typed into the chat.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/cloudflare",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "cloudflare",
+    "dns",
+    "subdomain",
+    "pages",
+    "r2",
+    "workers",
+    "devops"
+  ]
+}
