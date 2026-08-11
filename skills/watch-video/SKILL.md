@@ -2,7 +2,7 @@
 name: watch-video
 description: "Watch / analyze a video or audio source the agent cannot natively play — a URL from YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, LinkedIn or 1750+ other sites, or a local file. Downloads it, pulls captions (or transcribes locally when there are none), and extracts frames so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', 'transcribe this video', '/watch-video'."
 license: MIT
-compatibility: Requires ffmpeg, and yt-dlp for URL sources. Run scripts/setup.sh to install either. Optional local whisper enables transcripts for sources with no captions. Needs network access for remote videos.
+compatibility: Requires ffmpeg, and yt-dlp for URL sources. Run scripts/setup.sh to install either. An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
   version: "1.1.0"
@@ -25,7 +25,7 @@ Check and install what this skill needs:
 bash scripts/setup.sh --check          # report only, installs nothing
 bash scripts/setup.sh                  # shows a plan, asks, then installs
 bash scripts/setup.sh --yes            # non-interactive, for agent use
-bash scripts/setup.sh --with-whisper   # also install local speech-to-text
+bash scripts/setup.sh --with-whisper   # add free offline speech-to-text
 ```
 
 It detects the platform and package manager (Homebrew, apt, dnf, pacman, zypper, apk, pipx/pip) and prints every command before running it. Nothing installs without a confirmation or an explicit `--yes`.
@@ -46,16 +46,18 @@ If a dependency is missing when you run the main script, it will point you here.
 
 | Option | Default | What it does |
 | :-- | :-- | :-- |
-| `--frames N` | 30 (max 60) | Target frame count. More frames = finer detail, more tokens to read |
-| `--width W` | 480 | Frame width in px. Raise only to read fine on-screen text |
-| `--start SEC` `--end SEC` | — | Sample a time range only. Use this on long videos |
-| `--lang CODE` | `en.*` | Caption language pattern, e.g. `ar.*`, `es.*`, `all` |
-| `--scenes` | off | Sample one frame per visual cut instead of at a fixed interval |
-| `--whisper` | off | Transcribe locally when the source has no captions |
-| `--cookies BROWSER` | — | Use browser cookies for login-gated videos (`chrome`, `firefox`, …) |
-| `--playlist N` | single | Allow a playlist URL and take the first N entries |
-| `--outdir DIR` | temp dir | Where frames and transcript land |
-| `--keep-video` | off | Keep the downloaded video instead of deleting it |
+| `--frames N` | 30 (max 60) | Target frame count |
+| `--width W` | 480 | Frame width in px |
+| `--start SEC` / `--end SEC` | — | Sample a time range only |
+| `--lang CODE` | `en.*` | Caption language, e.g. `ar.*`, `all` |
+| `--scenes` | off | One frame per visual cut |
+| `--no-whisper` | off | Skip local transcription even if an engine is installed |
+| `--whisper-model M` | `base` | Speed vs accuracy, e.g. `large-v3` |
+| `--yes` | off | Accept prompts, including installing a transcriber |
+| `--cookies BROWSER` | — | Login-gated videos, e.g. `chrome` |
+| `--playlist N` | single | Allow a playlist, take first N |
+| `--outdir DIR` | temp | Where output lands |
+| `--keep-video` | off | Keep the download |
 
 ## Choosing options
 
@@ -65,7 +67,7 @@ If a dependency is missing when you run the main script, it will point you here.
 
 **Edited video with cuts.** `--scenes` gives one frame per visual cut, so you see the shots that actually exist rather than arbitrary samples across them. It falls back to even sampling automatically when a source has too few cuts to be useful, such as a static screencast or a single-shot talking head.
 
-**No captions.** Many sources ship none. Add `--whisper` to transcribe locally — accurate, but much slower than downloading a caption file, so it is opt-in.
+**No captions.** Many sources ship none. The script then looks for captions in any language, and if there are still none it transcribes locally — automatically, whenever a whisper engine is installed. Installing one is the opt-in; `--no-whisper` skips it, and `--whisper-model large-v3` trades speed for accuracy.
 
 **Login-gated or age-restricted.** `--cookies chrome` reuses a browser session you are already signed into. Only use it on accounts and content you have access to.
 

@@ -551,8 +551,71 @@ function agentsPage() {
 ${colophon()}`;
 }
 
+// Split a README on its H2s so sections can be placed and styled deliberately
+// instead of pouring the whole file onto the page as one column of prose.
+function sections(md) {
+  const out = [];
+  const parts = md.replace(/^#\s+.*\n/, '').split(/\n(?=##\s+)/);
+  for (const p of parts) {
+    const m = p.match(/^##\s+(.+)\n([\s\S]*)$/);
+    if (m) out.push({ title: m[1].trim(), body: m[2].trim() });
+    else if (p.trim()) out.push({ title: '', body: p.trim() });
+  }
+  return out;
+}
+
+const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// Pull the fenced blocks out of an Examples section, each with the comment line
+// above it as its label. Reads as a set of recipes rather than a code dump.
+function recipes(body) {
+  const out = [];
+  // A single fenced block usually holds several examples, each introduced by a
+  // comment line. Each comment starts a new card rather than all of them
+  // collapsing into one.
+  for (const m of body.matchAll(/```(?:bash|sh)?\n([\s\S]*?)```/g)) {
+    let label = '';
+    let cmds = [];
+    const flush = () => {
+      if (cmds.length) out.push({ label, cmd: cmds.join('\n') });
+      cmds = [];
+    };
+    for (const ln of m[1].trim().split('\n')) {
+      const t = ln.trim();
+      if (t.startsWith('#')) { flush(); label = t.replace(/^#\s?/, ''); continue; }
+      if (t) cmds.push(t);
+    }
+    flush();
+  }
+  return out;
+}
+
 function skillPage(s) {
-  const body = marked.parse(s.readme.replace(/^#\s+.*\n/, ''));
+  const secs = sections(s.readme);
+  const find = (re) => secs.find((x) => re.test(x.title));
+  const setup = find(/^setup/i);
+  const usage = find(/^usage/i);
+  const examples = find(/^example/i);
+  const how = find(/^how it works/i);
+  const limits = find(/^limit/i);
+  const shown = new Set([setup, usage, examples, how, limits, find(/^install/i), find(/^license/i)].filter(Boolean));
+  const rest = secs.filter((x) => x.title && !shown.has(x));
+
+  // The options table is already structured data in the README; render it as a
+  // table rather than letting it arrive as generic prose.
+  const optTable = usage && usage.body.match(/\|[\s\S]*\|/);
+
+  const nav = [
+    ['install', 'Install'],
+    s.triggers.length ? ['say', 'Say this'] : null,
+    setup ? ['requirements', 'Requirements'] : null,
+    optTable ? ['options', 'Options'] : null,
+    examples ? ['examples', 'Examples'] : null,
+    how ? ['how', 'How it works'] : null,
+    limits ? ['limits', 'Limits'] : null,
+  ].filter(Boolean);
+
+  const body = marked.parse(rest.map((r) => `## ${r.title}\n${r.body}`).join('\n\n'));
   return `
 <section class="head head-skill">
   <p class="eyebrow"><a href="/browse/">catalog</a> / skill</p>
@@ -560,11 +623,20 @@ function skillPage(s) {
   <p class="lede">${esc(s.summary)}</p>
   <div class="specs">
     <div><dt>version</dt><dd>${esc(s.version)}</dd></div>
-    <div><dt>agents</dt><dd>every conformant</dd></div>
-    <div><dt>requires</dt><dd>${s.deps.length ? s.deps.map((d) => esc(d)).join(' · ') : 'nothing'}</dd></div>
+    <div><dt>works in</dt><dd>every conformant agent</dd></div>
+    <div><dt>needs</dt><dd>${s.deps.length ? s.deps.map((d) => esc(d)).join(' · ') : 'nothing'}</dd></div>
+    <div><dt>cost</dt><dd>free · no API key</dd></div>
     <div><dt>license</dt><dd>${esc(s.license)}</dd></div>
   </div>
-  <div class="cmds">
+</section>
+
+<nav class="jump" aria-label="On this page">
+  ${nav.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
+</nav>
+
+<section class="band" id="install">
+  <h2 class="sec-h"><span class="sec-n">Install</span> pick your agent</h2>
+  <div class="cmds cmds-wide">
     <button class="cmd" data-copy="./scripts/install.sh ${s.name}">
       <span class="cmd-k">any agent</span><code>./scripts/install.sh ${esc(s.name)}</code><span class="cmd-c">copy</span>
     </button>
@@ -573,12 +645,45 @@ function skillPage(s) {
     </button>
   </div>
 </section>
-${s.triggers.length ? `<section class="band">
-  <h2 class="h2">Say any of this</h2>
+
+${s.triggers.length ? `<section class="band" id="say">
+  <h2 class="sec-h"><span class="sec-n">Say this</span> the agent matches on its own</h2>
   <ul class="triggers">${s.triggers.map((t) => `<li>“${esc(t)}”</li>`).join('')}</ul>
-  <p class="band-lede">The agent matches these on its own. No command to remember.</p>
 </section>` : ''}
-<section class="band prose">${body}</section>
+
+${setup ? `<section class="band" id="requirements">
+  <h2 class="sec-h"><span class="sec-n">Requirements</span> what to install, and why</h2>
+  <div class="prose prose-tight">${marked.parse(setup.body)}</div>
+</section>` : ''}
+
+${optTable ? `<section class="band" id="options">
+  <h2 class="sec-h"><span class="sec-n">Options</span> every flag</h2>
+  <div class="prose prose-tight">${marked.parse(optTable[0])}</div>
+</section>` : ''}
+
+${examples ? `<section class="band" id="examples">
+  <h2 class="sec-h"><span class="sec-n">Examples</span> copy and go</h2>
+  <div class="recipes">${recipes(examples.body).map((r) => `
+    <button class="recipe" data-copy="${esc(r.cmd)}">
+      <span class="recipe-label">${esc(r.label || 'run it')}</span>
+      <code class="recipe-cmd">${esc(r.cmd)}</code>
+      <span class="recipe-copy">copy</span>
+    </button>`).join('')}
+  </div>
+</section>` : ''}
+
+${how ? `<section class="band" id="how">
+  <h2 class="sec-h"><span class="sec-n">How it works</span> step by step</h2>
+  <div class="prose prose-tight steps">${marked.parse(how.body)}</div>
+</section>` : ''}
+
+${limits ? `<section class="band" id="limits">
+  <h2 class="sec-h"><span class="sec-n">Limits</span> what it will not do</h2>
+  <div class="prose prose-tight">${marked.parse(limits.body)}</div>
+</section>` : ''}
+
+${rest.length ? `<section class="band prose">${body}</section>` : ''}
+
 <p class="more"><a href="${s.source}" target="_blank" rel="noopener">Source on GitHub ↗</a></p>
 ${colophon()}`;
 }

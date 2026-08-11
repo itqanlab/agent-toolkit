@@ -513,3 +513,78 @@ main { min-width: 0; padding: 0 var(--gut); }
 
 /* the mechanism, demoted to supporting proof */
 .band .rig { margin-top: 26px; max-width: 760px; }
+
+/* ------------------------------------------------------- skill detail page */
+
+.jump {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 12px 0; margin-top: 26px;
+  background: var(--paper); border-bottom: 1px solid var(--line);
+}
+.jump a {
+  padding: 6px 11px; font-family: var(--mono); font-size: 11.5px;
+  color: var(--slate); text-decoration: none; border-radius: 3px;
+  border: 1px solid transparent; transition: color .15s, border-color .15s;
+}
+.jump a:hover { color: var(--amber); border-color: var(--line); }
+
+.cmds-wide { max-width: 620px; margin-top: 0; }
+
+/* recipes — each example is one thing you can take away */
+.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.recipe {
+  display: flex; flex-direction: column; gap: 9px; align-items: flex-start;
+  padding: 16px 18px; text-align: left; cursor: pointer; position: relative;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+  color: var(--ink); font: inherit;
+  transition: border-color .15s;
+}
+.recipe:hover { border-color: var(--amber); }
+.recipe-label {
+  font-family: var(--sans); font-size: .88rem; font-weight: 500;
+  color: var(--ink); padding-right: 44px;
+}
+.recipe-cmd {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.65;
+  color: var(--ink-2); white-space: pre-wrap; word-break: break-word;
+}
+.recipe-copy {
+  position: absolute; top: 14px; right: 14px;
+  font-family: var(--mono); font-size: 10px; color: var(--faint);
+}
+.recipe.is-copied { border-color: var(--amber); }
+.recipe.is-copied .recipe-copy { color: var(--amber); }
+
+/* tighter prose inside a designed section */
+.prose-tight { max-width: 78ch; }
+.prose-tight > :first-child { margin-top: 0; }
+.prose-tight table { margin-top: 0; }
+.prose-tight td:first-child code,
+.prose-tight td:first-child { white-space: nowrap; }
+
+/* numbered steps read as a sequence, not a bulleted blob */
+.steps ol { counter-reset: step; list-style: none; padding-left: 0; }
+.steps ol li {
+  counter-increment: step; position: relative;
+  padding: 0 0 14px 42px; margin: 0;
+}
+.steps ol li::before {
+  content: counter(step); position: absolute; left: 0; top: 0;
+  width: 26px; height: 26px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; color: var(--amber);
+  border: 1px solid var(--amber); border-radius: 50%;
+}
+
+.specs > div { flex: 1 1 118px; }
+
+@media (max-width: 760px) {
+  .jump { overflow-x: auto; flex-wrap: nowrap; }
+  .jump a { white-space: nowrap; }
+}
+
+/* Reference pages are read by scanning, so they sit tighter than the overview. */
+.p-skill .band { padding: 30px 0 34px; }
+.p-skill .band:first-of-type { padding-top: 24px; }
+.p-skill .sec-h { margin-top: 0; }
+.p-skill .head-skill { padding-bottom: 0; }

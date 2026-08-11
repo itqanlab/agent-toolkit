@@ -2,8 +2,8 @@
 
 /* copy a command ---------------------------------------------------------- */
 
-for (const btn of document.querySelectorAll('.cmd')) {
-  const label = btn.querySelector('.cmd-c');
+for (const btn of document.querySelectorAll('.cmd, .recipe')) {
+  const label = btn.querySelector('.cmd-c, .recipe-copy');
   btn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(btn.dataset.copy);
