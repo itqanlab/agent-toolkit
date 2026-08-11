@@ -1,6 +1,6 @@
 # cloudflare-ops
 
-Connect a Cloudflare account once, then let the agent manage DNS, subdomains, Pages and R2 — without opening the dashboard again.
+Connect a Cloudflare account once, then let the agent manage DNS, subdomains, Pages, Workers and R2 — without opening the dashboard again.
 
 ## Just ask
 
@@ -11,6 +11,7 @@ You do not need to run anything. Once the skill is installed, say what you want 
 > *"has the DNS updated yet?"*
 > *"what domains do I have?"*
 > *"publish this site to Cloudflare and put www.mysite.com on it"*
+> *"deploy this worker and put api.mysite.com on it"*
 > *"delete the old staging subdomain"*
 
 The agent runs the commands, checks the result, and tells you in plain words whether it worked. It will ask before deleting anything, and it will tell you when a choice matters — such as whether traffic should pass through Cloudflare or go straight to your server.
@@ -71,6 +72,11 @@ node scripts/cf.mjs pages-create my-site
 node scripts/cf.mjs pages-deploy my-site ./dist
 node scripts/cf.mjs pages-domain my-site www.example.com
 node scripts/cf.mjs pages-domains my-site
+
+node scripts/cf.mjs workers
+node scripts/cf.mjs worker-deploy ./my-worker
+node scripts/cf.mjs worker-domain my-worker api.example.com
+node scripts/cf.mjs worker-domains
 ```
 
 `dns-remove` lists what it matched and refuses to delete without `--yes`.
@@ -104,17 +110,26 @@ Re-deploying later is only the third line. Or say *"publish this site to Cloudfl
 
 `pages-deploy` runs `wrangler` through `npx` — nothing to install, no second login, the saved token is handed to it. `pages-domain` attaches the domain **and** creates the DNS record, because doing only one leaves it stuck at "pending" forever.
 
+## Deploying a Worker
+
+```bash
+node scripts/cf.mjs worker-deploy ./my-worker
+node scripts/cf.mjs worker-domain my-worker api.example.com
+```
+
+The directory needs a `wrangler.toml` naming the Worker and its entry file. Include `workers_dev = false` when it will live on your own domain — without it, a first deploy on a fresh account tries to register a `workers.dev` subdomain named after the folder and fails. `worker-deploy` checks for that before running and explains it.
+
+Unlike Pages, do not add a DNS record for a Worker hostname: `worker-domain` is the whole job and Cloudflare manages the record itself.
+
 ## What it cannot do
 
-Deploying a **Worker** from a local directory still needs `wrangler` run by hand — the same reason Pages did, minus the wrapper. Everything else works here.
-
-Building is yours: `pages-deploy` uploads a directory that already exists.
+Building is yours. `pages-deploy` and `worker-deploy` upload what already exists — run your build first.
 
 The token also cannot create further tokens: Cloudflare refuses to grant token-management permission to a token created by another token. Rotate with `begin --force`.
 
 ## Playbooks
 
-[`references/playbooks.md`](references/playbooks.md) — pointing a subdomain at a server and waiting for its certificate, replacing a record without downtime, Pages with a custom domain, R2 with a public hostname, and a diagnostic order for "it is not resolving".
+[`references/playbooks.md`](references/playbooks.md) — pointing a subdomain at a server and waiting for its certificate, replacing a record without downtime, Pages with a custom domain, Workers on your own domain, R2 with a public hostname, and a diagnostic order for "it is not resolving".
 
 ## Install
 

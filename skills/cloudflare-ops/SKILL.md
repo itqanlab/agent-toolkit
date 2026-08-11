@@ -1,8 +1,8 @@
 ---
 name: cloudflare-ops
-description: "Connect a Cloudflare account once, then manage DNS records, subdomains, Pages sites, R2 buckets and Workers from the agent without opening the dashboard again. Setup is a two-minute guided flow that needs three checkboxes, not the 390-odd permissions Cloudflare would otherwise ask you to pick by hand. Works on macOS, Windows and Linux. Triggers: 'connect my Cloudflare', 'add a subdomain', 'point a domain at my server', 'create a DNS record', 'set up Cloudflare Pages', 'add a custom domain to Pages', 'create an R2 bucket', 'check if DNS has propagated', 'list my domains', 'cloudflare'."
+description: "Connect a Cloudflare account once, then manage DNS records, subdomains, Pages sites, R2 buckets and Workers from the agent without opening the dashboard again. Setup is a two-minute guided flow that needs three checkboxes, not the 390-odd permissions Cloudflare would otherwise ask you to pick by hand. Works on macOS, Windows and Linux. Triggers: 'connect my Cloudflare', 'add a subdomain', 'point a domain at my server', 'create a DNS record', 'set up Cloudflare Pages', 'add a custom domain to Pages', 'create an R2 bucket', 'check if DNS has propagated', 'list my domains', 'deploy this worker', 'publish my site', 'cloudflare'."
 license: MIT
-compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a built site to Pages additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login."
+compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a site to Pages or a Worker additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login."
 metadata:
   author: itqanlab
   version: 1.0.0
@@ -78,6 +78,19 @@ node scripts/cf.mjs pages-domain <project> <hostname> attach a domain, DNS inclu
 node scripts/cf.mjs pages-domains <project>          domains and certificate status
 ```
 
+Workers:
+
+```
+node scripts/cf.mjs workers                          scripts and the hostnames they answer on
+node scripts/cf.mjs worker-deploy <dir>              upload the Worker configured in that directory
+node scripts/cf.mjs worker-domain <name> <hostname>  route a hostname to it
+node scripts/cf.mjs worker-domains                   every Worker hostname on the account
+```
+
+`worker-deploy` needs a `wrangler.toml` (or `.json`) in the directory naming the Worker and its entry file; it says so plainly if there is none. On an account that has never used Workers it stops first and explains the `workers.dev` subdomain problem, which otherwise fails with an error that only offers a dashboard link.
+
+Unlike Pages, **do not create a DNS record for a Worker hostname** — `worker-domain` is enough, and Cloudflare manages the record and certificate itself.
+
 `dns-add` and `pages-domain` take the full hostname — `app.example.com`, not `app`. The zone is worked out from it, so nothing needs a zone id.
 
 `pages-deploy` is the one command that shells out. Uploading files is not something the API can do for us, so it runs Cloudflare's own tool through `npx` — nothing to install, and the saved credential is passed to it, so there is no second login.
@@ -100,15 +113,16 @@ Anything not covered by a command is a direct API call; `references/playbooks.md
 
 - point a subdomain at a server, and wait for the certificate
 - deploy a Pages site and attach a custom domain
+- deploy a Worker on your own domain
 - create an R2 bucket and connect it to a public hostname
 - move a domain between servers with no downtime
 - work out why a hostname is not resolving
 
 ## What this cannot do
 
-Deploying a **Worker** from a local directory still needs Cloudflare's own tool run by hand — the same reason Pages did, but there is no wrapper for it here yet. Everything else, including the whole Pages path, works through these scripts.
+Building is the caller's job. `pages-deploy` and `worker-deploy` upload what is already there; run whatever build the project uses first, then point at its output.
 
-Building the site is the caller's job. `pages-deploy` uploads a directory that already exists; run whatever build the project uses first, then point at its output.
+Everything else on this account — DNS, subdomains, Pages, Workers, R2, zones — works through these scripts.
 
 ## Failure messages
 

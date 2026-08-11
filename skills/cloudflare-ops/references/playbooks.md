@@ -68,6 +68,33 @@ For the apex (`example.com`, no subdomain) pass it the same way. Cloudflare reso
 
 ---
 
+## Deploy a Worker on your own domain
+
+Verified end to end: uploaded, hostname attached, answering over HTTPS about twenty seconds later.
+
+```bash
+node scripts/cf.mjs worker-deploy ./my-worker
+node scripts/cf.mjs worker-domain my-worker api.example.com
+node scripts/cf.mjs workers                              # confirm the hostname
+```
+
+The directory needs a `wrangler.toml` naming the Worker and its entry file:
+
+```toml
+name = "my-worker"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+workers_dev = false
+```
+
+**`workers_dev = false` matters more than it looks.** On an account that has never used Workers there is no `workers.dev` subdomain, and a deploy without that line tries to register one named after the current directory — which usually fails, with an error whose only advice is to open the dashboard. Setting it says "this Worker lives on my own domain", and the problem disappears. `worker-deploy` checks for this before running and explains it rather than letting wrangler fail.
+
+**Do not add a DNS record for a Worker hostname.** This is the opposite of Pages: `worker-domain` is the whole job, and Cloudflare creates and manages the record itself. Adding one by hand fights with it.
+
+Immediately after attaching, the hostname may answer `error code: 1104` while the route reaches the edge. That is normal and clears within a minute — it is not a broken deploy.
+
+---
+
 ## Create an R2 bucket
 
 ```

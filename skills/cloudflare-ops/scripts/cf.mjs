@@ -67,6 +67,14 @@ export async function request(path, { method = 'GET', body, token, query } = {})
   }
 
   const text = await response.text();
+
+  // Some endpoints — several DELETEs among them — answer with an empty body.
+  // That is a success, not a malformed response.
+  if (!text.trim()) {
+    if (response.ok) return { success: true, result: null, errors: [], messages: [] };
+    throw new CloudflareError(`Cloudflare rejected the request (HTTP ${response.status}).`, { status: response.status });
+  }
+
   let payload;
   try {
     payload = JSON.parse(text);
@@ -341,6 +349,124 @@ const COMMANDS = {
     if (result.status !== 0) process.exit(result.status ?? 1);
     console.log(`\nto put your own domain on it:`);
     console.log(`  node scripts/cf.mjs pages-domain ${name} www.example.com`);
+  },
+
+  async workers() {
+    const accountId = await firstAccountId();
+    const [scripts, domains] = await Promise.all([
+      request(`/accounts/${accountId}/workers/scripts`).then((p) => p.result),
+      request(`/accounts/${accountId}/workers/domains`).then((p) => p.result).catch(() => []),
+    ]);
+    if (!scripts.length) return console.log('no Workers on this account yet');
+    for (const s of scripts) {
+      const hosts = domains.filter((d) => d.service === s.id).map((d) => d.hostname);
+      console.log(`${s.id.padEnd(32)} ${hosts.join(', ') || `${s.id}.<your-subdomain>.workers.dev`}`);
+    }
+  },
+
+  async 'worker-domains'() {
+    const accountId = await firstAccountId();
+    const domains = await request(`/accounts/${accountId}/workers/domains`).then((p) => p.result);
+    if (!domains.length) return console.log('no Worker custom domains');
+    for (const d of domains) console.log(`${d.hostname.padEnd(36)} -> ${d.service} (${d.environment})`);
+  },
+
+  /**
+   * Upload a Worker. Same hand-off as pages-deploy and for the same reason: the
+   * code is on this machine. wrangler reads its configuration from the directory,
+   * so it runs there rather than wherever this was invoked from.
+   */
+  async 'worker-deploy'(args) {
+    const dir = args[0] || '.';
+    const { existsSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    if (!existsSync(dir)) throw new Error(`directory not found: ${dir}`);
+
+    const hasConfig = ['wrangler.toml', 'wrangler.json', 'wrangler.jsonc']
+      .some((f) => existsSync(join(dir, f)));
+    if (!hasConfig) {
+      throw new Error(
+        `no wrangler configuration in ${dir}\n` +
+        'A Worker needs a wrangler.toml (or wrangler.json) next to its code, naming the\n' +
+        'worker and its entry file. Create one, or point at the directory that has it.',
+      );
+    }
+
+    const accountId = await firstAccountId();
+
+    // A brand new account has no workers.dev subdomain, and wrangler responds by
+    // trying to register one named after the current directory — which usually
+    // fails, with an error that sends you to the dashboard and explains nothing.
+    // Catch it here, where we can say what to actually do.
+    const config = ['wrangler.toml', 'wrangler.json', 'wrangler.jsonc']
+      .map((f) => join(dir, f)).filter(existsSync).map((f) => readFileSync(f, 'utf8')).join('\n');
+    const optedOut = /workers_dev\s*[=:]\s*false/.test(config);
+
+    if (!optedOut) {
+      const hasSubdomain = await request(`/accounts/${accountId}/workers/subdomain`)
+        .then(() => true).catch(() => false);
+      if (!hasSubdomain) {
+        throw new CloudflareError(
+          'This account has no workers.dev subdomain yet, so the deploy would fail.\n\n' +
+          'Two ways forward:\n\n' +
+          '  1. If this Worker will live on your own domain (recommended), add this line\n' +
+          `     to the wrangler config in ${dir} and run this again:\n\n` +
+          '         workers_dev = false\n\n' +
+          '     Then attach the hostname with:\n' +
+          '         node scripts/cf.mjs worker-domain <worker-name> api.example.com\n\n' +
+          '  2. Otherwise open the Workers page in the Cloudflare dashboard once — just\n' +
+          '     visiting it creates the subdomain — then run this again:\n' +
+          '         https://dash.cloudflare.com/?to=/:account/workers/workers-and-pages',
+        );
+      }
+    }
+
+    const { spawnSync } = await import('node:child_process');
+    console.log(`deploying the Worker in ${dir}...\n`);
+    const result = spawnSync(
+      process.platform === 'win32' ? 'npx.cmd' : 'npx',
+      ['--yes', 'wrangler@latest', 'deploy'],
+      {
+        cwd: dir,
+        stdio: 'inherit',
+        env: { ...process.env, CLOUDFLARE_API_TOKEN: getToken(), CLOUDFLARE_ACCOUNT_ID: accountId },
+      },
+    );
+    if (result.error) {
+      throw new Error(
+        `could not run wrangler: ${result.error.message}\n` +
+        'It is downloaded on demand through npx, which needs network access the first time.',
+      );
+    }
+    if (result.status !== 0) process.exit(result.status ?? 1);
+    console.log(`\nto put your own domain on it:`);
+    console.log(`  node scripts/cf.mjs worker-domain <worker-name> api.example.com`);
+  },
+
+  /**
+   * Attach a hostname to a Worker. Cloudflare creates the DNS record itself for
+   * this one — unlike Pages — so adding a record by hand here would conflict.
+   */
+  async 'worker-domain'(args) {
+    const [service, hostname] = args;
+    if (!service || !hostname) throw new Error('usage: worker-domain <worker-name> <hostname>');
+    const envIndex = args.indexOf('--env');
+    const accountId = await firstAccountId();
+    const zone = await findZone(hostname);
+
+    const domain = await request(`/accounts/${accountId}/workers/domains`, {
+      method: 'PUT',
+      body: {
+        hostname,
+        service,
+        environment: envIndex === -1 ? 'production' : args[envIndex + 1],
+        zone_id: zone.id,
+      },
+    }).then((p) => p.result);
+
+    console.log(`${domain.hostname} now routes to the Worker "${domain.service}"`);
+    console.log('Cloudflare manages the DNS record and the certificate for this hostname itself.');
+    console.log(`\ncheck with:  node scripts/cf.mjs check ${hostname}`);
   },
 
   async r2() {
