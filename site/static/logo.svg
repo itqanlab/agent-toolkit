@@ -1,0 +1,13 @@
+<svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ItqanLab logo">
+  <rect width="280" height="280" rx="56" fill="#09090B"/>
+  <circle cx="140" cy="140" r="104" fill="none" stroke="#d4a853" stroke-width="12"/>
+  <circle cx="140" cy="36" r="9" fill="#d4a853"/>
+  <circle cx="244" cy="140" r="9" fill="#d4a853"/>
+  <circle cx="140" cy="244" r="9" fill="#d4a853"/>
+  <circle cx="36" cy="140" r="9" fill="#d4a853"/>
+  <g transform="translate(140,138) scale(1.05)">
+    <path d="M-10 -44 C-10 -44,-16 -10,-5 14 C0 28,10 36,10 36" fill="none" stroke="#d4a853" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-5 14 C-5 14,14 8,22 -6" fill="none" stroke="#d4a853" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="-10" cy="-50" r="12.3" fill="#d4a853"/>
+  </g>
+</svg>
