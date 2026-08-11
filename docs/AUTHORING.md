@@ -29,7 +29,7 @@ One deliberate exception: **the name of a directory this toolkit owns on disk.**
 Per the spec, `name` and `description` are required; `license`, `compatibility`, `metadata`, and `allowed-tools` are optional.
 
 - `name` — 1–64 chars, lowercase alphanumerics and hyphens, no leading/trailing hyphen, no consecutive hyphens, and it **must match the parent directory name**.
-- `description` — up to 1024 chars. This is the only thing an agent sees when deciding whether to invoke the skill, so it must carry the trigger phrases a user would actually type. Write it as: what it does, what it needs, then explicit `Triggers: '...', '...'`.
+- `description` — up to 1024 chars. This is the only thing an agent sees when deciding whether to invoke the skill, so it must carry the trigger phrases a user would actually type. Write it as: what it does, what it needs, then explicit `Triggers: '...', '...'`. **Quote the whole value** — `description: "… Triggers: 'a', 'b'"` — because the colon in `Triggers:` inside a bare scalar is invalid YAML and the upstream validator rejects it. Use single quotes for the phrases so the outer double quotes stay valid. The generated site leads each skill page with these phrases, so a skill without them loses its most useful section.
 - `compatibility` — use it when the skill needs system packages or network access. Most skills do not need it.
 
 Keep the body under 500 lines and roughly under 5000 tokens; push detail into `references/`, which agents load only on demand.

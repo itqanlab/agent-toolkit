@@ -70,6 +70,18 @@ for skill_dir in "$REPO_ROOT"/skills/*/; do
   else
     [ ${#fm_desc} -le 1024 ] || err "description is ${#fm_desc} chars, max is 1024"
     [ ${#fm_desc} -ge 40 ] || warn "description is very short — it is the only thing an agent sees when deciding to invoke this skill"
+
+    # The generated site leads each skill page with these phrases, so losing them
+    # to a stray separator costs the skill its most useful section.
+    case "$fm_desc" in
+      *Trigger*)
+        printf '%s' "$fm_desc" | grep -qE 'Triggers?:' \
+          || warn "description mentions triggers but not in the form 'Triggers: '...', '...'' — the catalog and site parse that exact form"
+        printf '%s' "$fm_desc" | grep -q "'" \
+          || warn "description has a Triggers section with no single-quoted phrases in it — nothing will be extracted"
+        ;;
+      *) warn "description has no 'Triggers: ...' section — agents and the catalog use those phrases to match user requests";;
+    esac
   fi
 
   # --- portability rules (this repo)
