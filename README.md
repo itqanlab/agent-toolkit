@@ -5,6 +5,8 @@
 **Portable tooling for AI coding agents.**
 Skills · MCP servers · Plugins — one repo, eight agents.
 
+**[agent-toolkit.itqanlab.com](https://agent-toolkit.itqanlab.com)**
+
 [![Spec](https://img.shields.io/badge/Agent_Skills-conformant-5A67D8)](https://agentskills.io/specification)
 [![Agents](https://img.shields.io/badge/agents-8-2F855A)](docs/COMPATIBILITY.md)
 [![License](https://img.shields.io/badge/license-MIT-4A5568)](LICENSE)
@@ -99,6 +101,7 @@ plugins/                          multi-component Claude Code bundles
 mcp/                              MCP servers, npm workspaces
 .claude-plugin/marketplace.json   marketplace catalog — id: itqan
 scripts/                          install · validate
+site/                             generated site → agent-toolkit.itqanlab.com
 docs/                             COMPATIBILITY · AUTHORING · PUBLISHING
 ```
 
