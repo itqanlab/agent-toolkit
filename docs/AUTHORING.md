@@ -12,6 +12,8 @@ The format is the [Agent Skills open standard](https://agentskills.io/specificat
 
 **No personal or brand identifiers.** No account names, store handles, domain names, platform IDs, ticket boards, or persona names in the skill body. If the skill needs one, it reads it from the host project at run time and says so.
 
+One deliberate exception: **the name of a directory this toolkit owns on disk.** A shared store — `~/.itqan-agent-toolkit/`, written by `toolkit-credentials` — carries the publisher prefix because it must not collide with another project's. `agent-toolkit` alone is a generic phrase, and two unrelated tools quietly sharing one credential directory is a bad failure to debug. This is the same reasoning as a scoped package name or a reverse-DNS bundle id, and it is the opposite of the coupling this rule exists to prevent: it hard-codes nothing about our accounts, projects or infrastructure, it only makes the folder unique and attributable. Any such path must still be overridable by an environment variable, so an organisation can relocate it.
+
 **No private config contracts.** A skill requiring `{PROJECT_BRAND}` or `~/.claude/<org>-brand/identity.md` to exist is not agnostic. Either it works with no config, or it documents an explicit config file the host project supplies and degrades gracefully when that is absent.
 
 **No required secrets** unless the skill's entire purpose is that service. `watch-video` needs no key; a Shopify skill obviously needs a Shopify connection, which is fine when documented and when it fails with a clear message.
