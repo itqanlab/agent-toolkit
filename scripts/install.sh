@@ -18,7 +18,9 @@
 #   --target DIR       install into an explicit directory instead
 #
 #   --link             symlink instead of copy — edits go live immediately
-#   --force            replace an existing entry, backing it up to <name>.bak-<ts>
+#   --force            replace an existing entry, backing it up to
+#                      <skills-dir>-backups/<name>.bak-<ts> (outside the skills
+#                      directory, so agents do not load the backup as a skill)
 #   --dry-run          print what would happen, change nothing
 #   --detect           just report which agents are installed, then exit
 set -euo pipefail
@@ -142,8 +144,15 @@ for target in "${TARGETS[@]}"; do
         installed=$((installed+1)); continue
       fi
       if [ "$FORCE" -eq 1 ]; then
-        echo "    replace  $name (backup -> ${name}.bak-${TS})"
-        [ "$DRY" -eq 1 ] || mv "$dst" "${dst}.bak-${TS}"
+        # The backup must land OUTSIDE the skills directory. Agents discover any
+        # directory in there, so a backup left alongside gets loaded as a second,
+        # near-identical skill — which is worse than no backup at all.
+        backup_dir="${target%/}-backups"
+        echo "    replace  $name (backup -> ${backup_dir}/${name}.bak-${TS})"
+        if [ "$DRY" -eq 0 ]; then
+          mkdir -p "$backup_dir"
+          mv "$dst" "${backup_dir}/${name}.bak-${TS}"
+        fi
       else
         echo "    SKIP     $name — exists (re-run with --force to replace)"
         skipped=$((skipped+1)); continue

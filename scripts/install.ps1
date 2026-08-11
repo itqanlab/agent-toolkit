@@ -107,8 +107,15 @@ foreach ($target in $targets) {
 
     if (Test-Path $dst) {
       if ($Force) {
-        Write-Host "    replace  $name (backup -> $name.bak-$ts)"
-        if (-not $DryRun) { Move-Item -Path $dst -Destination "$dst.bak-$ts" }
+        # The backup must land OUTSIDE the skills directory. Agents discover any
+        # directory in there, so a backup left alongside gets loaded as a second,
+        # near-identical skill — which is worse than no backup at all.
+        $backupDir = "$($target.TrimEnd('\','/'))-backups"
+        Write-Host "    replace  $name (backup -> $backupDir\$name.bak-$ts)"
+        if (-not $DryRun) {
+          New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+          Move-Item -Path $dst -Destination (Join-Path $backupDir "$name.bak-$ts")
+        }
       } else {
         Write-Host "    SKIP     $name - exists (re-run with -Force to replace)"
         $script:skipped++
