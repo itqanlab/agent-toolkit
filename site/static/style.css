@@ -26,8 +26,11 @@
   --disp: 'Outfit', var(--sans);
 }
 
+/* Dark tokens live in one place and are applied twice: once for the system
+   preference (unless the reader explicitly chose light), once for an explicit
+   dark choice. That way the toggle wins in both directions. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ink:   #FAFAF9;
     --ink-2: #D4D4D8;
     --paper: #09090B;
@@ -37,6 +40,16 @@
     --faint: #5E5E66;
     --amber: #f0900f;
   }
+}
+:root[data-theme="dark"] {
+  --ink:   #FAFAF9;
+  --ink-2: #D4D4D8;
+  --paper: #09090B;
+  --panel: #141417;
+  --line:  #26262B;
+  --slate: #8E8E96;
+  --faint: #5E5E66;
+  --amber: #f0900f;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -79,14 +92,7 @@ code, pre { font-family: var(--mono); }
 }
 
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.brand-mark {
-  width: 26px; height: 26px; border-radius: 8px; background: #09090B;
-  position: relative; flex: none;
-}
-.brand-mark::after {
-  content: ''; position: absolute; inset: 6px;
-  border: 2px solid var(--gold); border-radius: 50%;
-}
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; flex: none; display: block; }
 .brand-text { font-family: var(--disp); font-size: 13px; letter-spacing: .14em; color: var(--ink); }
 .brand-text b { font-weight: 700; }
 
@@ -106,10 +112,24 @@ code, pre { font-family: var(--mono); }
 .tree-glyph { color: var(--faint); white-space: pre; }
 .tree-node.is-active { color: var(--amber); }
 .tree-out { margin-top: 8px; }
-.rail-foot {
-  margin: auto 0 0; font-family: var(--mono); font-size: 11px;
-  color: var(--faint); letter-spacing: .04em;
+.rail-foot { margin: auto 0 0; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.rail-meta { margin: 0; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+
+.theme {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  padding: 5px 10px 5px 7px; font: 400 11px/1 var(--mono); letter-spacing: .06em;
+  color: var(--slate); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px;
+  transition: color .15s, border-color .15s;
 }
+.theme:hover { color: var(--ink); border-color: var(--amber); }
+.theme-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  border: 1px solid var(--slate);
+  background: linear-gradient(to right, var(--ink) 0 50%, transparent 50% 100%);
+}
+:root[data-theme="light"] .theme-dot { background: var(--amber); border-color: var(--amber); }
+:root[data-theme="dark"] .theme-dot { background: transparent; border-color: var(--amber); }
 
 main { min-width: 0; padding: 0 var(--gut); }
 .hero, .band, .head, .foot, .filters, .grid, .agents { max-width: var(--max); }
@@ -395,4 +415,64 @@ main { min-width: 0; padding: 0 var(--gut); }
   .tier { grid-template-columns: 1fr; gap: 4px; }
   .cmd { grid-template-columns: 1fr auto; }
   .cmd-k { display: none; }
+}
+
+/* ------------------------------------------------------------ new sections */
+
+.sec-h {
+  margin: 40px 0 14px; font-family: var(--disp); font-weight: 600; font-size: 1.05rem;
+  display: flex; align-items: baseline; gap: 12px; color: var(--slate);
+  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.sec-n { font-family: var(--mono); font-size: .82rem; color: var(--amber); letter-spacing: .04em; }
+
+.compat { list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.compat a {
+  display: flex; align-items: baseline; gap: 8px; padding: 10px 12px;
+  text-decoration: none; border: 1px solid var(--line); border-radius: 3px;
+  transition: border-color .15s, background .15s;
+}
+.compat a:hover { border-color: var(--amber); background: var(--panel); }
+.compat-n { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+.compat-v { font-size: 10.5px; color: var(--faint); margin-left: auto; }
+
+/* FAQ — open by default so crawlers and readers get the answers either way */
+.faq { display: flex; flex-direction: column; }
+.qa { border-top: 1px solid var(--line); padding: 4px 0; }
+.qa:last-child { border-bottom: 1px solid var(--line); }
+.qa summary { list-style: none; cursor: pointer; padding: 14px 0; display: flex;
+  align-items: center; gap: 12px; }
+.qa summary::-webkit-details-marker { display: none; }
+.qa summary::after {
+  content: '+'; margin-left: auto; font-family: var(--mono); color: var(--amber);
+  font-size: 1.1rem; transition: transform .2s;
+}
+.qa[open] summary::after { content: '−'; }
+.qa summary h3 { margin: 0; font-family: var(--disp); font-weight: 500; font-size: 1.02rem; }
+.qa summary:hover h3 { color: var(--amber); }
+.qa-a { padding: 0 0 18px; max-width: 68ch; }
+.qa-a p { margin: 0; color: var(--ink-2); font-size: .93rem; }
+.qa-a code { font-size: .87em; padding: 1px 5px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 2px; }
+
+/* colophon — quiet authorship */
+.colophon {
+  display: flex; gap: 22px; align-items: flex-start; max-width: var(--max);
+  margin-top: clamp(48px, 8vh, 88px); padding: 28px 0 0; border-top: 1px solid var(--line);
+}
+.colo-mark img { display: block; border-radius: 11px; }
+.colo-body { max-width: 62ch; }
+.colo-lead { margin: 0 0 6px; font-family: var(--disp); font-weight: 500; font-size: 1.02rem; }
+.colo-lead a { color: var(--amber); text-decoration: none; }
+.colo-lead a:hover { text-decoration: underline; }
+.colo-ar { margin: 0 0 10px; color: var(--ink-2); font-size: .93rem; }
+.colo-ar span[lang="ar"] { font-size: 1.15em; color: var(--gold); }
+.colo-ar em { font-style: italic; }
+.colo-meta { margin: 0; font-family: var(--mono); font-size: 11px; color: var(--faint); line-height: 1.7; }
+
+@media (max-width: 760px) {
+  .rail-foot { margin: 0; flex-direction: row; align-items: center; gap: 10px; }
+  .rail-meta { display: none; }
+  .colophon { flex-direction: column; gap: 14px; }
 }

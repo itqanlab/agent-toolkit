@@ -77,3 +77,42 @@ if (q) {
     q.focus();
   });
 }
+
+/* theme: auto → light → dark ---------------------------------------------- */
+// Default is the system preference. An explicit choice persists and wins over
+// it in both directions; clearing the choice returns to following the system.
+
+{
+  const btn = document.getElementById('theme');
+  const label = document.getElementById('theme-label');
+  const root = document.documentElement;
+  const ORDER = ['auto', 'light', 'dark'];
+
+  const read = () => {
+    try {
+      const v = localStorage.getItem('theme');
+      return v === 'light' || v === 'dark' ? v : 'auto';
+    } catch { return 'auto'; }
+  };
+
+  const paint = (mode) => {
+    if (mode === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', mode);
+    if (label) label.textContent = mode;
+    btn?.setAttribute('aria-label', `Colour theme: ${mode}. Click to change.`);
+  };
+
+  paint(read());
+
+  btn?.addEventListener('click', () => {
+    const next = ORDER[(ORDER.indexOf(read()) + 1) % ORDER.length];
+    try {
+      if (next === 'auto') localStorage.removeItem('theme');
+      else localStorage.setItem('theme', next);
+    } catch { /* private mode — the choice just won't survive a reload */ }
+    paint(next);
+  });
+
+  // Another tab changed the preference.
+  addEventListener('storage', (e) => { if (e.key === 'theme') paint(read()); });
+}

@@ -25,7 +25,7 @@ const SITE = {
   repo: 'https://github.com/itqanlab/agent-toolkit',
   org: 'https://github.com/itqanlab',
   marketplace: 'itqan',
-  tagline: 'Write it once. Eight agents find it.',
+  tagline: 'Write it once. Every agent finds it.',
 };
 
 /* ---------------------------------------------------------------- read repo */
@@ -149,7 +149,12 @@ function tree(active) {
   </nav>`;
 }
 
-function page({ title, desc, active, body, cls = '', og = '/og.png' }) {
+// Applied before first paint so a saved theme never flashes the wrong ground.
+const THEME_BOOT = `<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})()</script>`;
+
+function page({ title, desc, active, body, cls = '', og = '/og.png', path = '/', jsonld = [] }) {
+  const canonical = `${SITE.url}${path}`;
+  const graph = [...jsonld, ORG_LD, breadcrumbLd(path, title)].filter(Boolean);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -157,34 +162,84 @@ function page({ title, desc, active, body, cls = '', og = '/og.png' }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}">
+<link rel="canonical" href="${canonical}">
+<meta name="author" content="Itqan Lab">
+<meta name="theme-color" content="#FAFAF9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)">
+<meta property="og:site_name" content="${esc(SITE.title)}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:type" content="website">
-<meta property="og:url" content="${SITE.url}">
+<meta property="og:url" content="${canonical}">
 <meta property="og:image" content="${SITE.url}${og}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${SITE.url}${og}">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">${JSON.stringify(graph.length === 1 ? graph[0] : { '@context': 'https://schema.org', '@graph': graph.map(stripCtx) })}</script>
+${THEME_BOOT}
 </head>
 <body class="${cls}">
 <a class="skip" href="#main">Skip to content</a>
 <div class="shell">
 <header class="rail">
-  <a class="brand" href="/">
-    <span class="brand-mark" aria-hidden="true"></span>
+  <a class="brand" href="/" aria-label="${esc(SITE.title)} — by Itqan Lab">
+    <img class="brand-mark" src="/logo.svg" alt="" width="26" height="26">
     <span class="brand-text"><b>ITQAN</b> LAB</span>
   </a>
   ${tree(active)}
-  <p class="rail-foot">MIT · verified ${agentData.verified}</p>
+  <div class="rail-foot">
+    <button class="theme" id="theme" type="button" aria-label="Colour theme">
+      <span class="theme-dot" aria-hidden="true"></span><span id="theme-label">auto</span>
+    </button>
+    <p class="rail-meta">MIT · verified ${agentData.verified}</p>
+  </div>
 </header>
 <main id="main">${body}</main>
 </div>
 <script src="/app.js" type="module"></script>
 </body>
 </html>`;
+}
+
+const stripCtx = (o) => { const { '@context': _c, ...rest } = o; return rest; };
+
+/* ------------------------------------------------------------ structured data */
+
+const ORG_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${SITE.url}#org`,
+  name: 'Itqan Lab',
+  alternateName: 'إتقان لاب',
+  description: 'Design and technology studio. Itqan (إتقان) is the Arabic word for mastery — doing a thing precisely and completely.',
+  url: 'https://itqanlab.com',
+  logo: `${SITE.url}/logo.svg`,
+  sameAs: ['https://github.com/itqanlab'],
+};
+
+function breadcrumbLd(path, title) {
+  if (path === '/') return null;
+  const parts = path.split('/').filter(Boolean);
+  const items = [{ '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url }];
+  let acc = '';
+  parts.forEach((p, i) => {
+    acc += `/${p}`;
+    items.push({
+      '@type': 'ListItem', position: i + 2,
+      name: i === parts.length - 1 ? title.split(' — ')[0] : p,
+      item: `${SITE.url}${acc}/`,
+    });
+  });
+  return { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: items };
 }
 
 /* ---------------------------------------------------------------- signature */
@@ -263,7 +318,7 @@ function card(item) {
   </header>
   <p class="card-sum">${esc(item.summary)}</p>
   <footer class="card-foot">
-    <span class="card-agents"><b>${item.agents}</b>/8 agents</span>
+    <span class="card-agents">portable</span>
     ${item.deps.map((d) => `<span class="tag">${esc(d)}</span>`).join('')}
   </footer>
 </a>`;
@@ -277,9 +332,11 @@ function home() {
 <section class="hero">
   <div class="hero-copy">
     <p class="eyebrow">Agent Skills · open standard</p>
-    <h1 class="hero-h">Write it once.<br><em>Eight agents</em><br>find it.</h1>
-    <p class="lede">One skill directory. No forks, no per-agent rewrites, no build step.
-      Drop it in the shared path and every conformant agent picks it up.</p>
+    <h1 class="hero-h">Write it once.<br><em>Every agent</em><br>finds it.</h1>
+    <p class="lede">An agent skill is a folder with a <code>SKILL.md</code> in it — instructions plus
+      scripts that an AI coding agent loads when a task calls for them. Because the format is an
+      open standard, one folder works in Claude Code, Codex, Cursor, Gemini CLI, Copilot and
+      ${agentData.ecosystem.approx} other tools without a fork, a rewrite, or a build step.</p>
     <div class="cmds">
       <button class="cmd" data-copy="./scripts/install.sh">
         <span class="cmd-k">any agent</span>
@@ -307,15 +364,89 @@ function home() {
     <p class="band-lede">Split by how far each one travels, not by taste.</p>
   </div>
   <dl class="tiers">
-    <div class="tier"><dt>Skills</dt><dd><b>${counts.skill}</b> · portable to all 8 agents. Instructions plus scripts, read by every conformant agent unchanged.</dd></div>
+    <div class="tier"><dt>Skills</dt><dd><b>${counts.skill}</b> · every conformant agent. Instructions plus scripts, read unchanged wherever the standard is implemented.</dd></div>
     <div class="tier"><dt>MCP servers</dt><dd><b>${counts.mcp}</b> · any MCP client. Live tool surfaces with their own credentials and typed contracts.</dd></div>
     <div class="tier"><dt>Plugins</dt><dd><b>${counts.plugin}</b> · Claude Code. Subagents, hooks and commands — components the standard has no concept of.</dd></div>
   </dl>
 </section>
 
+<section class="band">
+  <h2 class="h2"><span class="h2-n">03</span> Questions</h2>
+  <div class="faq">${FAQ.map((f, i) => `
+    <details class="qa"${i === 0 ? ' open' : ''}>
+      <summary><h3>${esc(f.q)}</h3></summary>
+      <div class="qa-a">${f.a}</div>
+    </details>`).join('')}
+  </div>
+</section>
+
+${colophon()}`;
+}
+
+// Answers are written to stand alone. Each one should survive being lifted out
+// of the page and quoted on its own, which is also how AI search reads them.
+const FAQ = [
+  {
+    q: 'What is an agent skill?',
+    a: `<p>An agent skill is a folder containing a <code>SKILL.md</code> file: YAML frontmatter with a
+      <code>name</code> and <code>description</code>, followed by instructions in Markdown, plus optional
+      <code>scripts/</code>, <code>references/</code> and <code>assets/</code> directories. The agent loads
+      only the name and description at startup, and reads the full instructions only when a task matches.
+      That progressive loading is why an agent can keep many skills available at almost no context cost.
+      The format is defined by the Agent Skills specification, an open standard stewarded by the Agentic
+      AI Foundation and implemented by ${agentData.ecosystem.approx} tools.</p>`,
+  },
+  {
+    q: 'Do I need a different version of a skill for each agent?',
+    a: `<p>No. A skill written to the specification is a single folder that every conformant agent reads
+      unchanged. The two rules that keep it portable are to reference bundled files by paths relative to the
+      skill root — <code>scripts/watch.sh</code>, never an absolute path — and to keep vendor-specific
+      syntax out of the instructions, since the body is read verbatim by every agent. Every skill in this
+      toolkit is checked against both rules automatically before it can be committed.</p>`,
+  },
+  {
+    q: 'Where do agents look for skills on disk?',
+    a: `<p>Most read <code>~/.agents/skills/</code> at the user level and <code>.agents/skills/</code> inside
+      a project — a vendor-neutral path that several agents give precedence over their own directories.
+      Of the ${agentData.agents.length} agents whose documentation we verified on ${agentData.verified},
+      ${agentData.agents.filter((a) => a.neutral).length} read it. Claude Code is the exception: it reads
+      <code>~/.claude/skills/</code>, <code>.claude/skills/</code> and installed plugins only, which is why
+      it installs from a plugin marketplace here instead.</p>`,
+  },
+  {
+    q: 'How is this different from an MCP server?',
+    a: `<p>A skill is procedural knowledge — instructions and scripts, loaded on demand, with no process
+      running. An MCP server is a live tool surface: it runs, holds credentials, and exposes typed tools over
+      a protocol. Reach for MCP when the capability needs a persistent connection or a typed contract; reach
+      for a skill when a Markdown file and a shell script would do the job. This toolkit ships both, and
+      keeps them in separate tiers because they travel differently.</p>`,
+  },
+  {
+    q: 'Is it free, and can I use it commercially?',
+    a: `<p>Yes. Everything here is MIT licensed and free to use, modify and redistribute, including in
+      commercial work. There is no account, no telemetry, and no API key required by the toolkit itself —
+      individual skills declare their own dependencies, such as <code>ffmpeg</code>, in a
+      <code>compatibility</code> field you can read before installing.</p>`,
+  },
+];
+
+// Quiet authorship. Who made this, why the name means what it means, and how it
+// was built — the kind of thing a developer reads at the bottom and remembers.
+function colophon() {
+  return `
+<section class="colophon">
+  <div class="colo-mark"><img src="/logo.svg" alt="Itqan Lab" width="44" height="44"></div>
+  <div class="colo-body">
+    <p class="colo-lead">Built at <a href="https://itqanlab.com">Itqan Lab</a>, a design and technology studio.</p>
+    <p class="colo-ar"><span lang="ar" dir="rtl">إتقان</span> — <em>itqan</em>, the Arabic word for mastery:
+      doing a thing precisely, and completely.</p>
+    <p class="colo-meta">Open source under MIT · agent paths re-verified ${agentData.verified} ·
+      this site is generated from the repository on every push.</p>
+  </div>
+</section>
 <footer class="foot">
   <p><a href="${SITE.repo}">github.com/itqanlab/agent-toolkit</a></p>
-  <p>MIT · <a href="${SITE.org}">Itqan Lab</a></p>
+  <p><a href="https://agentskills.io/specification">Agent Skills spec</a> · <a href="/llms.txt">llms.txt</a></p>
 </footer>`;
 }
 
@@ -339,7 +470,8 @@ function browse() {
 </div>
 <div class="grid" id="results">${catalog.map(card).join('')}</div>
 <p class="empty" id="empty" hidden>Nothing matches that. <button class="linkish" id="clear">Clear filters</button></p>
-<footer class="foot"><p><a href="${SITE.repo}">Propose a skill →</a></p></footer>`;
+<p class="more"><a href="${SITE.repo}/issues">Propose a skill →</a></p>
+${colophon()}`;
 }
 
 function agentsPage() {
@@ -357,14 +489,26 @@ function agentsPage() {
     <p class="agent-note">${esc(a.note)}</p>
     <p class="agent-doc"><a href="${a.docs}">Vendor documentation ↗</a></p>
   </article>`).join('');
+  const onCount = agentData.agents.filter((a) => a.neutral).length;
   return `
 <section class="head">
   <h1 class="page-h">Agents</h1>
-  <p class="lede">Discovery paths read from each vendor's own documentation on ${agentData.verified}.
-    Seven of eight read <code>${esc(agentData.neutral)}</code>. Claude Code does not, so it gets the marketplace.</p>
+  <p class="lede">Agent Skills is an open standard, so a conformant skill runs in any tool that implements
+    it. Below are the ${agentData.agents.length} agents whose discovery paths we read from the vendor's own
+    documentation and verified on ${agentData.verified}. ${onCount} of them read
+    <code>${esc(agentData.neutral)}</code>; Claude Code does not, so it installs from the marketplace.</p>
 </section>
+<h2 class="sec-h"><span class="sec-n">Verified</span> paths documented and sourced</h2>
 <div class="agents">${rows}</div>
-<footer class="foot"><p><a href="${SITE.repo}/blob/main/docs/COMPATIBILITY.md">Full matrix with sources →</a></p></footer>`;
+
+<h2 class="sec-h"><span class="sec-n">Also compatible</span> implements the same standard</h2>
+<p class="band-lede">These tools read the same <code>SKILL.md</code>. We have not verified their install
+  paths ourselves, so they are listed rather than documented — follow the vendor link for placement.</p>
+<ul class="compat">${agentData.compatible.map((c) => `
+  <li><a href="${c.url}"><span class="compat-n">${esc(c.name)}</span><span class="compat-v">${esc(c.vendor)}</span></a></li>`).join('')}
+</ul>
+<p class="more"><a href="${agentData.ecosystem.showcase}">Full ecosystem showcase →</a></p>
+${colophon()}`;
 }
 
 function skillPage(s) {
@@ -376,7 +520,7 @@ function skillPage(s) {
   <p class="lede">${esc(s.summary)}</p>
   <div class="specs">
     <div><dt>version</dt><dd>${esc(s.version)}</dd></div>
-    <div><dt>agents</dt><dd>${s.agents}/8</dd></div>
+    <div><dt>agents</dt><dd>every conformant</dd></div>
     <div><dt>requires</dt><dd>${s.deps.length ? s.deps.map((d) => esc(d)).join(' · ') : 'nothing'}</dd></div>
     <div><dt>license</dt><dd>${esc(s.license)}</dd></div>
   </div>
@@ -395,7 +539,8 @@ ${s.triggers.length ? `<section class="band">
   <p class="band-lede">The agent matches these on its own. No command to remember.</p>
 </section>` : ''}
 <section class="band prose">${body}</section>
-<footer class="foot"><p><a href="${s.source}">Source on GitHub ↗</a></p></footer>`;
+<p class="more"><a href="${s.source}">Source on GitHub ↗</a></p>
+${colophon()}`;
 }
 
 /* ---------------------------------------------------------------- og cards */
@@ -436,29 +581,68 @@ const write = (rel, content) => {
   writeFileSync(p, content);
 };
 
+const WEBSITE_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': `${SITE.url}#site`,
+  name: SITE.title,
+  url: SITE.url,
+  description: 'Portable Agent Skills, MCP servers and plugins for AI coding agents.',
+  inLanguage: 'en',
+  publisher: { '@id': `${SITE.url}#org` },
+};
+
+const FAQ_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() },
+  })),
+};
+
+const skillLd = (s) => ({
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: s.name,
+  description: s.summary,
+  url: `${SITE.url}/s/${s.name}/`,
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'macOS, Linux, Windows',
+  softwareVersion: s.version,
+  license: 'https://opensource.org/licenses/MIT',
+  isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  author: { '@id': `${SITE.url}#org` },
+  codeRepository: s.source,
+  softwareRequirements: s.deps.join(', ') || undefined,
+});
+
 write('index.html', page({
   title: `${SITE.title} — ${SITE.tagline}`,
-  desc: 'Portable Agent Skills, MCP servers and plugins. One directory, eight agents.',
-  active: '/', body: home(), cls: 'p-home',
+  desc: `Portable agent skills for AI coding agents. One SKILL.md folder runs in Claude Code, Codex, Cursor, Gemini CLI, Copilot and ${agentData.ecosystem.approx} more. Open standard, MIT licensed.`,
+  active: '/', body: home(), cls: 'p-home', path: '/', jsonld: [WEBSITE_LD, FAQ_LD],
 }));
 
 write('browse/index.html', page({
-  title: `Browse — ${SITE.title}`,
-  desc: `${catalog.length} skills, MCP servers and plugins for AI coding agents.`,
-  active: '/browse/', body: browse(), cls: 'p-browse', og: '/og-browse.png',
+  title: `Browse the catalog — ${SITE.title}`,
+  desc: `${catalog.length} portable skills, MCP servers and plugins for AI coding agents. Free and MIT licensed.`,
+  active: '/browse/', body: browse(), cls: 'p-browse', og: '/og-browse.png', path: '/browse/',
 }));
 
 write('agents/index.html', page({
-  title: `Agents — ${SITE.title}`,
-  desc: 'Verified skill discovery paths for eight AI coding agents.',
-  active: '/agents/', body: agentsPage(), cls: 'p-agents', og: '/og-agents.png',
+  title: `Where each AI agent looks for skills — ${SITE.title}`,
+  desc: `Verified skill discovery paths for ${agentData.agents.length} AI coding agents, read from each vendor's own documentation, plus ${agentData.compatible.length} more compatible tools.`,
+  active: '/agents/', body: agentsPage(), cls: 'p-agents', og: '/og-agents.png', path: '/agents/',
 }));
 
 for (const s of skills) {
   write(`s/${s.name}/index.html`, page({
     title: `${s.name} — ${SITE.title}`,
     desc: s.summary,
-    active: '/browse/', body: skillPage(s), cls: 'p-skill', og: `/og-${s.name}.png`,
+    active: '/browse/', body: skillPage(s), cls: 'p-skill',
+    og: `/og-${s.name}.png`, path: `/s/${s.name}/`, jsonld: [skillLd(s)],
   }));
   write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary.slice(0, 64) }));
 }
@@ -469,12 +653,96 @@ write('og-agents.svg', ogSvg({ kicker: 'COMPATIBILITY', title: 'Eight agents', s
 
 write('CNAME', `${SITE.domain}\n`);
 write('.nojekyll', '');
-write('robots.txt', `User-agent: *\nAllow: /\nSitemap: ${SITE.url}/sitemap.xml\n`);
+
+// AI search engines are a first-class audience here: the whole point of the
+// project is being found by people asking an assistant how to do this.
+write('robots.txt', `User-agent: *
+Allow: /
+
+# AI search crawlers — explicitly welcome
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: ${SITE.url}/sitemap.xml
+`);
+
+const today = agentData.verified;
 write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${['/', '/browse/', '/agents/', ...skills.map((s) => `/s/${s.name}/`)]
-    .map((u) => `  <url><loc>${SITE.url}${u}</loc></url>`).join('\n')}
+${[['/', '1.0'], ['/browse/', '0.9'], ['/agents/', '0.9'], ...skills.map((s) => [`/s/${s.name}/`, '0.8'])]
+    .map(([u, pr]) => `  <url><loc>${SITE.url}${u}</loc><lastmod>${today}</lastmod><priority>${pr}</priority></url>`).join('\n')}
 </urlset>`);
+
+// llms.txt — the emerging convention for handing an AI assistant a clean map of
+// the site plus the facts it is most likely to be asked for.
+write('llms.txt', `# ${SITE.title}
+
+> Portable Agent Skills, MCP servers and Claude Code plugins for AI coding agents.
+> One SKILL.md folder runs unchanged in every tool that implements the Agent Skills
+> open standard. Free, MIT licensed, no account and no telemetry.
+> Made by Itqan Lab (${ORG_LD.url}), a design and technology studio.
+
+## What this is
+
+- An agent skill is a folder containing a SKILL.md file: YAML frontmatter with a name and
+  description, Markdown instructions, and optional scripts/, references/ and assets/ directories.
+- Agents load the name and description at startup and the full instructions only when a task
+  matches, so many skills cost almost no context until used.
+- The format is the Agent Skills specification, an open standard stewarded by the Agentic AI
+  Foundation: https://agentskills.io/specification
+
+## Pages
+
+- [Overview](${SITE.url}/): What agent skills are, the catalog, and how to install.
+- [Browse](${SITE.url}/browse/): All ${catalog.length} skills, MCP servers and plugins, searchable.
+- [Agents](${SITE.url}/agents/): Verified skill discovery paths per agent, with vendor sources.
+${skills.map((s) => `- [${s.name}](${SITE.url}/s/${s.name}/): ${s.summary}`).join('\n')}
+
+## Install
+
+- Any conformant agent: clone ${SITE.repo} and run ./scripts/install.sh
+  This writes to ~/.agents/skills/, the vendor-neutral path.
+- Claude Code: /plugin marketplace add itqanlab/agent-toolkit
+  then /plugin install <skill>@${SITE.marketplace}
+
+## Key facts
+
+- Verified on ${agentData.verified}: of ${agentData.agents.length} agents whose vendor documentation
+  was read directly, ${agentData.agents.filter((a) => a.neutral).length} read ~/.agents/skills/.
+- Claude Code is the exception. It reads ~/.claude/skills/, .claude/skills/ and installed plugins
+  only, so it installs from a plugin marketplace instead.
+- A further ${agentData.ecosystem.approx} tools implement the same standard, including
+  ${agentData.compatible.slice(0, 6).map((c) => c.name).join(', ')}.
+- Skills stay portable by referencing bundled files with paths relative to the skill root and by
+  keeping vendor-specific syntax out of the instruction body.
+- Everything is MIT licensed and free for commercial use.
+
+## Source
+
+- Repository: ${SITE.repo}
+- Specification: https://agentskills.io/specification
+- Full compatibility matrix with sources: ${SITE.repo}/blob/main/docs/COMPATIBILITY.md
+`);
 
 cpSync(join(HERE, 'static'), OUT, { recursive: true });
 

@@ -9,8 +9,12 @@
       "neutral": false,
       "channel": "marketplace",
       "install": "/plugin marketplace add itqanlab/agent-toolkit",
-      "userPaths": ["~/.claude/skills/"],
-      "projectPaths": [".claude/skills/"],
+      "userPaths": [
+        "~/.claude/skills/"
+      ],
+      "projectPaths": [
+        ".claude/skills/"
+      ],
       "note": "Reads only its own directories and installed plugins. Gets the marketplace instead, which is better here anyway: versioned installs and one-command updates.",
       "docs": "https://code.claude.com/docs/en/skills"
     },
@@ -20,8 +24,13 @@
       "vendor": "OpenAI",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "/etc/codex/skills"],
-      "projectPaths": [".agents/skills (cwd, parent, repo root)"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "/etc/codex/skills"
+      ],
+      "projectPaths": [
+        ".agents/skills (cwd, parent, repo root)"
+      ],
       "note": "Walks up from the working directory. Follows symlinked skill folders.",
       "docs": "https://learn.chatgpt.com/docs/build-skills"
     },
@@ -31,8 +40,18 @@
       "vendor": "Anysphere",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.cursor/skills/", "~/.claude/skills/", "~/.codex/skills/"],
-      "projectPaths": [".agents/skills/", ".cursor/skills/", ".claude/skills/", ".codex/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.cursor/skills/",
+        "~/.claude/skills/",
+        "~/.codex/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".cursor/skills/",
+        ".claude/skills/",
+        ".codex/skills/"
+      ],
       "note": "Also discovers skills in nested project subdirectories.",
       "docs": "https://cursor.com/docs/context/skills"
     },
@@ -42,8 +61,14 @@
       "vendor": "Google",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.gemini/skills/"],
-      "projectPaths": [".agents/skills/", ".gemini/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.gemini/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".gemini/skills/"
+      ],
       "note": "The neutral path takes precedence over the vendor path at both levels.",
       "docs": "https://geminicli.com/docs/cli/skills/"
     },
@@ -53,8 +78,15 @@
       "vendor": "GitHub",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.copilot/skills/"],
-      "projectPaths": [".agents/skills/", ".github/skills/", ".claude/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.copilot/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".github/skills/",
+        ".claude/skills/"
+      ],
       "note": "Same discovery in VS Code agent mode.",
       "docs": "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills"
     },
@@ -64,8 +96,16 @@
       "vendor": "SST",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.config/opencode/skills/", "~/.claude/skills/"],
-      "projectPaths": [".agents/skills/", ".opencode/skills/", ".claude/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.config/opencode/skills/",
+        "~/.claude/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".opencode/skills/",
+        ".claude/skills/"
+      ],
       "note": "Walks up from the working directory to the git worktree root.",
       "docs": "https://opencode.ai/docs/skills/"
     },
@@ -75,8 +115,15 @@
       "vendor": "Sourcegraph",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.config/agents/skills/", "~/.config/amp/skills/"],
-      "projectPaths": [".agents/skills/", ".claude/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.config/agents/skills/",
+        "~/.config/amp/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".claude/skills/"
+      ],
       "note": "Uses the first skill with a given frontmatter name, in documented precedence order.",
       "docs": "https://ampcode.com/manual"
     },
@@ -86,10 +133,125 @@
       "vendor": "Block",
       "neutral": true,
       "channel": "neutral",
-      "userPaths": ["~/.agents/skills/", "~/.config/goose/skills/", "~/.claude/skills/"],
-      "projectPaths": [".agents/skills/", ".goose/skills/", ".claude/skills/"],
+      "userPaths": [
+        "~/.agents/skills/",
+        "~/.config/goose/skills/",
+        "~/.claude/skills/"
+      ],
+      "projectPaths": [
+        ".agents/skills/",
+        ".goose/skills/",
+        ".claude/skills/"
+      ],
       "note": "Treats the neutral path as the recommended standard; vendor paths are fallbacks.",
       "docs": "https://goose-docs.ai/docs/guides/context-engineering/using-skills/"
     }
-  ]
+  ],
+  "compatible": [
+    {
+      "name": "pi",
+      "vendor": "badlogic",
+      "url": "https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md"
+    },
+    {
+      "name": "Junie",
+      "vendor": "JetBrains",
+      "url": "https://junie.jetbrains.com/docs/agent-skills.html"
+    },
+    {
+      "name": "Kiro",
+      "vendor": "AWS",
+      "url": "https://kiro.dev/docs/skills/"
+    },
+    {
+      "name": "Roo Code",
+      "vendor": "Roo",
+      "url": "https://docs.roocode.com/features/skills"
+    },
+    {
+      "name": "Factory",
+      "vendor": "Factory",
+      "url": "https://docs.factory.ai/cli/configuration/skills"
+    },
+    {
+      "name": "OpenHands",
+      "vendor": "OpenHands",
+      "url": "https://docs.openhands.dev/overview/skills"
+    },
+    {
+      "name": "Letta",
+      "vendor": "Letta",
+      "url": "https://docs.letta.com/letta-code/skills/"
+    },
+    {
+      "name": "TRAE",
+      "vendor": "ByteDance",
+      "url": "https://www.trae.ai/blog/trae_tutorial_0115"
+    },
+    {
+      "name": "Tabnine",
+      "vendor": "Tabnine",
+      "url": "https://docs.tabnine.com/main/getting-started/tabnine-cli/features/agent-skills"
+    },
+    {
+      "name": "Qodo",
+      "vendor": "Qodo",
+      "url": "https://www.qodo.ai/blog/how-i-use-qodos-agent-skills-to-auto-fix-issues-in-pull-requests/"
+    },
+    {
+      "name": "Mistral Vibe",
+      "vendor": "Mistral AI",
+      "url": "https://github.com/mistralai/mistral-vibe"
+    },
+    {
+      "name": "Snowflake Cortex Code",
+      "vendor": "Snowflake",
+      "url": "https://docs.snowflake.com/en/user-guide/cortex-code/extensibility#extensibility-skills"
+    },
+    {
+      "name": "Databricks Genie Code",
+      "vendor": "Databricks",
+      "url": "https://docs.databricks.com/aws/en/assistant/skills"
+    },
+    {
+      "name": "Laravel Boost",
+      "vendor": "Laravel",
+      "url": "https://laravel.com/docs/12.x/boost#agent-skills"
+    },
+    {
+      "name": "Spring AI",
+      "vendor": "Spring",
+      "url": "https://spring.io/blog/2026/01/13/spring-ai-generic-agent-skills/"
+    },
+    {
+      "name": "Pulumi Neo",
+      "vendor": "Pulumi",
+      "url": "https://www.pulumi.com/docs/ai/skills/"
+    },
+    {
+      "name": "Ona",
+      "vendor": "Ona",
+      "url": "https://ona.com/docs/ona/agents-md#skills-for-repository-specific-workflows"
+    },
+    {
+      "name": "Zed",
+      "vendor": "Zed",
+      "url": "https://agentskills.io/clients"
+    },
+    {
+      "name": "Hermes Agent",
+      "vendor": "Nous Research",
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/features/skills"
+    },
+    {
+      "name": "OpenClaw",
+      "vendor": "OpenClaw",
+      "url": "https://docs.openclaw.ai/tools/skills"
+    }
+  ],
+  "ecosystem": {
+    "showcase": "https://agentskills.io/clients",
+    "approx": "40+",
+    "note": "Agent Skills is an open standard stewarded by the Agentic AI Foundation. Any conformant tool reads the same SKILL.md."
+  }
 }
