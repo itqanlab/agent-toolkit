@@ -43,7 +43,7 @@ sh scripts/setup-deps.sh            # show the install command, ask, then run it
 
 It picks the right command for your machine (Homebrew, apt, dnf, pacman, zypper, apk, winget) and never installs anything without asking. Where there is no package manager it prints instructions you can follow yourself, including one that needs no admin rights.
 
-Publishing a site to Pages also uses [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), but there is nothing to install — it is fetched on demand through `npx`, which ships with Node, and receives the saved token so it needs no login of its own.
+Publishing to Pages or Workers also uses [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), but there is nothing to install — it is fetched on demand through `npx`, which ships with Node, and receives the saved token so it needs no login of its own.
 
 ## Setup
 
@@ -77,6 +77,9 @@ node scripts/cf.mjs workers
 node scripts/cf.mjs worker-deploy ./my-worker
 node scripts/cf.mjs worker-domain my-worker api.example.com
 node scripts/cf.mjs worker-domains
+
+node scripts/api.mjs search waf rule
+node scripts/api.mjs show "/zones/{zone_id}/rulesets" post
 ```
 
 `dns-remove` lists what it matched and refuses to delete without `--yes`.
@@ -120,6 +123,17 @@ node scripts/cf.mjs worker-domain my-worker api.example.com
 The directory needs a `wrangler.toml` naming the Worker and its entry file. Include `workers_dev = false` when it will live on your own domain — without it, a first deploy on a fresh account tries to register a `workers.dev` subdomain named after the folder and fails. `worker-deploy` checks for that before running and explains it.
 
 Unlike Pages, do not add a DNS record for a Worker hostname: `worker-domain` is the whole job and Cloudflare manages the record itself.
+
+## Anything not wrapped
+
+Cloudflare has about 2000 endpoints and `request()` reaches all of them with the same credential. The only hard part is knowing which one and what it wants, so the skill can look that up instead of guessing:
+
+```bash
+node scripts/api.mjs search waf rule
+node scripts/api.mjs show "/zones/{zone_id}/rulesets" post
+```
+
+It reads Cloudflare's own API description — downloaded once, cached next to the credentials — and resolves the internal references so the request body is readable rather than a pointer. This is the job the official Cloudflare MCP server does; doing it here means no second server, no OAuth, and it works in every agent rather than one.
 
 ## What it cannot do
 

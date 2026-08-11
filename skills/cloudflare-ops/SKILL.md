@@ -2,7 +2,7 @@
 name: cloudflare-ops
 description: "Connect a Cloudflare account once, then manage DNS records, subdomains, Pages sites, R2 buckets and Workers from the agent without opening the dashboard again. Setup is a two-minute guided flow that needs three checkboxes, not the 390-odd permissions Cloudflare would otherwise ask you to pick by hand. Works on macOS, Windows and Linux. Triggers: 'connect my Cloudflare', 'add a subdomain', 'point a domain at my server', 'create a DNS record', 'set up Cloudflare Pages', 'add a custom domain to Pages', 'create an R2 bucket', 'check if DNS has propagated', 'list my domains', 'deploy this worker', 'publish my site', 'cloudflare'."
 license: MIT
-compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a site to Pages or a Worker additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login."
+compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a site to Pages or a Worker additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login. Endpoint lookup downloads Cloudflare's API description once (about 22 MB) and caches it."
 metadata:
   author: itqanlab
   version: 1.0.0
@@ -10,7 +10,7 @@ metadata:
 
 # Cloudflare
 
-Everything here runs through two scripts. `scripts/setup.mjs` connects an account; `scripts/cf.mjs` does the work.
+Everything here runs through three scripts. `scripts/setup.mjs` connects an account, `scripts/cf.mjs` does the work, and `scripts/api.mjs` looks up any endpoint the others do not wrap.
 
 ## Who you are doing this for
 
@@ -97,7 +97,26 @@ Unlike Pages, **do not create a DNS record for a Worker hostname** — `worker-d
 
 `pages-domain` does two things on purpose: attaches the domain to the project **and** creates the DNS record. Doing only one leaves the domain stuck at "pending" forever, which is the most common way this goes wrong. It replaces any existing record for that hostname, and always creates it proxied, because Cloudflare has to be in the request path to serve a Pages site and its certificate.
 
-Anything not covered by a command is a direct API call; `references/playbooks.md` shows the pattern.
+## Anything not wrapped above
+
+The commands cover the everyday work. Cloudflare has about 2000 endpoints, and `request()` from `scripts/cf.mjs` reaches all of them with the same credential — so the only real question is which endpoint, and what it wants in the body.
+
+**Do not guess that.** Look it up:
+
+```
+node scripts/api.mjs search waf rule          find endpoints
+node scripts/api.mjs show <path> <method>     parameters and request body
+```
+
+It reads Cloudflare's own API description, cached alongside the credentials after a one-off download, and resolves the internal references so the fields are actually readable. Then:
+
+```js
+import { request, findZone } from './scripts/cf.mjs';
+const zone = await findZone('app.example.com');
+await request(`/zones/${zone.id}/rulesets`, { method: 'POST', body: { /* from `show` */ } });
+```
+
+`references/playbooks.md` shows the same pattern in context.
 
 ## Before changing anything
 
