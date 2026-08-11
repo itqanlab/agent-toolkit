@@ -2,10 +2,10 @@
 name: watch-video
 description: "Watch / analyze a video or audio source the agent cannot natively play — a URL from YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, LinkedIn or 1750+ other sites, or a local file. Downloads it, pulls captions (or transcribes locally when there are none), and extracts frames so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', 'transcribe this video', '/watch-video'."
 license: MIT
-compatibility: Requires ffmpeg, and yt-dlp for URL sources. Run scripts/setup.sh to install either. An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
+compatibility: Runs on macOS and Linux — both scripts are bash. On Windows use WSL or Git Bash; there is no native PowerShell path. Requires ffmpeg, and yt-dlp for URL sources; run scripts/setup.sh to check for either (--check) or install them (--yes). An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # watch-video

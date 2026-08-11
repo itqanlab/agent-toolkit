@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "itqan",
-  "description": "Itqan Lab agent toolkit — portable skills, MCP servers, subagents, hooks and commands. No project or brand coupling.",
+  "description": "Itqan Lab agent toolkit \u2014 portable skills, MCP servers, subagents, hooks and commands. No project or brand coupling.",
   "owner": {
     "name": "Itqan Lab",
     "email": "hello@itqanlab.com",
@@ -66,8 +66,8 @@
     {
       "name": "watch-video",
       "source": "./skills/watch-video",
-      "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
-      "version": "1.1.0",
+      "description": "Let the agent watch a video \u2014 any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
+      "version": "1.1.1",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"

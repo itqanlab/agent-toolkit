@@ -1,7 +1,7 @@
 {
   "name": "watch-video",
   "displayName": "Watch Video",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
   "author": {
     "name": "Itqan Lab",
