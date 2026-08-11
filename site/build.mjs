@@ -25,7 +25,7 @@ const SITE = {
   repo: 'https://github.com/itqanlab/agent-toolkit',
   org: 'https://github.com/itqanlab',
   marketplace: 'itqan',
-  tagline: 'Write it once. Every agent finds it.',
+  tagline: 'Just ask. Your agent has the tool.',
 };
 
 /* ---------------------------------------------------------------- read repo */
@@ -145,7 +145,7 @@ function tree(active) {
   return `<nav class="tree" aria-label="Sections">
     <a class="tree-root" href="/"><span class="tree-mark"></span>agent-toolkit</a>
     ${rows}
-    <a class="tree-node tree-out" href="${SITE.repo}"><span class="tree-glyph">  </span><span>github ↗</span></a>
+    <a class="tree-node tree-out" href="${SITE.repo}" target="_blank" rel="noopener"><span class="tree-glyph">  </span><span>github ↗</span></a>
   </nav>`;
 }
 
@@ -328,15 +328,22 @@ function card(item) {
 
 function home() {
   const featured = skills.slice(0, 6).map(card).join('');
+  // The trigger phrases are real: each skill declares them in its own frontmatter.
+  // They are also the actual interface, so they belong in the hero.
+  const asks = skills.flatMap((s) => s.triggers.filter((t) => t.length > 12 && !t.startsWith('/'))
+    .map((t) => ({ say: t, skill: s.name, deps: s.deps })))
+    .sort((a, b) => b.say.length - a.say.length);
+  const first = asks[0] || { say: 'watch this video and tell me why the hook works', skill: skills[0]?.name || '', deps: [] };
+
   return `
 <section class="hero">
   <div class="hero-copy">
-    <p class="eyebrow">Agent Skills · open standard</p>
-    <h1 class="hero-h">Write it once.<br><em>Every agent</em><br>finds it.</h1>
-    <p class="lede">An agent skill is a folder with a <code>SKILL.md</code> in it — instructions plus
-      scripts that an AI coding agent loads when a task calls for them. Because the format is an
-      open standard, one folder works in Claude Code, Codex, Cursor, Gemini CLI, Copilot and
-      ${agentData.ecosystem.approx} other tools without a fork, a rewrite, or a build step.</p>
+    <p class="eyebrow">A toolkit for AI coding agents</p>
+    <h1 class="hero-h">Just ask.<br>Your agent<br><em>has the tool.</em></h1>
+    <p class="lede">Install once and your agent picks up new abilities it did not have before —
+      no commands to memorise, no wiring. Ask in plain language and it reaches for the right one.
+      Works in Claude Code, Codex, Cursor, Gemini CLI, Copilot and
+      ${agentData.ecosystem.approx} more, because it is built on an open standard.</p>
     <div class="cmds">
       <button class="cmd" data-copy="./scripts/install.sh">
         <span class="cmd-k">any agent</span>
@@ -348,11 +355,23 @@ function home() {
       </button>
     </div>
   </div>
-  ${convergence()}
+
+  <figure class="say" data-asks='${esc(JSON.stringify(asks))}'>
+    <div class="say-turn">
+      <span class="say-who">you say</span>
+      <p class="say-line" id="say-line">${esc(first.say)}</p>
+    </div>
+    <div class="say-turn say-turn-agent">
+      <span class="say-who">your agent reaches for</span>
+      <p class="say-skill"><a id="say-skill" href="/s/${esc(first.skill)}/">${esc(first.skill)}</a></p>
+      <p class="say-deps" id="say-deps">${first.deps.map((d) => esc(d)).join(' · ')}</p>
+    </div>
+    <figcaption class="say-cap">Real trigger phrases, read from each skill's own frontmatter.</figcaption>
+  </figure>
 </section>
 
 <section class="band">
-  <h2 class="h2"><span class="h2-n">01</span> The catalog</h2>
+  <h2 class="h2"><span class="h2-n">01</span> What's in the bag</h2>
   <p class="band-lede">Generated from the repository on every push. What you see here is what ships.</p>
   <div class="grid">${featured}</div>
   <p class="more"><a href="/browse/">Browse all ${catalog.length} →</a></p>
@@ -360,7 +379,28 @@ function home() {
 
 <section class="band band-split">
   <div>
-    <h2 class="h2"><span class="h2-n">02</span> Three tiers</h2>
+    <h2 class="h2"><span class="h2-n">02</span> Who it's for</h2>
+    <p class="band-lede">If you already work with an AI coding agent, this is a bag of tools it can
+      reach into. If you build them, it is a worked example of the standard.</p>
+  </div>
+  <dl class="tiers">
+    <div class="tier"><dt>You use one agent</dt><dd>Install once. Your agent gains abilities you can ask for in plain language, and nothing changes about how you work.</dd></div>
+    <div class="tier"><dt>You switch between agents</dt><dd>The same tools follow you. Move from Claude Code to Cursor to Codex and your setup comes with you, unchanged.</dd></div>
+    <div class="tier"><dt>You work in a team</dt><dd>Commit the skills to a repository and everyone who clones it gets the same tools, whichever agent each person prefers.</dd></div>
+    <div class="tier"><dt>You build tooling</dt><dd>Every skill here is a working reference for the spec, with a validator that enforces portability before a commit lands.</dd></div>
+  </dl>
+</section>
+
+<section class="band">
+  <h2 class="h2"><span class="h2-n">03</span> Why it works everywhere</h2>
+  <p class="band-lede">A skill is a folder with a <code>SKILL.md</code> in it. Agents look for those
+    folders in a shared location, so one copy serves all of them. Here is where each one actually looks.</p>
+  ${convergence()}
+</section>
+
+<section class="band band-split">
+  <div>
+    <h2 class="h2"><span class="h2-n">04</span> Three tiers</h2>
     <p class="band-lede">Split by how far each one travels, not by taste.</p>
   </div>
   <dl class="tiers">
@@ -371,7 +411,7 @@ function home() {
 </section>
 
 <section class="band">
-  <h2 class="h2"><span class="h2-n">03</span> Questions</h2>
+  <h2 class="h2"><span class="h2-n">05</span> Questions</h2>
   <div class="faq">${FAQ.map((f, i) => `
     <details class="qa"${i === 0 ? ' open' : ''}>
       <summary><h3>${esc(f.q)}</h3></summary>
@@ -437,7 +477,7 @@ function colophon() {
 <section class="colophon">
   <div class="colo-mark"><img src="/logo.svg" alt="Itqan Lab" width="44" height="44"></div>
   <div class="colo-body">
-    <p class="colo-lead">Built at <a href="https://itqanlab.com">Itqan Lab</a>, a design and technology studio.</p>
+    <p class="colo-lead">Built at <a href="https://itqanlab.com" target="_blank" rel="noopener">Itqan Lab</a>, a design and technology studio.</p>
     <p class="colo-ar"><span lang="ar" dir="rtl">إتقان</span> — <em>itqan</em>, the Arabic word for mastery:
       doing a thing precisely, and completely.</p>
     <p class="colo-meta">Open source under MIT · agent paths re-verified ${agentData.verified} ·
@@ -445,8 +485,8 @@ function colophon() {
   </div>
 </section>
 <footer class="foot">
-  <p><a href="${SITE.repo}">github.com/itqanlab/agent-toolkit</a></p>
-  <p><a href="https://agentskills.io/specification">Agent Skills spec</a> · <a href="/llms.txt">llms.txt</a></p>
+  <p><a href="${SITE.repo}" target="_blank" rel="noopener">github.com/itqanlab/agent-toolkit</a></p>
+  <p><a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills spec</a> · <a href="/llms.txt">llms.txt</a></p>
 </footer>`;
 }
 
@@ -470,7 +510,7 @@ function browse() {
 </div>
 <div class="grid" id="results">${catalog.map(card).join('')}</div>
 <p class="empty" id="empty" hidden>Nothing matches that. <button class="linkish" id="clear">Clear filters</button></p>
-<p class="more"><a href="${SITE.repo}/issues">Propose a skill →</a></p>
+<p class="more"><a href="${SITE.repo}/issues" target="_blank" rel="noopener">Propose a skill →</a></p>
 ${colophon()}`;
 }
 
@@ -487,7 +527,7 @@ function agentsPage() {
       <dt>project</dt><dd>${a.projectPaths.map((p) => `<code>${esc(p)}</code>`).join('')}</dd>
     </dl>
     <p class="agent-note">${esc(a.note)}</p>
-    <p class="agent-doc"><a href="${a.docs}">Vendor documentation ↗</a></p>
+    <p class="agent-doc"><a href="${a.docs}" target="_blank" rel="noopener">Vendor documentation ↗</a></p>
   </article>`).join('');
   const onCount = agentData.agents.filter((a) => a.neutral).length;
   return `
@@ -505,9 +545,9 @@ function agentsPage() {
 <p class="band-lede">These tools read the same <code>SKILL.md</code>. We have not verified their install
   paths ourselves, so they are listed rather than documented — follow the vendor link for placement.</p>
 <ul class="compat">${agentData.compatible.map((c) => `
-  <li><a href="${c.url}"><span class="compat-n">${esc(c.name)}</span><span class="compat-v">${esc(c.vendor)}</span></a></li>`).join('')}
+  <li><a href="${c.url}" target="_blank" rel="noopener"><span class="compat-n">${esc(c.name)}</span><span class="compat-v">${esc(c.vendor)}</span></a></li>`).join('')}
 </ul>
-<p class="more"><a href="${agentData.ecosystem.showcase}">Full ecosystem showcase →</a></p>
+<p class="more"><a href="${agentData.ecosystem.showcase}" target="_blank" rel="noopener">Full ecosystem showcase →</a></p>
 ${colophon()}`;
 }
 
@@ -539,7 +579,7 @@ ${s.triggers.length ? `<section class="band">
   <p class="band-lede">The agent matches these on its own. No command to remember.</p>
 </section>` : ''}
 <section class="band prose">${body}</section>
-<p class="more"><a href="${s.source}">Source on GitHub ↗</a></p>
+<p class="more"><a href="${s.source}" target="_blank" rel="noopener">Source on GitHub ↗</a></p>
 ${colophon()}`;
 }
 

@@ -116,3 +116,34 @@ if (q) {
   // Another tab changed the preference.
   addEventListener('storage', (e) => { if (e.key === 'theme') paint(read()); });
 }
+
+/* hero: cycle through real trigger phrases ------------------------------- */
+
+{
+  const panel = document.querySelector('.say');
+  const line = document.getElementById('say-line');
+  const skill = document.getElementById('say-skill');
+  const deps = document.getElementById('say-deps');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (panel && line && !still) {
+    let asks = [];
+    try { asks = JSON.parse(panel.dataset.asks || '[]'); } catch { /* keep the rendered one */ }
+
+    if (asks.length > 1) {
+      let i = 0;
+      setInterval(() => {
+        i = (i + 1) % asks.length;
+        const a = asks[i];
+        line.classList.add('is-out');
+        setTimeout(() => {
+          line.textContent = a.say;
+          skill.textContent = a.skill;
+          skill.href = `/s/${a.skill}/`;
+          deps.textContent = (a.deps || []).join(' · ');
+          line.classList.remove('is-out');
+        }, 280);
+      }, 3800);
+    }
+  }
+}

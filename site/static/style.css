@@ -476,3 +476,40 @@ main { min-width: 0; padding: 0 var(--gut); }
   .rail-meta { display: none; }
   .colophon { flex-direction: column; gap: 14px; }
 }
+
+/* ------------------------------------------------------- hero: the ask */
+/* The two voices again: what a person says is set in the display face,
+   what the machine reaches for is set in mono. */
+
+.say {
+  margin: 0; padding: 26px 28px 22px;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel);
+  position: relative; overflow: hidden;
+}
+.say::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--amber);
+}
+.say-turn + .say-turn { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+.say-who {
+  display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 10px;
+}
+.say-line {
+  margin: 0; font-family: var(--disp); font-weight: 500;
+  font-size: clamp(1.25rem, 2.1vw, 1.72rem); line-height: 1.3;
+  letter-spacing: -.018em; color: var(--ink); min-height: 2.6em;
+  transition: opacity .28s;
+}
+.say-line::before { content: '“'; color: var(--amber); }
+.say-line::after  { content: '”'; color: var(--amber); }
+.say-line.is-out { opacity: 0; }
+
+.say-skill { margin: 0; font-family: var(--mono); font-size: 1.12rem; font-weight: 700; }
+.say-skill a { color: var(--amber); text-decoration: none; }
+.say-skill a:hover { text-decoration: underline; }
+.say-deps { margin: 5px 0 0; font-family: var(--mono); font-size: 11px; color: var(--slate); }
+.say-cap { margin-top: 18px; font-family: var(--mono); font-size: 10px; color: var(--faint); }
+
+/* the mechanism, demoted to supporting proof */
+.band .rig { margin-top: 26px; max-width: 760px; }
