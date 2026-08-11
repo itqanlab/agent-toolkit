@@ -11,16 +11,19 @@
 #   --end SEC         clip end
 #   --lang CODE       caption language pattern (default "en.*"; e.g. "ar.*", "all")
 #   --scenes          sample on scene changes instead of a fixed interval
-#   --whisper         transcribe locally when the source ships no captions
+#   --no-whisper      skip local transcription even if an engine is installed
+#   --whisper-model M speed/accuracy trade (default: base; try large-v3)
+#   --yes             answer prompts automatically, incl. installing whisper
 #   --cookies BROWSER use browser cookies for login-gated videos (chrome, firefox…)
 #   --playlist N      allow a playlist and take the first N entries (default: single)
 #   --outdir DIR      where to write (default: a fresh temp dir)
 #   --keep-video      do not delete the downloaded video afterwards
 set -e
 
+case "${1:-}" in -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0;; esac
 SRC="$1"; shift || true
 FRAMES=30; WIDTH=480; START=""; END=""; OUTDIR=""; LANG_PAT="en.*"
-SCENES=0; WHISPER=0; COOKIES=""; PLAYLIST=0; KEEP=0
+SCENES=0; NO_WHISPER=0; ASSUME_YES=0; WHISPER_MODEL=""; COOKIES=""; PLAYLIST=0; KEEP=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -30,7 +33,10 @@ while [ $# -gt 0 ]; do
     --end)      END="$2";    shift 2;;
     --lang)     LANG_PAT="$2"; shift 2;;
     --scenes)   SCENES=1; shift;;
-    --whisper)  WHISPER=1; shift;;
+    --no-whisper)     NO_WHISPER=1; shift;;
+    --whisper-model)  WHISPER_MODEL="$2"; shift 2;;
+    --yes|-y)         ASSUME_YES=1; shift;;
+    --whisper)        shift;;   # accepted for compatibility; now the default
     --cookies)  COOKIES="$2"; shift 2;;
     --playlist) PLAYLIST="$2"; shift 2;;
     --outdir)   OUTDIR="$2"; shift 2;;
@@ -103,18 +109,63 @@ DIM=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of
 HAS_VIDEO=1
 [ -z "$DIM" ] && HAS_VIDEO=0
 
-# --- transcript fallback ---------------------------------------------------
-# Only when the source shipped no captions and the caller opted in, because
-# transcribing is much slower than downloading a caption file.
-if [ -z "$SRT" ] && [ "$WHISPER" -eq 1 ]; then
+# --- getting a transcript --------------------------------------------------
+# Cheapest source first. A caption file the publisher already wrote beats
+# anything we can generate, in both speed and accuracy.
+#
+#   1. captions in the requested language
+#   2. captions in any language the source offers
+#   3. local speech-to-text, if it is installed
+
+# 2. The requested language missed, but the source may still have captions in
+# some other language. Fetching just the subtitles is cheap — no media transfer.
+if [ -z "$SRT" ] && [ "$IS_URL" -eq 1 ] && [ "$LANG_PAT" != "all" ]; then
+  yt-dlp -q --no-warnings --skip-download --no-playlist \
+    --write-auto-subs --write-subs --sub-lang "all" --convert-subs srt \
+    -o "$OUTDIR/video.%(ext)s" "$SRC" >/dev/null 2>&1 || true
+  SRT="$(ls "$OUTDIR"/video*.srt 2>/dev/null | head -1 || true)"
+  [ -n "$SRT" ] && echo "no '$LANG_PAT' captions; using $(basename "$SRT")" >&2
+fi
+
+# 3. Still nothing. Transcribe locally when an engine is present — having
+# installed one is itself the opt-in, so this does not need a flag.
+if [ -z "$SRT" ] && [ "$NO_WHISPER" -eq 0 ]; then
   W=""
-  for c in mlx_whisper whisper; do command -v "$c" >/dev/null 2>&1 && { W="$c"; break; }; done
+  for c in mlx_whisper whisper-ctranslate2 whisper; do command -v "$c" >/dev/null 2>&1 && { W="$c"; break; }; done
+
+  if [ -z "$W" ]; then
+    # Offer rather than just complain. Non-interactive callers get the command.
+    echo "This source has no captions." >&2
+    if [ -t 0 ] && [ "$ASSUME_YES" -eq 0 ]; then
+      printf 'Install a local transcriber (whisper) to get one? [y/N] ' >&2
+      read -r reply
+      case "$reply" in [yY]*) bash "$HERE/setup.sh" --with-whisper --yes >&2 || true;; esac
+    elif [ "$ASSUME_YES" -eq 1 ]; then
+      echo "Installing a local transcriber (--yes given)…" >&2
+      bash "$HERE/setup.sh" --with-whisper --yes >&2 || true
+    else
+      echo "For a transcript, install one:  bash \"$HERE/setup.sh\" --with-whisper" >&2
+    fi
+    for c in mlx_whisper whisper-ctranslate2 whisper; do command -v "$c" >/dev/null 2>&1 && { W="$c"; break; }; done
+  fi
+
   if [ -n "$W" ]; then
-    echo "no captions on the source — transcribing locally with $W (this takes a while)" >&2
-    "$W" "$VID" --output_dir "$OUTDIR" --output_format srt >/dev/null 2>&1 || true
+    echo "transcribing locally with $W — slower than a caption file, please wait" >&2
+    # The engines do not share a flag convention. mlx_whisper hyphenates
+    # (--output-dir); whisper and whisper-ctranslate2 use underscores
+    # (--output_dir). Getting this wrong fails silently and looks exactly like
+    # "this video has no captions", so it is spelled out per engine.
+    case "$W" in
+      mlx_whisper)
+        MODEL="${WHISPER_MODEL:-mlx-community/whisper-base-mlx}"
+        "$W" "$VID" --output-dir "$OUTDIR" --output-format srt --model "$MODEL" >&2 \
+          || echo "transcription failed" >&2;;
+      *)
+        MODEL="${WHISPER_MODEL:-base}"
+        "$W" "$VID" --output_dir "$OUTDIR" --output_format srt --model "$MODEL" >&2 \
+          || echo "transcription failed" >&2;;
+    esac
     SRT="$(ls "$OUTDIR"/*.srt 2>/dev/null | head -1 || true)"
-  else
-    echo "no captions, and no local whisper installed — run: bash \"$HERE/setup.sh\" --with-whisper" >&2
   fi
 fi
 
@@ -155,7 +206,7 @@ echo "DURATION: ${DUR}s${DIM:+  DIMS: $DIM}"
 [ "$HAS_VIDEO" -eq 0 ] && echo "NOTE: audio-only source — transcript only, no frames"
 echo "OUTDIR: $OUTDIR"
 if [ -n "$SRT" ]; then echo "TRANSCRIPT (srt): $SRT"; else
-  echo "TRANSCRIPT: none (source has no captions; add --whisper to transcribe locally)"; fi
+  echo "TRANSCRIPT: none (no captions found and no local transcriber available)"; fi
 SAMPLING=""; [ "$SCENES" -eq 1 ] && [ "$FRAME_COUNT" -gt 0 ] && SAMPLING=" (scene-sampled)"
 echo "FRAMES: ${FRAME_COUNT}${SAMPLING}"
 ls "$OUTDIR"/frame_*.jpg 2>/dev/null || true
