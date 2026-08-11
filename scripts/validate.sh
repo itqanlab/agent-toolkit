@@ -92,7 +92,9 @@ for skill_dir in "$REPO_ROOT"/skills/*/; do
     [ -z "$ref" ] && continue
     if [ ! -f "${skill_dir}${ref}" ]; then
       err "SKILL.md references '$ref' which does not exist in the skill directory"
-    elif [ ! -x "${skill_dir}${ref}" ]; then
+    elif [ ! -x "${skill_dir}${ref}" ] && case "$ref" in scripts/*) true;; *) false;; esac; then
+      # Only scripts are executed. references/ and assets/ are read, and marking
+      # a markdown file executable would be wrong.
       warn "'$ref' is not executable (chmod +x), which some agents require"
     fi
   done < <(grep -oE '(scripts|references|assets)/[A-Za-z0-9._/-]+' "$skill_md" | sort -u)
