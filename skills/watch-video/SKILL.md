@@ -1,46 +1,82 @@
 ---
 name: watch-video
-description: "Watch / analyze a video the agent cannot natively play — a YouTube/TikTok/etc URL or a local video file. Downloads it (yt-dlp), pulls captions, and extracts frames (ffmpeg) so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', '/watch-video'."
+description: "Watch / analyze a video or audio source the agent cannot natively play — a URL from YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, LinkedIn or 1750+ other sites, or a local file. Downloads it, pulls captions (or transcribes locally when there are none), and extracts frames so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', 'transcribe this video', '/watch-video'."
 license: MIT
-compatibility: Requires ffmpeg, and yt-dlp for URL sources. Needs network access to download remote videos.
+compatibility: Requires ffmpeg, and yt-dlp for URL sources. Run scripts/setup.sh to install either. Optional local whisper enables transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # watch-video
 
-Let the agent "watch" a video by turning it into a transcript + frames it can Read.
+Let the agent "watch" a video by turning it into a transcript plus frames it can Read.
 
 ## When to use
-- User shares a video URL (YouTube, Shorts, TikTok, Reels, Vimeo, X, etc.) or a local file and wants it watched, analyzed, summarized, or reverse-engineered (hook, pacing, on-screen text, editing style, format).
-- You need to inspect the visual content of a video, not just its metadata.
+- Someone shares a video URL or a local file and wants it watched, analyzed, summarized, or reverse-engineered — hook, pacing, on-screen text, editing style, format.
+- You need the visual or spoken content of a video, not just its metadata.
+- Also works on audio-only sources, in which case you get a transcript and no frames.
 
-## Requirements
-- `ffmpeg` — required. macOS: `brew install ffmpeg`. Debian/Ubuntu: `apt install ffmpeg`.
-- `yt-dlp` — required only for URLs (local files skip it). `brew install yt-dlp` / `pipx install yt-dlp`.
-- No API keys. Captions come from the platform's own subtitles (auto or uploaded); if none exist, you get frames only.
+## Setup
+
+Check and install what this skill needs:
+
+```
+bash scripts/setup.sh --check          # report only, installs nothing
+bash scripts/setup.sh                  # shows a plan, asks, then installs
+bash scripts/setup.sh --yes            # non-interactive, for agent use
+bash scripts/setup.sh --with-whisper   # also install local speech-to-text
+```
+
+It detects the platform and package manager (Homebrew, apt, dnf, pacman, zypper, apk, pipx/pip) and prints every command before running it. Nothing installs without a confirmation or an explicit `--yes`.
+
+If a dependency is missing when you run the main script, it will point you here.
 
 ## How to use
-1. Run the bundled script `scripts/watch.sh` (path is relative to this skill's directory). It prints a manifest with the transcript path + frame paths:
+
+1. Run the script. It prints a manifest with the transcript path and frame paths:
    ```
-   bash scripts/watch.sh "<url-or-path>" [--frames N] [--width W] [--start SEC] [--end SEC] [--lang CODE] [--outdir DIR]
+   bash scripts/watch.sh "<url-or-path>" [options]
    ```
-   - `--frames` target frame count (default 30, cap 60). More frames = finer temporal detail, more tokens to Read.
-   - `--start/--end` to focus on a time range (seconds).
-   - `--lang` caption language pattern (default `en.*`; e.g. `ar.*`, `es.*`, or `all`).
-2. **Read the transcript** (the `.srt` path in the manifest), if present.
+2. **Read the transcript** — the `.srt` path in the manifest, if present.
 3. **Read the frames** in order (`frame_001.jpg`, `frame_002.jpg`, …) — the visual track.
-4. Synthesize: answer the user's question, or describe hook (first ~1s), pacing/cuts, on-screen text/subtitles, format (letterbox vs full-bleed), branding, and anything notable.
+4. Synthesize: answer the question, or describe the hook (first ~1s), pacing and cuts, on-screen text, format (letterbox vs full-bleed), branding, and anything notable.
 
-`scripts/watch.sh` sits next to this `SKILL.md`. If the working directory is elsewhere, use the absolute path of this skill's directory — the script has no dependency on where it is invoked from.
+### Options
 
-## Tips
-- Shorts/Reels (<60s): 30 frames ≈ ~1 frame every 1–2s — plenty. Long videos: raise `--frames` or use `--start/--end` to sample a section.
-- To compare several videos (e.g. "what makes the top performers work"), run once per URL and read across the frame sets.
-- Frames are downscaled (default 480px wide) to stay token-cheap; raise `--width` only if you must read fine text in-frame.
-- Output lands in a temp dir by default; pass `--outdir` to keep it alongside project files.
+| Option | Default | What it does |
+| :-- | :-- | :-- |
+| `--frames N` | 30 (max 60) | Target frame count. More frames = finer detail, more tokens to read |
+| `--width W` | 480 | Frame width in px. Raise only to read fine on-screen text |
+| `--start SEC` `--end SEC` | — | Sample a time range only. Use this on long videos |
+| `--lang CODE` | `en.*` | Caption language pattern, e.g. `ar.*`, `es.*`, `all` |
+| `--scenes` | off | Sample one frame per visual cut instead of at a fixed interval |
+| `--whisper` | off | Transcribe locally when the source has no captions |
+| `--cookies BROWSER` | — | Use browser cookies for login-gated videos (`chrome`, `firefox`, …) |
+| `--playlist N` | single | Allow a playlist URL and take the first N entries |
+| `--outdir DIR` | temp dir | Where frames and transcript land |
+| `--keep-video` | off | Keep the downloaded video instead of deleting it |
+
+## Choosing options
+
+**Short clips (under 60s).** The default 30 frames is roughly one every 1–2s. Plenty.
+
+**Long videos.** Raise `--frames`, or better, use `--start`/`--end` to sample the section that matters. The whole file downloads before framing, so narrowing the range does not skip the download but does keep the frame count meaningful.
+
+**Edited video with cuts.** `--scenes` gives one frame per visual cut, so you see the shots that actually exist rather than arbitrary samples across them. It falls back to even sampling automatically when a source has too few cuts to be useful, such as a static screencast or a single-shot talking head.
+
+**No captions.** Many sources ship none. Add `--whisper` to transcribe locally — accurate, but much slower than downloading a caption file, so it is opt-in.
+
+**Login-gated or age-restricted.** `--cookies chrome` reuses a browser session you are already signed into. Only use it on accounts and content you have access to.
+
+**Comparing several videos.** Run once per URL into separate `--outdir` directories, then read across the frame sets.
+
+## What it accepts
+
+Any source yt-dlp supports — 1750+ sites including YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, Dailymotion, Bilibili, SoundCloud and LinkedIn — plus direct media URLs and local files. Audio-only sources return a transcript with no frames.
 
 ## Notes
-- This reads publicly accessible videos. It does not bypass logins, paywalls, or DRM.
-- Large/long videos download fully before framing; prefer `--start/--end` for long sources.
+- Reads publicly accessible media. It does not bypass paywalls or DRM. `--cookies` reuses your own session; it does not defeat access control.
+- A playlist URL downloads a single video unless you pass `--playlist N`.
+- Downloaded video is deleted after framing unless you pass `--keep-video`. Frames and transcript remain.
+- If a source that used to work stops downloading, the usual cause is an out-of-date yt-dlp. `scripts/setup.sh` will update it.
