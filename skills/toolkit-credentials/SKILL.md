@@ -1,6 +1,6 @@
 ---
 name: toolkit-credentials
-description: Shared credential setup and storage for any skill that needs an API key or token. Walks a user of any experience level through getting a credential from the provider, storing it in one standard place that works on macOS, Windows and Linux, and verifying it — without the secret ever being typed into the conversation. Other skills call this instead of inventing their own key handling. Triggers, 'set up my credentials', 'connect my account', 'add an API key', 'where are my tokens stored', 'the skill says my credential is missing', 'toolkit credentials'.
+description: "Shared credential setup and storage for any skill that needs an API key or token. Walks a user of any experience level through getting a credential from the provider, storing it in one standard place that works on macOS, Windows and Linux, and verifying it — without the secret ever being typed into the conversation. Other skills call this instead of inventing their own key handling. Triggers: 'set up my credentials', 'connect my account', 'add an API key', 'where are my tokens stored', 'the skill says my credential is missing', 'toolkit credentials'."
 license: MIT
 compatibility: Requires Node 18 or newer — every script here is written in it. Run scripts/setup.sh (or scripts/setup.ps1 on Windows) to check for Node and install it if it is missing. Nothing else is needed; network access is only whatever the provider being connected requires.
 metadata:

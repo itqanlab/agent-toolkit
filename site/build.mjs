@@ -62,8 +62,13 @@ const unquote = (v) => v.replace(/^["']|["']$/g, '').trim();
 
 // Triggers are written into the description as: Triggers: 'a', 'b', 'c'.
 // Pulling them out gives the catalog real search terms instead of invented tags.
+//
+// The separator is matched loosely. A skill that writes "Triggers," instead of
+// "Triggers:" is following the convention in spirit, and silently dropping its
+// whole trigger list — which is what the page leads with — is far worse than
+// accepting a comma. validate.sh warns when the canonical form is not used.
 function splitDescription(desc = '') {
-  const i = desc.search(/Triggers?:/i);
+  const i = desc.search(/Triggers?\s*[:,—-]/i);
   if (i === -1) return { summary: desc.trim(), triggers: [] };
   const summary = desc.slice(0, i).trim();
   const triggers = [...desc.slice(i).matchAll(/'([^']+)'/g)].map((m) => m[1]);
@@ -605,9 +610,12 @@ function skillPage(s) {
   // table rather than letting it arrive as generic prose.
   const optTable = usage && usage.body.match(/\|[\s\S]*\|/);
 
+  // "Say this" leads. Most people arriving here will never type a command —
+  // they ask their agent — so the page opens with the sentences that work, and
+  // the install step follows for whoever is actually setting the machine up.
   const nav = [
-    ['install', 'Install'],
     s.triggers.length ? ['say', 'Say this'] : null,
+    ['install', 'Install'],
     setup ? ['requirements', 'Requirements'] : null,
     optTable ? ['options', 'Options'] : null,
     examples ? ['examples', 'Examples'] : null,
@@ -634,6 +642,14 @@ function skillPage(s) {
   ${nav.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
 </nav>
 
+${s.triggers.length ? `<section class="band" id="say">
+  <h2 class="sec-h"><span class="sec-n">Say this</span> you do not type commands, you ask</h2>
+  <ul class="triggers">${s.triggers.map((t) => `<li>“${esc(t)}”</li>`).join('')}</ul>
+  <p class="band-lede">Once it is installed, that is the whole interface. Your agent picks the skill
+  up on its own and runs whatever it needs to. The commands further down are there for anyone who
+  would rather drive it themselves.</p>
+</section>` : ''}
+
 <section class="band" id="install">
   <h2 class="sec-h"><span class="sec-n">Install</span> pick your agent</h2>
   <div class="cmds cmds-wide">
@@ -645,11 +661,6 @@ function skillPage(s) {
     </button>
   </div>
 </section>
-
-${s.triggers.length ? `<section class="band" id="say">
-  <h2 class="sec-h"><span class="sec-n">Say this</span> the agent matches on its own</h2>
-  <ul class="triggers">${s.triggers.map((t) => `<li>“${esc(t)}”</li>`).join('')}</ul>
-</section>` : ''}
 
 ${setup ? `<section class="band" id="requirements">
   <h2 class="sec-h"><span class="sec-n">Requirements</span> what to install, and why</h2>
