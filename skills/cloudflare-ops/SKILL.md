@@ -2,7 +2,7 @@
 name: cloudflare-ops
 description: "Connect a Cloudflare account once, then manage DNS records, subdomains, Pages sites, R2 buckets and Workers from the agent without opening the dashboard again. Setup is a two-minute guided flow that needs three checkboxes, not the 390-odd permissions Cloudflare would otherwise ask you to pick by hand. Works on macOS, Windows and Linux. Triggers: 'connect my Cloudflare', 'add a subdomain', 'point a domain at my server', 'create a DNS record', 'set up Cloudflare Pages', 'add a custom domain to Pages', 'create an R2 bucket', 'check if DNS has propagated', 'list my domains', 'cloudflare'."
 license: MIT
-compatibility: Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Uploading a built site to Pages, or a Worker from a local directory, additionally needs wrangler; nothing else here does.
+compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a built site to Pages additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login."
 metadata:
   author: itqanlab
   version: 1.0.0
@@ -65,11 +65,24 @@ node scripts/cf.mjs dns <domain>            all records for a domain
 node scripts/cf.mjs dns-add <name> <type> <content> [--proxied] [--ttl 300]
 node scripts/cf.mjs dns-remove <name> [--type A] --yes
 node scripts/cf.mjs check <hostname>        what public resolvers currently return
-node scripts/cf.mjs pages                   Pages projects and their domains
 node scripts/cf.mjs r2                      R2 buckets
 ```
 
-`dns-add` takes the full hostname — `app.example.com`, not `app`. The zone is worked out from it, so nothing needs a zone id.
+Pages, start to finish:
+
+```
+node scripts/cf.mjs pages                            projects and their domains
+node scripts/cf.mjs pages-create <project> [--branch main]
+node scripts/cf.mjs pages-deploy <project> <dir>     upload a built directory
+node scripts/cf.mjs pages-domain <project> <hostname> attach a domain, DNS included
+node scripts/cf.mjs pages-domains <project>          domains and certificate status
+```
+
+`dns-add` and `pages-domain` take the full hostname — `app.example.com`, not `app`. The zone is worked out from it, so nothing needs a zone id.
+
+`pages-deploy` is the one command that shells out. Uploading files is not something the API can do for us, so it runs Cloudflare's own tool through `npx` — nothing to install, and the saved credential is passed to it, so there is no second login.
+
+`pages-domain` does two things on purpose: attaches the domain to the project **and** creates the DNS record. Doing only one leaves the domain stuck at "pending" forever, which is the most common way this goes wrong. It replaces any existing record for that hostname, and always creates it proxied, because Cloudflare has to be in the request path to serve a Pages site and its certificate.
 
 Anything not covered by a command is a direct API call; `references/playbooks.md` shows the pattern.
 
@@ -93,7 +106,9 @@ Anything not covered by a command is a direct API call; `references/playbooks.md
 
 ## What this cannot do
 
-Uploading files is outside the API surface used here. Deploying a built site to Pages, or a Worker script from a local directory, needs Cloudflare's own command line tool — `references/playbooks.md` covers where that hand-off happens. Everything that is a configuration change rather than a file upload works through these scripts.
+Deploying a **Worker** from a local directory still needs Cloudflare's own tool run by hand — the same reason Pages did, but there is no wrapper for it here yet. Everything else, including the whole Pages path, works through these scripts.
+
+Building the site is the caller's job. `pages-deploy` uploads a directory that already exists; run whatever build the project uses first, then point at its output.
 
 ## Failure messages
 

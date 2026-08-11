@@ -43,28 +43,28 @@ Raise the TTL again once the new address is confirmed and stable.
 
 ## Deploy a Pages site with a custom domain
 
-Pages has two halves. Creating the project and attaching domains is configuration and works through these scripts. **Uploading the built files is not** — that needs Cloudflare's own command line tool, because the files live on the local disk and the API expects them uploaded directly.
+Four commands, start to finish. Verified end to end: a new project was live on its own hostname over HTTPS about a minute after the domain was attached.
 
 ```bash
-# 1. build locally, however this project builds
-npm run build
+npm run build                                            # 1. whatever this project's build is
 
-# 2. upload — Cloudflare's tool, not this skill.
-#    It reads the same credential this skill saved.
-CLOUDFLARE_API_TOKEN=$(...) npx wrangler pages deploy ./dist --project-name my-site
+node scripts/cf.mjs pages-create my-site                 # 2. once per project
+node scripts/cf.mjs pages-deploy my-site ./dist          # 3. upload the built files
+node scripts/cf.mjs pages-domain my-site www.example.com # 4. domain + DNS together
+node scripts/cf.mjs pages-domains my-site                # watch the certificate
 ```
 
-Then attach the domain:
+Re-deploying later is only step 3.
 
-```
-node scripts/cf.mjs pages                               # confirm the project exists
-node scripts/cf.mjs dns-add www.example.com CNAME my-site.pages.dev --proxied
-node scripts/cf.mjs check www.example.com
-```
+**`pages-deploy` is the one command that shells out.** The files are on this machine and the API cannot reach them, so it runs Cloudflare's own tool through `npx` — nothing to install — and passes the saved credential in the environment, so there is no separate login. The first run downloads the tool, so it needs network access and takes a little longer.
 
-Pages custom domains are proxied. This is one of the few cases where `--proxied` is required rather than optional — Cloudflare has to be in the path to serve the site and its certificate.
+**`pages-domain` deliberately does two things**: attaches the domain to the project and creates the DNS record. Doing only one is the classic failure — the domain sits at "pending" indefinitely, because Cloudflare is waiting for a record that was never created. It also replaces any existing record for that hostname, so pointing an already-used subdomain at a Pages site works without a manual cleanup step.
 
-For the apex (`example.com` with no subdomain) use a CNAME to the same `.pages.dev` address. Cloudflare resolves apex CNAMEs correctly where ordinary DNS would not allow it.
+The record is always proxied. This is one of the few places where that is not a choice: Cloudflare has to be in the request path to serve the site and issue its certificate.
+
+Certificate status moves `initializing` → `pending` → `active`. Expect a minute or two, during which the hostname may return a 52x error — that is the certificate not being ready, not a broken deploy. `pages-domains` shows the current state.
+
+For the apex (`example.com`, no subdomain) pass it the same way. Cloudflare resolves apex CNAMEs correctly where ordinary DNS would not permit the record at all.
 
 ---
 

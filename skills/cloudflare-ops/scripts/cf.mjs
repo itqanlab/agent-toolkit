@@ -39,7 +39,7 @@ export async function request(path, { method = 'GET', body, token, query } = {})
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   }
 
-  const response = await fetch(url, {
+  const init = {
     method,
     headers: {
       Authorization: `Bearer ${token || getToken()}`,
@@ -47,7 +47,24 @@ export async function request(path, { method = 'GET', body, token, query } = {})
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  };
+
+  // A dropped connection surfaces as a bare "fetch failed", which tells the
+  // person nothing. Retry the transient case, then say something useful.
+  let response;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      response = await fetch(url, init);
+      break;
+    } catch (err) {
+      if (attempt >= 3) {
+        throw new CloudflareError(
+          `Could not reach Cloudflare (${err.message}). Check the internet connection and try again.`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+    }
+  }
 
   const text = await response.text();
   let payload;
@@ -106,6 +123,13 @@ export async function whoami(token) {
     request('/user', { token }).then((p) => p.result).catch(() => null),
   ]);
   return { accounts, user };
+}
+
+/** Most people have one account; commands that need an id should not ask for it. */
+export async function firstAccountId() {
+  const { accounts } = await whoami();
+  if (!accounts.length) throw new CloudflareError('This token cannot see any Cloudflare account.');
+  return accounts[0].id;
 }
 
 /** Resolve a hostname to the zone that serves it, longest match wins. */
@@ -217,6 +241,106 @@ const COMMANDS = {
       console.log(`${account.name}: ${projects.length} Pages projects`);
       for (const p of projects) console.log(`  ${p.name.padEnd(28)} ${(p.domains || []).join(', ')}`);
     }
+  },
+
+  // pages-create <name> [--branch main]
+  async 'pages-create'(args) {
+    const [name] = args;
+    if (!name) throw new Error('usage: pages-create <project-name> [--branch main]');
+    const branchIndex = args.indexOf('--branch');
+    const accountId = await firstAccountId();
+    const project = await request(`/accounts/${accountId}/pages/projects`, {
+      method: 'POST',
+      body: { name, production_branch: branchIndex === -1 ? 'main' : args[branchIndex + 1] },
+    }).then((p) => p.result);
+    console.log(`created Pages project ${project.name}`);
+    console.log(`it will be served at https://${project.subdomain}`);
+    console.log(`\nnext: put your built files online with`);
+    console.log(`  node scripts/cf.mjs pages-deploy ${project.name} ./dist`);
+  },
+
+  async 'pages-domains'([name]) {
+    if (!name) throw new Error('usage: pages-domains <project-name>');
+    const accountId = await firstAccountId();
+    const domains = await request(`/accounts/${accountId}/pages/projects/${name}/domains`).then((p) => p.result);
+    if (!domains.length) return console.log(`${name} has no custom domains`);
+    for (const d of domains) console.log(`${d.name.padEnd(36)} ${d.status}`);
+  },
+
+  /**
+   * Attach a custom domain to a Pages project AND create the DNS record it needs.
+   * Doing only one of the two leaves the domain stuck "pending", which is the
+   * single most common way this goes wrong.
+   */
+  async 'pages-domain'(args) {
+    const [name, hostname] = args;
+    if (!name || !hostname) throw new Error('usage: pages-domain <project-name> <hostname>');
+    const accountId = await firstAccountId();
+
+    const project = await request(`/accounts/${accountId}/pages/projects/${name}`).then((p) => p.result);
+    const target = project.subdomain;
+
+    await request(`/accounts/${accountId}/pages/projects/${name}/domains`, {
+      method: 'POST',
+      body: { name: hostname },
+    });
+    console.log(`attached ${hostname} to Pages project ${name}`);
+
+    // Pages custom domains must be proxied — Cloudflare has to be in the path to
+    // serve the site and its certificate. This is not the usual optional choice.
+    const zone = await findZone(hostname);
+    const existing = (await requestAll(`/zones/${zone.id}/dns_records`, { query: { name: hostname } }));
+    for (const r of existing) {
+      await request(`/zones/${zone.id}/dns_records/${r.id}`, { method: 'DELETE' });
+      console.log(`removed old ${r.type} record for ${hostname}`);
+    }
+    await request(`/zones/${zone.id}/dns_records`, {
+      method: 'POST',
+      body: { type: 'CNAME', name: hostname, content: target, proxied: true, ttl: 1 },
+    });
+    console.log(`pointed ${hostname} -> ${target} (proxied)`);
+    console.log(`\nthe certificate is issued automatically and usually takes a minute or two`);
+    console.log(`check with:  node scripts/cf.mjs pages-domains ${name}`);
+  },
+
+  /**
+   * Upload a built directory. This is the one thing the API cannot do for us —
+   * the files are on this machine — so it hands off to Cloudflare's own tool,
+   * run through npx so there is nothing extra to install. The stored token is
+   * passed in the environment, so wrangler needs no separate login.
+   */
+  async 'pages-deploy'(args) {
+    const [name, dir] = args;
+    if (!name || !dir) throw new Error('usage: pages-deploy <project-name> <directory>');
+    const { existsSync } = await import('node:fs');
+    if (!existsSync(dir)) throw new Error(`directory not found: ${dir}\nBuild the site first, then point at its output folder.`);
+
+    const accountId = await firstAccountId();
+    const { spawnSync } = await import('node:child_process');
+    const branchIndex = args.indexOf('--branch');
+
+    console.log(`uploading ${dir} to Pages project ${name}...\n`);
+    const result = spawnSync(
+      process.platform === 'win32' ? 'npx.cmd' : 'npx',
+      ['--yes', 'wrangler@latest', 'pages', 'deploy', dir, '--project-name', name,
+        // Without this, wrangler warns whenever the working tree is dirty. That
+        // is normal here: we are uploading a built directory, not a git deploy.
+        '--commit-dirty=true',
+        ...(branchIndex === -1 ? [] : ['--branch', args[branchIndex + 1]])],
+      {
+        stdio: 'inherit',
+        env: { ...process.env, CLOUDFLARE_API_TOKEN: getToken(), CLOUDFLARE_ACCOUNT_ID: accountId },
+      },
+    );
+    if (result.error) {
+      throw new Error(
+        `could not run wrangler: ${result.error.message}\n` +
+        'It is downloaded on demand through npx, which needs network access the first time.',
+      );
+    }
+    if (result.status !== 0) process.exit(result.status ?? 1);
+    console.log(`\nto put your own domain on it:`);
+    console.log(`  node scripts/cf.mjs pages-domain ${name} www.example.com`);
   },
 
   async r2() {

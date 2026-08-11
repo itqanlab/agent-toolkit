@@ -10,7 +10,7 @@ You do not need to run anything. Once the skill is installed, say what you want 
 > *"point app.mysite.com at my server, the address is 203.0.113.10"*
 > *"has the DNS updated yet?"*
 > *"what domains do I have?"*
-> *"add my domain to the Pages site"*
+> *"publish this site to Cloudflare and put www.mysite.com on it"*
 > *"delete the old staging subdomain"*
 
 The agent runs the commands, checks the result, and tells you in plain words whether it worked. It will ask before deleting anything, and it will tell you when a choice matters — such as whether traffic should pass through Cloudflare or go straight to your server.
@@ -42,7 +42,7 @@ sh scripts/setup-deps.sh            # show the install command, ask, then run it
 
 It picks the right command for your machine (Homebrew, apt, dnf, pacman, zypper, apk, winget) and never installs anything without asking. Where there is no package manager it prints instructions you can follow yourself, including one that needs no admin rights.
 
-Deploying files to Pages or Workers additionally needs [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), for the reason explained below. Nothing else here does.
+Publishing a site to Pages also uses [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), but there is nothing to install — it is fetched on demand through `npx`, which ships with Node, and receives the saved token so it needs no login of its own.
 
 ## Setup
 
@@ -64,8 +64,13 @@ node scripts/cf.mjs dns-add app.example.com A 203.0.113.10
 node scripts/cf.mjs dns-add www.example.com CNAME my-site.pages.dev --proxied
 node scripts/cf.mjs dns-remove old.example.com --type A --yes
 node scripts/cf.mjs check app.example.com
-node scripts/cf.mjs pages
 node scripts/cf.mjs r2
+
+node scripts/cf.mjs pages
+node scripts/cf.mjs pages-create my-site
+node scripts/cf.mjs pages-deploy my-site ./dist
+node scripts/cf.mjs pages-domain my-site www.example.com
+node scripts/cf.mjs pages-domains my-site
 ```
 
 `dns-remove` lists what it matched and refuses to delete without `--yes`.
@@ -83,9 +88,27 @@ $ node scripts/cf.mjs check status.example.com
 A      203.0.113.10
 ```
 
+## Publishing a site
+
+The whole path, verified end to end — a new project was live on its own hostname over HTTPS about a minute after the domain was attached:
+
+```bash
+npm run build                                            # your build, whatever it is
+node scripts/cf.mjs pages-create my-site
+node scripts/cf.mjs pages-deploy my-site ./dist
+node scripts/cf.mjs pages-domain my-site www.example.com
+node scripts/cf.mjs pages-domains my-site                # certificate status
+```
+
+Re-deploying later is only the third line. Or say *"publish this site to Cloudflare and put www.example.com on it"* and the agent does all of it.
+
+`pages-deploy` runs `wrangler` through `npx` — nothing to install, no second login, the saved token is handed to it. `pages-domain` attaches the domain **and** creates the DNS record, because doing only one leaves it stuck at "pending" forever.
+
 ## What it cannot do
 
-Uploading files is outside this API surface. Deploying a built site to Pages, or a Worker from a local directory, needs `wrangler` — it reads the same `CLOUDFLARE_API_TOKEN`, so no second setup. Creating the project, attaching custom domains, and every other configuration change works here.
+Deploying a **Worker** from a local directory still needs `wrangler` run by hand — the same reason Pages did, minus the wrapper. Everything else works here.
+
+Building is yours: `pages-deploy` uploads a directory that already exists.
 
 The token also cannot create further tokens: Cloudflare refuses to grant token-management permission to a token created by another token. Rotate with `begin --force`.
 
