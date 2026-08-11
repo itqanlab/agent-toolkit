@@ -9,6 +9,61 @@
   },
   "plugins": [
     {
+      "name": "cloudflare-ops",
+      "source": "./skills/cloudflare-ops",
+      "description": "Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions, and the token is never typed into the chat.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/cloudflare-ops",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "devops",
+      "keywords": [
+        "cloudflare",
+        "dns",
+        "subdomain",
+        "pages",
+        "r2",
+        "workers",
+        "devops"
+      ],
+      "tags": [
+        "cloudflare",
+        "dns",
+        "infrastructure"
+      ]
+    },
+    {
+      "name": "toolkit-credentials",
+      "source": "./skills/toolkit-credentials",
+      "description": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/toolkit-credentials",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "credentials",
+        "api-key",
+        "token",
+        "secrets",
+        "setup",
+        "onboarding"
+      ],
+      "tags": [
+        "credentials",
+        "setup",
+        "cross-platform"
+      ]
+    },
+    {
       "name": "watch-video",
       "source": "./skills/watch-video",
       "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
