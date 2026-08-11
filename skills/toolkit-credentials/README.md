@@ -6,9 +6,34 @@ Without a shared convention each skill invents its own credential handling, and 
 
 It is aimed squarely at people who are not engineers. The setup instructions name the exact button to click and every permission to tick, and the failure messages say what to do next rather than quoting an error code.
 
+## Just ask
+
+You do not run this yourself. When a skill needs a credential it invokes this one, and the agent walks you through it:
+
+> *"connect my Cloudflare account"*
+> *"where are my tokens stored?"*
+> *"the skill says my credential is missing"*
+
+You will be asked to do exactly one thing by hand: open a file and paste a value into it. That is the whole point — a secret pasted into a chat window ends up in a transcript and usually a log file, so the agent creates an empty file, tells you its name, and never sees the value except inside a running script.
+
+Everything below is for people who would rather drive themselves.
+
 ## Requirements
 
-Node 18 or newer. Nothing else — the script uses only the Node standard library, so a skill directory copied anywhere keeps working with no install step.
+**Node 18 or newer.** If you do not have it, this installs it for you:
+
+```bash
+sh scripts/setup.sh --check    # is it present and new enough?
+sh scripts/setup.sh            # show the install command, ask, then run it
+```
+
+```powershell
+.\scripts\setup.ps1            # Windows
+```
+
+It picks the right command for your machine (Homebrew, apt, dnf, pacman, zypper, apk, winget) and never installs anything without asking — add `--yes` to skip the question. Where there is no package manager it prints instructions you can follow, including a route that needs no admin rights.
+
+Nothing else is required. The scripts use only the Node standard library, so a skill directory copied anywhere keeps working with no install step.
 
 ## Where credentials are stored
 
@@ -35,7 +60,7 @@ setx AGENT_TOOLKIT_HOME "$env:USERPROFILE\.acme\agent-toolkit"
 
 Directories are created mode 700 and files 600 on macOS and Linux. Windows does not enforce Unix permissions; `status` says so rather than implying protection that is not there.
 
-## Usage
+## If you prefer the command line
 
 Normally you do not run this directly — a skill that needs a credential invokes it for you. To inspect or repair a setup:
 
@@ -74,7 +99,7 @@ const { CLOUDFLARE_API_TOKEN } = readSecrets('cloudflare');
 
 Copy the file verbatim. Every skill agreeing on the same file format and location is the entire point.
 
-`SKILL.md` has the full contract: the setup flow, how to write instructions someone non-technical can follow, and how to let a provider mint its own credential so the user ticks two boxes instead of forty.
+`SKILL.md` has the full contract: the setup flow, how to write instructions someone non-technical can follow, and how to let a provider mint its own credential so the user ticks a few boxes instead of hundreds.
 
 ## Install
 

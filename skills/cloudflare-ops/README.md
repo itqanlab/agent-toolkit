@@ -2,6 +2,23 @@
 
 Connect a Cloudflare account once, then let the agent manage DNS, subdomains, Pages and R2 — without opening the dashboard again.
 
+## Just ask
+
+You do not need to run anything. Once the skill is installed, say what you want in your own words and the agent does it:
+
+> *"connect my Cloudflare account"*
+> *"point app.mysite.com at my server, the address is 203.0.113.10"*
+> *"has the DNS updated yet?"*
+> *"what domains do I have?"*
+> *"add my domain to the Pages site"*
+> *"delete the old staging subdomain"*
+
+The agent runs the commands, checks the result, and tells you in plain words whether it worked. It will ask before deleting anything, and it will tell you when a choice matters — such as whether traffic should pass through Cloudflare or go straight to your server.
+
+The only thing it cannot do for you is the one-time account connection: you tick three boxes on Cloudflare's website and paste the result into a file. That is deliberate — it means your token never passes through a chat window. The agent walks you through it and does everything after.
+
+The commands below are for people who would rather drive themselves.
+
 ## The setup problem this solves
 
 Cloudflare has no "grant everything" control. Building a token by hand means choosing from **392 separate permissions** across four scopes, and picking wrong produces an error that means nothing to a beginner. Cloudflare does, however, let a token that can manage tokens create other tokens.
@@ -12,7 +29,20 @@ So the flow is: the user ticks **three** checkboxes to make a temporary token, p
 
 ## Requirements
 
-Node 18 or newer. Nothing else. Deploying files to Pages or Workers additionally needs [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), for the reason explained below.
+**Node 18 or newer.** If you do not have it, the skill installs it for you — the agent runs this, or you can:
+
+```bash
+sh scripts/setup-deps.sh --check    # is everything present?
+sh scripts/setup-deps.sh            # show the install command, ask, then run it
+```
+
+```powershell
+.\scripts\setup-deps.ps1            # Windows
+```
+
+It picks the right command for your machine (Homebrew, apt, dnf, pacman, zypper, apk, winget) and never installs anything without asking. Where there is no package manager it prints instructions you can follow yourself, including one that needs no admin rights.
+
+Deploying files to Pages or Workers additionally needs [`wrangler`](https://developers.cloudflare.com/workers/wrangler/), for the reason explained below. Nothing else here does.
 
 ## Setup
 
@@ -24,7 +54,7 @@ node scripts/setup.mjs status     # which account is connected
 
 `begin --force` replaces an existing credential. Running `begin` when already connected does nothing.
 
-## Usage
+## If you prefer the command line
 
 ```bash
 node scripts/cf.mjs whoami
