@@ -2,7 +2,9 @@
 name: toolkit-credentials
 description: Shared credential setup and storage for any skill that needs an API key or token. Walks a user of any experience level through getting a credential from the provider, storing it in one standard place that works on macOS, Windows and Linux, and verifying it — without the secret ever being typed into the conversation. Other skills call this instead of inventing their own key handling. Triggers, 'set up my credentials', 'connect my account', 'add an API key', 'where are my tokens stored', 'the skill says my credential is missing', 'toolkit credentials'.
 license: MIT
+compatibility: Requires Node 18 or newer — every script here is written in it. Run scripts/setup.sh (or scripts/setup.ps1 on Windows) to check for Node and install it if it is missing. Nothing else is needed; network access is only whatever the provider being connected requires.
 metadata:
+  author: itqanlab
   version: 1.0.0
 ---
 
@@ -11,6 +13,29 @@ metadata:
 Skills that talk to a service need a credential. Without a shared convention every skill invents its own — a different file, a different variable name, a different failure message — and the user is asked to paste a secret into a chat window, where it lands in a transcript and often in a log.
 
 This skill is the convention. One store, one setup flow, one rule.
+
+## Who you are doing this for
+
+Assume the person asking has never opened a terminal and should not have to. **You run the commands; they never do.** The only thing they are asked to do by hand is open one file and paste one value, because that is the one step that must not pass through the conversation.
+
+So:
+
+- Do not print a command and wait. Run it, and say what happened in ordinary words.
+- Do not name a flag, a path, or an exit code unless they need to act on it. The one path that matters is the file they must open, and that gets its own line.
+- When something fails, say what to do next, not what went wrong internally. "That token is missing one permission — go back to the page and add this row" beats any error text.
+- If they clearly are comfortable with a terminal, drop the hand-holding and let them drive. Read which kind of person you are talking to; do not make everyone sit through the same script.
+
+## Before anything else: check the dependencies
+
+Nothing here runs without Node 18 or newer, and a first-time user will not have it as often as you would expect. Check before starting a setup, never after failing one:
+
+```
+sh scripts/setup.sh --check
+```
+
+Exit status 0 means ready. Non-zero means missing or too old — run `sh scripts/setup.sh` (Windows: `.\scripts\setup.ps1`) which shows the exact install command for that machine and asks before running it. Add `--yes` to install without asking. When there is no package manager it prints instructions the person can follow themselves, including a route that needs no admin rights.
+
+Never assume the tools are present because they are present on your own machine.
 
 ## The rule
 

@@ -2,13 +2,33 @@
 name: cloudflare-ops
 description: Connect a Cloudflare account once, then manage DNS records, subdomains, Pages sites, R2 buckets and Workers from the agent without opening the dashboard again. Setup is a two-minute guided flow that needs three checkboxes, not the 390-odd permissions Cloudflare would otherwise ask you to pick by hand. Works on macOS, Windows and Linux. Triggers, 'connect my Cloudflare', 'add a subdomain', 'point a domain at my server', 'create a DNS record', 'set up Cloudflare Pages', 'add a custom domain to Pages', 'create an R2 bucket', 'check if DNS has propagated', 'list my domains', 'cloudflare'.
 license: MIT
+compatibility: Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Uploading a built site to Pages, or a Worker from a local directory, additionally needs wrangler; nothing else here does.
 metadata:
+  author: itqanlab
   version: 1.0.0
 ---
 
 # Cloudflare
 
-Everything here runs through two scripts. `scripts/setup.mjs` connects an account; `scripts/cf.mjs` does the work. Node is the only requirement and no packages are installed.
+Everything here runs through two scripts. `scripts/setup.mjs` connects an account; `scripts/cf.mjs` does the work.
+
+## Who you are doing this for
+
+Assume the person asking has never opened a terminal. **You run the commands; they never do.** They are asked to do exactly two things by hand, and only because neither can be done for them: tick three boxes on a web page, and paste the resulting value into a file so it never passes through the conversation.
+
+Everything else — checking what exists, adding the record, waiting for it to resolve, confirming it worked — is yours. Report it in plain words. "app.example.com now points at your server, and the world can see it" is the result they asked for; the record id is not.
+
+If they are clearly comfortable with a terminal, stop narrating and let them drive.
+
+## Before anything else: check the dependencies
+
+These scripts need Node 18 or newer. Check first, so a missing dependency does not surface as a confusing failure halfway through a setup:
+
+```
+sh scripts/setup-deps.sh --check
+```
+
+Non-zero exit means missing or too old. `sh scripts/setup-deps.sh` (Windows: `.\scripts\setup-deps.ps1`) prints the right install command for that machine and asks before running it; `--yes` skips the question. Where there is no package manager it gives instructions the person can follow, including one that needs no admin rights.
 
 ## Connect an account first
 
