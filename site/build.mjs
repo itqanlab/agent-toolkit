@@ -701,7 +701,45 @@ ${colophon()}`;
 
 /* ---------------------------------------------------------------- og cards */
 
+// The real mark (rounded square, ring, four compass dots, the ain glyph) —
+// inlined from site/static/logo.svg so OG cards carry the actual logo instead
+// of a lookalike square-and-circle placeholder.
+const LOGO_MARK = `
+  <rect width="280" height="280" rx="56" fill="#09090B"/>
+  <circle cx="140" cy="140" r="104" fill="none" stroke="#d4a853" stroke-width="12"/>
+  <circle cx="140" cy="36" r="9" fill="#d4a853"/>
+  <circle cx="244" cy="140" r="9" fill="#d4a853"/>
+  <circle cx="140" cy="244" r="9" fill="#d4a853"/>
+  <circle cx="36" cy="140" r="9" fill="#d4a853"/>
+  <g transform="translate(140,138) scale(1.05)">
+    <path d="M-10 -44 C-10 -44,-16 -10,-5 14 C0 28,10 36,10 36" fill="none" stroke="#d4a853" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-5 14 C-5 14,14 8,22 -6" fill="none" stroke="#d4a853" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="-10" cy="-50" r="12.3" fill="#d4a853"/>
+  </g>`;
+
+// Greedy word wrap by character budget — good enough for a single sans-serif
+// weight at a fixed size. Keeps whole words; never slices mid-word like the
+// old fixed-length slice() did (it cut "natively" down to "nativel").
+function wrapWords(text, maxChars, maxLines) {
+  const words = text.trim().split(/\s+/);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (next.length > maxChars && line) { lines.push(line); line = w; }
+    else line = next;
+    if (lines.length === maxLines - 1 && line.length > maxChars) break;
+  }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    lines[maxLines - 1] = lines[maxLines - 1].replace(/\s*\S*$/, '').trim() + '…';
+  }
+  return lines;
+}
+
 function ogSvg({ kicker, title, sub }) {
+  const subLines = wrapWords(sub, 54, 2);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#FAFAF9"/>
   <rect x="0" y="0" width="1200" height="10" fill="#d97706"/>
@@ -711,18 +749,15 @@ function ogSvg({ kicker, title, sub }) {
   <g font-family="Outfit, Inter, sans-serif" font-weight="700">
     <text x="76" y="290" font-size="82" fill="#09090B">${esc(title)}</text>
   </g>
-  <g font-family="Inter, sans-serif">
-    <text x="76" y="360" font-size="30" fill="#3F3F46">${esc(sub)}</text>
+  <g font-family="Inter, sans-serif" font-size="30" fill="#3F3F46">
+    ${subLines.map((l, i) => `<text x="76" y="${360 + i * 42}">${esc(l)}</text>`).join('\n    ')}
   </g>
   <g font-family="JetBrains Mono, monospace" font-size="24" fill="#71717A">
     <text x="76" y="540">~/.agents/skills/</text>
     <rect x="76" y="556" width="330" height="3" fill="#d4a853"/>
     <text x="76" y="592" font-size="20" fill="#A1A1AA">agent-toolkit.itqanlab.com</text>
   </g>
-  <g transform="translate(1010 470)">
-    <rect width="114" height="114" rx="26" fill="#09090B"/>
-    <circle cx="57" cy="57" r="34" fill="none" stroke="#d4a853" stroke-width="5"/>
-  </g>
+  <g transform="translate(1004 434) scale(0.4286)">${LOGO_MARK}</g>
 </svg>`;
 }
 
@@ -800,7 +835,7 @@ for (const s of skills) {
     active: '/browse/', body: skillPage(s), cls: 'p-skill',
     og: `/og-${s.name}.png`, path: `/s/${s.name}/`, jsonld: [skillLd(s)],
   }));
-  write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary.slice(0, 64) }));
+  write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary }));
 }
 
 write('og.svg', ogSvg({ kicker: 'ITQAN LAB', title: 'Agent Toolkit', sub: SITE.tagline }));
