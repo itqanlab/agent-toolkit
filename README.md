@@ -34,6 +34,8 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 | [`watch-video`](skills/watch-video) | Turns a video URL or local file into a transcript + frames the agent can read, so it can actually *watch* it | `ffmpeg`, `yt-dlp` |
 | [`toolkit-credentials`](skills/toolkit-credentials) | One store for API keys and tokens, shared by every skill. Walks any user through getting a credential — without it ever being typed into the chat | `node` |
 | [`cloudflare-ops`](skills/cloudflare-ops) | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions | `node` |
+| [`hetzner-ops`](skills/hetzner-ops) | Run your Hetzner Cloud servers from the agent — create, resize, reboot, DNS, and what it all costs. Adopts a token the machine already has, and keeps several projects apart by name | `node` |
+| [`dokploy-ops`](skills/dokploy-ops) | Run what is deployed on your self-hosted Dokploy installations — deploy and *wait for the build to actually finish*, read logs, restart, check health. Several installations, kept apart by name | `node` |
 
 ---
 

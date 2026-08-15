@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "itqan",
-  "description": "Itqan Lab agent toolkit \u2014 portable skills, MCP servers, subagents, hooks and commands. No project or brand coupling.",
+  "description": "Itqan Lab agent toolkit — portable skills, MCP servers, subagents, hooks and commands. No project or brand coupling.",
   "owner": {
     "name": "Itqan Lab",
     "email": "hello@itqanlab.com",
@@ -66,7 +66,7 @@
     {
       "name": "watch-video",
       "source": "./skills/watch-video",
-      "description": "Let the agent watch a video \u2014 any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
+      "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
       "version": "1.1.1",
       "author": {
         "name": "Itqan Lab",
@@ -92,6 +92,61 @@
         "analysis",
         "media",
         "no-api-key"
+      ]
+    },
+    {
+      "name": "hetzner-ops",
+      "source": "./skills/hetzner-ops",
+      "description": "Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. Adopts a token the machine already has, and keeps several projects apart by name.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/hetzner-ops",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "devops",
+      "keywords": [
+        "hetzner",
+        "cloud",
+        "server",
+        "vps",
+        "infrastructure",
+        "dns",
+        "devops"
+      ],
+      "tags": [
+        "hetzner",
+        "servers",
+        "infrastructure"
+      ]
+    },
+    {
+      "name": "dokploy-ops",
+      "source": "./skills/dokploy-ops",
+      "description": "Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. Adopts a key the machine already has, and keeps several installations apart by name.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/dokploy-ops",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "devops",
+      "keywords": [
+        "dokploy",
+        "deployment",
+        "paas",
+        "self-hosted",
+        "docker",
+        "devops"
+      ],
+      "tags": [
+        "dokploy",
+        "deployment",
+        "infrastructure"
       ]
     }
   ]
