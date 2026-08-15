@@ -1,0 +1,20 @@
+{
+  "name": "dokploy-ops",
+  "description": "Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. Adopts a key the machine already has, and keeps several installations apart by name.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/dokploy-ops",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "dokploy",
+    "deployment",
+    "paas",
+    "self-hosted",
+    "docker",
+    "devops"
+  ]
+}
