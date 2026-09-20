@@ -3,17 +3,20 @@
     {
       "id": "devops",
       "label": "DevOps",
-      "description": "Servers, deployments, DNS and domains. Run your infrastructure from the agent."
+      "description": "Servers, deployments, DNS and domains. Run your infrastructure from the agent.",
+      "codex": "Developer Tools"
     },
     {
       "id": "media",
       "label": "Media",
-      "description": "Video, audio and images. Let the agent work with files it cannot open on its own."
+      "description": "Video, audio and images. Let the agent work with files it cannot open on its own.",
+      "codex": "Creativity"
     },
     {
       "id": "productivity",
       "label": "Productivity",
-      "description": "Shared setup and helpers that other skills build on."
+      "description": "Shared setup and helpers that other skills build on.",
+      "codex": "Productivity"
     }
   ]
 }

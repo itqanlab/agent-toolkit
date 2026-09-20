@@ -7,6 +7,7 @@ metadata:
   author: itqanlab
   version: 1.1.0
   category: devops
+  short: "DNS, Pages, Workers and R2 from your agent"
 ---
 
 # Cloudflare

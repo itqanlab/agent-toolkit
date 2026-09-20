@@ -7,6 +7,7 @@ metadata:
   author: itqanlab
   version: 1.1.0
   category: devops
+  short: "Run your Hetzner Cloud servers from your agent"
 ---
 
 # Hetzner Cloud

@@ -7,6 +7,7 @@ metadata:
   author: itqanlab
   version: 1.1.0
   category: productivity
+  short: "Set up and keep API keys safely"
 ---
 
 # Toolkit credentials

@@ -3,5 +3,90 @@
   "interface": {
     "displayName": "Itqan Agent Toolkit"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "cloudflare-ops",
+      "source": {
+        "source": "local",
+        "path": "./plugins/cloudflare-ops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dokploy-ops",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dokploy-ops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "hetzner-ops",
+      "source": {
+        "source": "local",
+        "path": "./plugins/hetzner-ops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "namecheap-ops",
+      "source": {
+        "source": "local",
+        "path": "./plugins/namecheap-ops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "watch-video",
+      "source": {
+        "source": "local",
+        "path": "./plugins/watch-video"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
+      "name": "toolkit-credentials",
+      "source": {
+        "source": "local",
+        "path": "./plugins/toolkit-credentials"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "toolkit-updates",
+      "source": {
+        "source": "local",
+        "path": "./plugins/toolkit-updates"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
 }

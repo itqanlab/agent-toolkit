@@ -1,0 +1,42 @@
+{
+  "name": "watch-video",
+  "version": "1.2.0",
+  "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/watch-video",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "youtube",
+    "tiktok",
+    "instagram",
+    "transcript",
+    "frames",
+    "ffmpeg",
+    "yt-dlp",
+    "whisper"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Watch Video",
+    "shortDescription": "Let your agent watch and transcribe any video",
+    "longDescription": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
+    "developerName": "Itqan Lab",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/watch-video/",
+    "defaultPrompt": [
+      "Watch this video",
+      "Analyze this short/reel/clip",
+      "What happens in this video"
+    ]
+  }
+}

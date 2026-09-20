@@ -1,0 +1,37 @@
+{
+  "name": "toolkit-updates",
+  "version": "1.0.0",
+  "description": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/toolkit-updates",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "updates",
+    "changelog",
+    "version",
+    "upgrade",
+    "toolkit"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Toolkit Updates",
+    "shortDescription": "See what changed in your installed toolkit skills",
+    "longDescription": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
+    "developerName": "Itqan Lab",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/toolkit-updates/",
+    "defaultPrompt": [
+      "Are my toolkit skills up to date",
+      "Check for updates",
+      "What changed in the toolkit"
+    ]
+  }
+}

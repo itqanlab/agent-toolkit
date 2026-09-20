@@ -154,6 +154,24 @@ else
   echo
 fi
 
+# --- Codex's own plugin validator, when Codex is installed here. It ships inside Codex, so CI
+# does not have it. It checks the generated .codex-plugin/plugin.json against the real contract.
+codex_validator="${HOME}/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
+if [ -f "$codex_validator" ] && command -v python3 >/dev/null 2>&1; then
+  echo "codex plugin validator"
+  for plugin_dir in "$REPO_ROOT"/plugins/*/; do
+    [ -d "${plugin_dir}.codex-plugin" ] || continue
+    name="$(basename "$plugin_dir")"
+    want "$name" || continue
+    if out=$(python3 "$codex_validator" "${plugin_dir%/}" 2>&1); then
+      printf '  ✔ %s\n' "$name"
+    else
+      printf '  ✘ %s\n%s\n' "$name" "$out" | sed 's/^/    /'; errors=$((errors+1))
+    fi
+  done
+  echo
+fi
+
 # --- upstream conformance, via the reference validator from the spec authors.
 # Python package, Apache-2.0, in the official agentskills/agentskills repo.
 # (The unrelated `skills-ref` package on npm is not it — do not use that one.)

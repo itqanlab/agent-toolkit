@@ -11,7 +11,8 @@
 //   node scripts/build-catalog.mjs           write both files
 //   node scripts/build-catalog.mjs --check   fail if either file is out of date
 //
-//   .agents/plugins/marketplace.json  the catalog Codex reads (see docs/COMPATIBILITY.md)
+//   .agents/plugins/marketplace.json  the catalog Codex reads
+//   plugins/<name>/.codex-plugin/plugin.json   the manifest Codex reads, one per plugin
 //
 // It also fails, in both modes, on a skill that is missing a piece the catalog needs,
 // including a CHANGELOG.md whose newest entry is not the skill's current version.
@@ -19,7 +20,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readPlugins, readSkills, deps, SITE_URL } from './lib/catalog.mjs';
+import { readPlugins, readSkills, deps, splitDescription, SITE_URL } from './lib/catalog.mjs';
 import { parseChangelog } from './lib/changelog.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,6 +47,9 @@ for (const pl of readPlugins(ROOT)) {
   else if (pl.skills[0].name !== pl.name) fail(pl.name, `the skill inside is "${pl.skills[0].name}". It must be named like the plugin`);
 }
 
+// A trigger phrase is a fine starter prompt when it is a real phrase, not a command.
+const isPrompt = (t) => t.length >= 12 && t.includes(' ') && !t.startsWith('/');
+
 const skills = readSkills(ROOT).map((s) => {
   const meta = s.fm.metadata || {};
   const p = s.plugin;
@@ -59,6 +63,14 @@ const skills = readSkills(ROOT).map((s) => {
   if (!meta.category) fail(s.name, `SKILL.md metadata has no category (one of: ${categoryIds.join(', ')})`);
   else if (!categoryIds.includes(meta.category)) {
     fail(s.name, `category "${meta.category}" is not in catalog/categories.json (${categoryIds.join(', ')})`);
+  }
+  // Codex shows a short line and starter prompts. The short line is written by hand.
+  if (!meta.short) fail(s.name, 'SKILL.md metadata has no short description (a line of up to 80 characters for the Codex plugin card)');
+  else if (meta.short.length > 80) fail(s.name, `metadata.short is ${meta.short.length} characters, the limit is 80`);
+  if (meta.access !== undefined && meta.access !== 'read') fail(s.name, 'metadata.access can only be "read". Leave it out for a skill that changes things');
+  if (!p.author || !p.author.name) fail(s.name, 'plugin.json has no author.name');
+  if (splitDescription(s.fm.description).triggers.filter(isPrompt).length === 0) {
+    fail(s.name, 'the description needs at least one trigger phrase of 12 or more characters, for the Codex starter prompts');
   }
   if (meta.featured !== undefined && !['true', 'false'].includes(meta.featured)) {
     fail(s.name, `metadata.featured must be "true" or "false", not "${meta.featured}"`);
@@ -134,30 +146,52 @@ if (from === -1 || to === -1 || to < from) {
 }
 const nextReadme = readme.slice(0, from) + table + readme.slice(to + END.length);
 
-/* ------------------------------------------------------------ codex catalog */
+/* ----------------------------------------------------------- codex plugins */
 
-// Codex reads .agents/plugins/marketplace.json before it reads the Claude file. A Codex
-// plugin needs .codex-plugin/plugin.json and its skills under skills/<name>/, which a
-// plain skill folder does not have. So without this file, Codex would list our skills as
-// "installed" while showing the model nothing. Bundles that do carry a Codex manifest are
-// listed here. Plain skills reach Codex through install.sh (docs/COMPATIBILITY.md).
-const codexPlugins = [];
-const bundles = join(ROOT, 'plugins');
-if (existsSync(bundles)) {
-  for (const e of readdirSync(bundles, { withFileTypes: true })) {
-    if (e.isDirectory() && existsSync(join(bundles, e.name, '.codex-plugin', 'plugin.json'))) {
-      codexPlugins.push({
-        name: e.name,
-        source: { source: 'local', path: `./plugins/${e.name}` },
-        policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
-      });
-    }
-  }
-}
+// Codex has its own manifest, .codex-plugin/plugin.json, and its own catalog,
+// .agents/plugins/marketplace.json, which it reads before the Claude one. Both are written
+// from what is already said about the skill, so nothing is said twice. A Codex plugin must
+// hold its skills in a skills/ folder. That is why each plugin lives in plugins/<name>/.
+const titleCase = (n) => n.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+const sentenceCase = (t) => t[0].toUpperCase() + t.slice(1);
+const codexCategory = (id) => (categories.find((c) => c.id === id) || {}).codex || 'Other';
+
+const codexManifests = skills.map(({ name, p, meta, fm, pluginRoot }) => {
+  const manifest = {
+    name,
+    version: p.version,
+    description: p.description,
+    author: p.author,
+    homepage: p.homepage,
+    repository: p.repository,
+    license: p.license,
+    keywords: p.keywords,
+    skills: './skills/',
+    interface: {
+      displayName: p.displayName || titleCase(name),
+      shortDescription: meta.short,
+      longDescription: p.description,
+      developerName: p.author.name,
+      category: codexCategory(meta.category),
+      capabilities: meta.access === 'read' ? ['Interactive', 'Read'] : ['Interactive', 'Read', 'Write'],
+      websiteURL: `${SITE_URL}/s/${name}/`,
+      defaultPrompt: splitDescription(fm.description).triggers.filter(isPrompt).slice(0, 3)
+        .map((t) => sentenceCase(t).slice(0, 128)),
+    },
+  };
+  return [join(pluginRoot, '.codex-plugin', 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`,
+    `plugins/${name}/.codex-plugin/plugin.json`];
+});
+
 const codex = `${JSON.stringify({
   name: existing.name,
   interface: { displayName: 'Itqan Agent Toolkit' },
-  plugins: codexPlugins,
+  plugins: skills.map(({ name, meta }) => ({
+    name,
+    source: { source: 'local', path: `./plugins/${name}` },
+    policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+    category: codexCategory(meta.category),
+  })),
 }, null, 2)}\n`;
 
 /* ------------------------------------------------------------------ write */
@@ -166,6 +200,7 @@ const targets = [
   [MARKETPLACE, marketplace, '.claude-plugin/marketplace.json'],
   [README, nextReadme, 'README.md'],
   [CODEX, codex, '.agents/plugins/marketplace.json'],
+  ...codexManifests,
 ];
 
 if (check) {

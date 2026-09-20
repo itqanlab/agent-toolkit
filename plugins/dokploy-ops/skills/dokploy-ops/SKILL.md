@@ -7,6 +7,7 @@ metadata:
   author: itqanlab
   version: 1.1.0
   category: devops
+  short: "Deploy and watch apps on self-hosted Dokploy"
 ---
 
 # Dokploy

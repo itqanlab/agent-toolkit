@@ -1,0 +1,39 @@
+{
+  "name": "toolkit-credentials",
+  "version": "1.1.0",
+  "description": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/toolkit-credentials",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "credentials",
+    "api-key",
+    "token",
+    "secrets",
+    "setup",
+    "onboarding"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Toolkit Credentials",
+    "shortDescription": "Set up and keep API keys safely",
+    "longDescription": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
+    "developerName": "Itqan Lab",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/toolkit-credentials/",
+    "defaultPrompt": [
+      "Set up my credentials",
+      "Connect my account",
+      "Add an API key"
+    ]
+  }
+}

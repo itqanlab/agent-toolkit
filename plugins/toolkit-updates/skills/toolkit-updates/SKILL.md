@@ -7,6 +7,8 @@ metadata:
   author: itqanlab
   version: 1.0.0
   category: productivity
+  short: "See what changed in your installed toolkit skills"
+  access: read
 ---
 
 # toolkit-updates
