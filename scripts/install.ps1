@@ -159,6 +159,29 @@ if ($detected.Count -gt 0) {
   Write-Host ''
 }
 
+# Codex runs commands in a sandbox. Under its usual mode the network is off and the
+# credential store is read-only, so skills that call web APIs would be blocked.
+# Measured in docs/COMPATIBILITY.md. We print the setting; we never edit its config.
+if ($detected | Where-Object { $_.Label -eq 'Codex' }) {
+  $store = if ($env:AGENT_TOOLKIT_HOME) { $env:AGENT_TOOLKIT_HOME } else { Join-Path $HOME '.itqan-agent-toolkit' }
+  $storeToml = $store -replace '\\', '/'
+  Write-Host 'Codex runs commands in a sandbox, and by default it is read-only with no network.'
+  Write-Host 'Skills that call a web API, or save a credential, are blocked until you allow'
+  Write-Host 'both. Add this to ~/.codex/config.toml. The first line must sit above any'
+  Write-Host '[section] header in that file:'
+  Write-Host ''
+  Write-Host '  sandbox_mode = "workspace-write"'
+  Write-Host ''
+  Write-Host '  [sandbox_workspace_write]'
+  Write-Host '  network_access = true'
+  Write-Host ("  writable_roots = [""{0}""]" -f $storeToml)
+  Write-Host ''
+  Write-Host 'Skip this if your config already sets sandbox_mode to danger-full-access.'
+  Write-Host 'Skills that only run local tools, such as watch-video on a local file, do not'
+  Write-Host 'need it.'
+  Write-Host ''
+}
+
 if (-not $Claude -and -not $Project -and -not $Target) {
   Write-Host "Claude Code does not read $neutral. Its native channel is better anyway:"
   Write-Host '  /plugin marketplace add itqanlab/agent-toolkit'

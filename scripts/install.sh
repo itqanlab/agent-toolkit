@@ -207,6 +207,30 @@ if [ ${#detected_labels[@]} -gt 0 ]; then
   echo
 fi
 
+# Codex runs commands in a sandbox. Under its usual mode, the network is off and the
+# credential store is read-only, so the skills that call web APIs would be blocked.
+# Measured in docs/COMPATIBILITY.md. We print the setting; we never edit its config.
+for label in "${detected_labels[@]}"; do
+  if [ "$label" = "Codex" ]; then
+    store="${AGENT_TOOLKIT_HOME:-$HOME/.itqan-agent-toolkit}"
+    echo "Codex runs commands in a sandbox, and by default it is read-only with no network."
+    echo "Skills that call a web API, or save a credential, are blocked until you allow"
+    echo "both. Add this to ~/.codex/config.toml. The first line must sit above any"
+    echo "[section] header in that file:"
+    echo
+    echo "  sandbox_mode = \"workspace-write\""
+    echo
+    echo "  [sandbox_workspace_write]"
+    echo "  network_access = true"
+    echo "  writable_roots = [\"$store\"]"
+    echo
+    echo "Skip this if your config already sets sandbox_mode to danger-full-access."
+    echo "Skills that only run local tools, such as watch-video on a local file, do not"
+    echo "need it."
+    echo
+  fi
+done
+
 if [ "$WANT_CLAUDE" -eq 0 ] && [ "$WANT_PROJECT" -eq 0 ] && [ -z "$EXPLICIT_TARGET" ]; then
   echo "Claude Code does not read $NEUTRAL. Its native channel is better anyway:"
   echo "  /plugin marketplace add itqanlab/agent-toolkit"
