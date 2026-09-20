@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readSkills, splitDescription, deps } from './lib/catalog.mjs';
+import { readSkills, deps } from './lib/catalog.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MARKETPLACE = join(ROOT, '.claude-plugin', 'marketplace.json');
@@ -47,6 +47,9 @@ const skills = readSkills(ROOT).map((s) => {
   if (!meta.category) fail(s.name, `SKILL.md metadata has no category (one of: ${categoryIds.join(', ')})`);
   else if (!categoryIds.includes(meta.category)) {
     fail(s.name, `category "${meta.category}" is not in catalog/categories.json (${categoryIds.join(', ')})`);
+  }
+  if (meta.featured !== undefined && !['true', 'false'].includes(meta.featured)) {
+    fail(s.name, `metadata.featured must be "true" or "false", not "${meta.featured}"`);
   }
   const home = `${repoUrl}/tree/main/skills/${s.name}`;
   if (p.homepage !== home) fail(s.name, `plugin.json homepage should be ${home}`);

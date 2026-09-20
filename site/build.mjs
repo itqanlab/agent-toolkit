@@ -63,6 +63,7 @@ function loadSkills() {
         version: (data.metadata && data.metadata.version) || entry.version || '0.0.0',
         keywords: entry.keywords || [],
         category: (data.metadata && data.metadata.category) || entry.category || 'general',
+        featured: !!data.metadata && data.metadata.featured === 'true',
         readme,
         agents: agentData.agents.length,
         source: `${SITE.repo}/tree/main/skills/${e.name}`,
@@ -291,7 +292,10 @@ function card(item) {
 /* ---------------------------------------------------------------- pages */
 
 function home() {
-  const featured = skills.slice(0, 6).map(card).join('');
+  // Skills that set metadata.featured lead; the rest fill up to six in name order.
+  const featured = [...skills]
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || a.name.localeCompare(b.name))
+    .slice(0, 6).map(card).join('');
   // The trigger phrases are real: each skill declares them in its own frontmatter.
   // They are also the actual interface, so they belong in the hero.
   const asks = skills.flatMap((s) => s.triggers.filter((t) => t.length > 12 && !t.startsWith('/'))
