@@ -88,5 +88,5 @@ Skills and MCP servers solve different problems and are not alternatives. A skil
 4. Skill `README.md` reflects any new flags
 5. `./scripts/install.sh <name> --link --force`, then run the skill once, end to end
 6. No vendor variables or absolute paths: `grep -rn 'CLAUDE_PLUGIN_ROOT\|/Users/\|~/\.claude' plugins/*/skills/*/SKILL.md plugins/*/skills/*/scripts/` returns nothing
-7. No secrets: confirm `.env`, tokens and account IDs are absent
+7. No secrets: confirm `.env`, tokens and account IDs are absent. The `Compatibility` workflow is green on all three operating systems
 8. Push, `claude plugin tag plugins/<name>`, then install from scratch in a clean session to confirm. For Codex, run `codex plugin marketplace add itqanlab/agent-toolkit` and `codex plugin add <name>@itqan` in a throwaway `CODEX_HOME`, then `codex debug prompt-input hello` to see that the skill reaches the model

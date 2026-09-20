@@ -47,6 +47,8 @@ Both are installed by `npm install`. Bypass only when you mean it: `git commit -
 
 The same validation runs in CI on every pull request and every push to `main`, and the site does not deploy unless it passes. So `--no-verify` delays the failure. It does not remove it.
 
+A second workflow, `compat.yml`, runs on Windows, macOS and Linux. It checks the line endings of the checkout, runs the validator, installs every plugin into a real Codex and asks what the model is shown, and runs the PowerShell installer on Windows. `.gitattributes` keeps every file LF, so do not turn that off. A CRLF shell script cannot run.
+
 ## Adding a component
 
 Full rules in [docs/AUTHORING.md](docs/AUTHORING.md). The mechanical bar:
