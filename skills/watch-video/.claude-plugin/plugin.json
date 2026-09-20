@@ -14,9 +14,11 @@
     "video",
     "youtube",
     "tiktok",
+    "instagram",
     "transcript",
     "frames",
     "ffmpeg",
-    "yt-dlp"
+    "yt-dlp",
+    "whisper"
   ]
 }
