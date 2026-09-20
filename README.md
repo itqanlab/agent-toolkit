@@ -38,6 +38,7 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 | [`namecheap-ops`](skills/namecheap-ops) | devops | [1.1.0](skills/namecheap-ops/CHANGELOG.md) | Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. | `node` |
 | [`watch-video`](skills/watch-video) | media | [1.2.0](skills/watch-video/CHANGELOG.md) | Let the agent watch a video — any of 1750+ sites or a local file. | `ffmpeg`, `yt-dlp` |
 | [`toolkit-credentials`](skills/toolkit-credentials) | productivity | [1.1.0](skills/toolkit-credentials/CHANGELOG.md) | Shared credential setup and storage for skills that need an API key or token. | `node` |
+| [`toolkit-updates`](skills/toolkit-updates) | productivity | [1.0.0](skills/toolkit-updates/CHANGELOG.md) | Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. | `node` |
 <!-- skills:end -->
 
 ---
