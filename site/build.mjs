@@ -37,6 +37,7 @@ const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
 
 const marketplace = JSON.parse(read(join(ROOT, '.claude-plugin', 'marketplace.json')));
 const agentData = JSON.parse(read(join(HERE, 'data', 'agents.json')));
+const categoryList = JSON.parse(read(join(ROOT, 'catalog', 'categories.json'))).categories;
 
 function loadSkills() {
   const dir = join(ROOT, 'skills');
@@ -61,7 +62,7 @@ function loadSkills() {
         license: data.license || entry.license || 'MIT',
         version: (data.metadata && data.metadata.version) || entry.version || '0.0.0',
         keywords: entry.keywords || [],
-        category: entry.category || 'general',
+        category: (data.metadata && data.metadata.category) || entry.category || 'general',
         readme,
         agents: agentData.agents.length,
         source: `${SITE.repo}/tree/main/skills/${e.name}`,
@@ -82,6 +83,11 @@ const plugins = loadDir('plugin', 'plugins');
 const servers = loadDir('mcp', 'mcp');
 const catalog = [...skills, ...plugins, ...servers];
 const counts = { skill: skills.length, plugin: plugins.length, mcp: servers.length };
+// Only categories that hold something are shown, so an empty one never leads to a blank page.
+const categories = categoryList
+  .map((c) => ({ ...c, items: skills.filter((s) => s.category === c.id) }))
+  .filter((c) => c.items.length);
+const categoryOf = (id) => categoryList.find((c) => c.id === id);
 
 /* ---------------------------------------------------------------- chrome */
 
@@ -265,9 +271,10 @@ function card(item) {
       <h3 class="card-name">${esc(item.name)}</h3><span class="tag">${item.type}</span>
     </header></article>`;
   }
+  const cat = categoryOf(item.category);
   return `<a class="card" href="/s/${item.name}/" data-name="${esc(item.name)}"
-     data-type="skill" data-deps="${esc(item.deps.join(' '))}"
-     data-search="${esc([item.name, item.summary, ...item.triggers, ...item.keywords].join(' ').toLowerCase())}">
+     data-type="skill" data-category="${esc(item.category)}" data-deps="${esc(item.deps.join(' '))}"
+     data-search="${esc([item.name, item.summary, cat ? cat.label : item.category, ...item.triggers, ...item.keywords].join(' ').toLowerCase())}">
   <header class="card-head">
     <h3 class="card-name">${esc(item.name)}</h3>
     <span class="card-v">v${esc(item.version)}</span>
@@ -275,6 +282,7 @@ function card(item) {
   <p class="card-sum">${esc(item.summary)}</p>
   <footer class="card-foot">
     <span class="card-agents">portable</span>
+    ${cat ? `<span class="tag tag-cat">${esc(cat.label)}</span>` : ''}
     ${item.deps.map((d) => `<span class="tag">${esc(d)}</span>`).join('')}
   </footer>
 </a>`;
@@ -450,23 +458,39 @@ function browse() {
   return `
 <section class="head">
   <h1 class="page-h">Browse</h1>
-  <p class="lede">${catalog.length} in the catalog. Search matches names, summaries and trigger phrases.</p>
+  <p class="lede">${catalog.length} in the catalog. Search matches names, summaries, categories and trigger phrases.</p>
 </section>
 <div class="filters">
   <label class="search">
     <span class="sr">Search the catalog</span>
     <input id="q" type="search" placeholder="search — try &quot;video&quot; or &quot;transcript&quot;" autocomplete="off">
   </label>
-  <div class="chips" role="group" aria-label="Filter by type">
+  <div class="chips" role="group" aria-label="Filter by type" data-group="type">
     <button class="chip is-on" data-type="all">all <b>${catalog.length}</b></button>
     <button class="chip" data-type="skill">skills <b>${counts.skill}</b></button>
     <button class="chip" data-type="mcp">mcp <b>${counts.mcp}</b></button>
     <button class="chip" data-type="plugin">plugins <b>${counts.plugin}</b></button>
   </div>
+  ${categories.length > 1 ? `<div class="chips" role="group" aria-label="Filter by category" data-group="category">
+    <button class="chip is-on" data-category="all">any category</button>
+    ${categories.map((c) => `<button class="chip" data-category="${esc(c.id)}">${esc(c.label)} <b>${c.items.length}</b></button>`).join('\n    ')}
+  </div>` : ''}
 </div>
 <div class="grid" id="results">${catalog.map(card).join('')}</div>
 <p class="empty" id="empty" hidden>Nothing matches that. <button class="linkish" id="clear">Clear filters</button></p>
 <p class="more"><a href="${SITE.repo}/issues" target="_blank" rel="noopener">Propose a skill →</a></p>
+${colophon()}`;
+}
+
+function categoryPage(c) {
+  return `
+<section class="head">
+  <p class="eyebrow"><a href="/browse/">catalog</a> / category</p>
+  <h1 class="page-h">${esc(c.label)}</h1>
+  <p class="lede">${esc(c.description)}</p>
+</section>
+<div class="grid">${c.items.map(card).join('')}</div>
+<p class="more"><a href="/browse/">Browse all ${catalog.length} →</a></p>
 ${colophon()}`;
 }
 
@@ -577,7 +601,7 @@ function skillPage(s) {
   const body = marked.parse(rest.map((r) => `## ${r.title}\n${r.body}`).join('\n\n'));
   return `
 <section class="head head-skill">
-  <p class="eyebrow"><a href="/browse/">catalog</a> / skill</p>
+  <p class="eyebrow"><a href="/browse/">catalog</a>${categoryOf(s.category) ? ` / <a href="/c/${esc(s.category)}/">${esc(categoryOf(s.category).label)}</a>` : ''} / skill</p>
   <h1 class="page-h mono">${esc(s.name)}</h1>
   <p class="lede">${esc(s.summary)}</p>
   <div class="specs">
@@ -779,6 +803,16 @@ write('agents/index.html', page({
   active: '/agents/', body: agentsPage(), cls: 'p-agents', og: '/og-agents.png', path: '/agents/',
 }));
 
+for (const c of categories) {
+  write(`c/${c.id}/index.html`, page({
+    title: `${c.label} skills for AI coding agents — ${SITE.title}`,
+    desc: `${c.description} ${c.items.length} portable ${c.items.length === 1 ? 'skill' : 'skills'}, free and MIT licensed.`,
+    active: '/browse/', body: categoryPage(c), cls: 'p-browse',
+    og: `/og-c-${c.id}.png`, path: `/c/${c.id}/`,
+  }));
+  write(`og-c-${c.id}.svg`, ogSvg({ kicker: 'CATEGORY', title: c.label, sub: c.description }));
+}
+
 for (const s of skills) {
   write(`s/${s.name}/index.html`, page({
     title: `${s.name} — ${SITE.title}`,
@@ -831,7 +865,7 @@ Sitemap: ${SITE.url}/sitemap.xml
 const today = agentData.verified;
 write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[['/', '1.0'], ['/browse/', '0.9'], ['/agents/', '0.9'], ...skills.map((s) => [`/s/${s.name}/`, '0.8'])]
+${[['/', '1.0'], ['/browse/', '0.9'], ['/agents/', '0.9'], ...categories.map((c) => [`/c/${c.id}/`, '0.7']), ...skills.map((s) => [`/s/${s.name}/`, '0.8'])]
     .map(([u, pr]) => `  <url><loc>${SITE.url}${u}</loc><lastmod>${today}</lastmod><priority>${pr}</priority></url>`).join('\n')}
 </urlset>`);
 
@@ -858,6 +892,7 @@ write('llms.txt', `# ${SITE.title}
 - [Overview](${SITE.url}/): What agent skills are, the catalog, and how to install.
 - [Browse](${SITE.url}/browse/): All ${catalog.length} skills, MCP servers and plugins, searchable.
 - [Agents](${SITE.url}/agents/): Verified skill discovery paths per agent, with vendor sources.
+${categories.map((c) => `- [${c.label}](${SITE.url}/c/${c.id}/): ${c.description}`).join('\n')}
 ${skills.map((s) => `- [${s.name}](${SITE.url}/s/${s.name}/): ${s.summary}`).join('\n')}
 
 ## Install
@@ -889,6 +924,6 @@ ${skills.map((s) => `- [${s.name}](${SITE.url}/s/${s.name}/): ${s.summary}`).joi
 cpSync(join(HERE, 'static'), OUT, { recursive: true });
 
 console.log(`built → site/dist`);
-console.log(`  pages   ${3 + skills.length}`);
+console.log(`  pages   ${3 + categories.length + skills.length}`);
 console.log(`  catalog ${catalog.length} (${counts.skill} skill · ${counts.mcp} mcp · ${counts.plugin} plugin)`);
 console.log(`  agents  ${agentData.agents.length}`);

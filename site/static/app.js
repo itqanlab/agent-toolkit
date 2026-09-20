@@ -46,15 +46,18 @@ if (q) {
   const cards = [...document.querySelectorAll('#results .card')];
   const chips = [...document.querySelectorAll('.chip')];
   const empty = document.getElementById('empty');
-  let type = 'all';
+  // Two independent chip rows. A chip carries data-type or data-category.
+  const state = { type: 'all', category: 'all' };
+  const keyOf = (chip) => ('type' in chip.dataset ? 'type' : 'category');
 
   const apply = () => {
     const term = q.value.trim().toLowerCase();
     let shown = 0;
     for (const c of cards) {
-      const okType = type === 'all' || c.dataset.type === type;
+      const okType = state.type === 'all' || c.dataset.type === state.type;
+      const okCat = state.category === 'all' || c.dataset.category === state.category;
       const okTerm = !term || (c.dataset.search || '').includes(term);
-      const on = okType && okTerm;
+      const on = okType && okCat && okTerm;
       c.hidden = !on;
       if (on) shown++;
     }
@@ -64,15 +67,19 @@ if (q) {
   q.addEventListener('input', apply);
   for (const chip of chips) {
     chip.addEventListener('click', () => {
-      chips.forEach((c) => c.classList.toggle('is-on', c === chip));
-      type = chip.dataset.type;
+      const key = keyOf(chip);
+      state[key] = chip.dataset[key];
+      for (const other of chips) {
+        if (keyOf(other) === key) other.classList.toggle('is-on', other === chip);
+      }
       apply();
     });
   }
   document.getElementById('clear')?.addEventListener('click', () => {
     q.value = '';
-    type = 'all';
-    chips.forEach((c) => c.classList.toggle('is-on', c.dataset.type === 'all'));
+    state.type = 'all';
+    state.category = 'all';
+    chips.forEach((c) => c.classList.toggle('is-on', c.dataset[keyOf(c)] === 'all'));
     apply();
     q.focus();
   });
