@@ -157,14 +157,14 @@ fi
 # (The unrelated `skills-ref` package on npm is not it — do not use that one.)
 if command -v uvx >/dev/null 2>&1; then
   echo "skills-ref (upstream reference validator)"
+  dirs=()
   for skill_dir in "$REPO_ROOT"/skills/*/; do
-    name="$(basename "$skill_dir")"
-    want "$name" || continue
-    out=$(uvx --quiet --from "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" \
-          skills-ref validate "$skill_dir" 2>&1) \
-      && printf '  ✔ %s\n' "$name" \
-      || { printf '  ✘ %s\n%s\n' "$name" "$out" | sed 's/^/    /'; errors=$((errors+1)); }
+    want "$(basename "$skill_dir")" && dirs+=("${skill_dir%/}")
   done
+  # One process for every skill. See scripts/lib/skills-ref-all.py for why.
+  uvx --quiet --from "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" \
+      python "$REPO_ROOT/scripts/lib/skills-ref-all.py" "${dirs[@]}" \
+    || errors=$((errors+1))
   echo
 else
   echo "(skipped skills-ref — install uv to run the upstream reference validator)"
