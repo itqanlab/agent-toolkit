@@ -34,11 +34,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot   = Split-Path -Parent $PSScriptRoot
-$skillsRoot = Join-Path $repoRoot 'skills'
+$pluginsRoot = Join-Path $repoRoot 'plugins'
 $neutral    = Join-Path $HOME '.agents\skills'
 $claudeDir  = Join-Path $HOME '.claude\skills'
 
-if (-not (Test-Path $skillsRoot)) { throw "No skills/ directory found at $skillsRoot" }
+if (-not (Test-Path $pluginsRoot)) { throw "No plugins/ directory found at $pluginsRoot" }
+
+# Each plugin keeps its skill folder at plugins\<name>\skills\<name>\. That folder is the unit
+# every agent reads, so it is what gets installed. The plugin manifests stay behind.
+$skillDirs = @(Get-ChildItem -Path $pluginsRoot -Directory | ForEach-Object {
+  $inner = Join-Path $_.FullName 'skills'
+  if (Test-Path $inner) { Get-ChildItem -Path $inner -Directory }
+})
 
 # ---------------------------------------------------------------- agent detection
 $agentDefs = @(
@@ -93,11 +100,8 @@ $installed = 0; $skipped = 0
 foreach ($target in $targets) {
   Write-Host "-> $target"
   if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $target | Out-Null }
-  # Claude Code loads a skill folder containing .claude-plugin\ as a full plugin, so keep
-  # it there. Every other agent ignores it, so strip it to stay clean.
-  $keepPluginDir = $target.TrimEnd('\') -like '*\.claude\skills'
 
-  Get-ChildItem -Path $skillsRoot -Directory | ForEach-Object {
+  $skillDirs | ForEach-Object {
     $name = $_.Name
     $src  = $_.FullName
     if (-not (Test-Path (Join-Path $src 'SKILL.md'))) { return }
@@ -130,10 +134,6 @@ foreach ($target in $targets) {
       Write-Host "    copy     $name"
       if (-not $DryRun) {
         Copy-Item -Path $src -Destination $dst -Recurse
-        if (-not $keepPluginDir) {
-          $pluginDir = Join-Path $dst '.claude-plugin'
-          if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
-        }
       }
     }
     $script:installed++

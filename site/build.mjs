@@ -3,8 +3,9 @@
 //
 // Source of truth is the repo, never a hand-kept copy:
 //   .claude-plugin/marketplace.json   catalog entries
-//   skills/<name>/SKILL.md            frontmatter = data, body = instructions
-//   skills/<name>/README.md           detail page body
+//   plugins/<name>/skills/<name>/SKILL.md    frontmatter = data, body = instructions
+//   plugins/<name>/skills/<name>/README.md   detail page body
+//   plugins/<name>/skills/<name>/CHANGELOG.md  the releases
 //   site/data/agents.json             verified per-agent discovery paths
 //
 // Adding a skill and pushing rebuilds the site. There is nothing to update by hand.
@@ -13,7 +14,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
-import { frontmatter, splitDescription, deps } from '../scripts/lib/catalog.mjs';
+import { frontmatter, splitDescription, deps, readPlugins, readSkills, SITE_URL } from '../scripts/lib/catalog.mjs';
 import { parseChangelog, compareVersions } from '../scripts/lib/changelog.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,7 @@ const OUT = join(HERE, 'dist');
 const SITE = {
   title: 'Itqan Agent Toolkit',
   domain: 'agent-toolkit.itqanlab.com',
-  url: 'https://agent-toolkit.itqanlab.com',
+  url: SITE_URL,
   repo: 'https://github.com/itqanlab/agent-toolkit',
   org: 'https://github.com/itqanlab',
   marketplace: 'itqan',
@@ -41,13 +42,11 @@ const agentData = JSON.parse(read(join(HERE, 'data', 'agents.json')));
 const categoryList = JSON.parse(read(join(ROOT, 'catalog', 'categories.json'))).categories;
 
 function loadSkills() {
-  const dir = join(ROOT, 'skills');
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && existsSync(join(dir, e.name, 'SKILL.md')))
-    .map((e) => {
-      const base = join(dir, e.name);
-      const { data } = frontmatter(read(join(base, 'SKILL.md')));
+  return readSkills(ROOT)
+    .map((sk) => {
+      const base = sk.base;
+      const data = sk.fm;
+      const e = { name: sk.name };
       const entry = (marketplace.plugins || []).find((p) => p.name === e.name) || {};
       const { summary, triggers } = splitDescription(data.description);
       const readme = existsSync(join(base, 'README.md')) ? read(join(base, 'README.md')) : '';
@@ -72,7 +71,7 @@ function loadSkills() {
         changelogRaw,
         released: (changelog.releases[0] && changelog.releases[0].date) || '',
         agents: agentData.agents.length,
-        source: `${SITE.repo}/tree/main/skills/${e.name}`,
+        source: `${SITE.repo}/tree/main/plugins/${e.name}/skills/${e.name}`,
       };
     });
 }
@@ -86,7 +85,8 @@ function loadDir(kind, folder) {
 }
 
 const skills = loadSkills();
-const plugins = loadDir('plugin', 'plugins');
+// A plugin that holds no skill is its own kind of item. Today there are none.
+const plugins = readPlugins(ROOT).filter((p) => p.skills.length === 0).map((p) => ({ type: 'plugin', name: p.name }));
 const servers = loadDir('mcp', 'mcp');
 const catalog = [...skills, ...plugins, ...servers];
 const counts = { skill: skills.length, plugin: plugins.length, mcp: servers.length };
@@ -525,6 +525,7 @@ function updatesFeed() {
   return {
     schema: 1,
     site: SITE.url,
+    repository: SITE.repo,
     updated: skills.map((sk) => sk.released).sort().pop() || '',
     how: 'Compare the version you have installed (metadata.version in the skill\'s SKILL.md) with "version" here. '
       + 'If yours is lower, read every entry in "releases" newer than yours and tell the user what changed before you update. '

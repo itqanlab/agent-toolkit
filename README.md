@@ -32,13 +32,13 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 <!-- skills:start -->
 | Skill | Category | Version | Does | Needs |
 | :-- | :-- | :-- | :-- | :-- |
-| [`cloudflare-ops`](skills/cloudflare-ops) | devops | [1.1.0](skills/cloudflare-ops/CHANGELOG.md) | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. | `node` |
-| [`dokploy-ops`](skills/dokploy-ops) | devops | [1.1.0](skills/dokploy-ops/CHANGELOG.md) | Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. | `node` |
-| [`hetzner-ops`](skills/hetzner-ops) | devops | [1.1.0](skills/hetzner-ops/CHANGELOG.md) | Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. | `node` |
-| [`namecheap-ops`](skills/namecheap-ops) | devops | [1.1.0](skills/namecheap-ops/CHANGELOG.md) | Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. | `node` |
-| [`watch-video`](skills/watch-video) | media | [1.2.0](skills/watch-video/CHANGELOG.md) | Let the agent watch a video — any of 1750+ sites or a local file. | `ffmpeg`, `yt-dlp` |
-| [`toolkit-credentials`](skills/toolkit-credentials) | productivity | [1.1.0](skills/toolkit-credentials/CHANGELOG.md) | Shared credential setup and storage for skills that need an API key or token. | `node` |
-| [`toolkit-updates`](skills/toolkit-updates) | productivity | [1.0.0](skills/toolkit-updates/CHANGELOG.md) | Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. | `node` |
+| [`cloudflare-ops`](plugins/cloudflare-ops/skills/cloudflare-ops) | devops | [1.1.0](plugins/cloudflare-ops/skills/cloudflare-ops/CHANGELOG.md) | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. | `node` |
+| [`dokploy-ops`](plugins/dokploy-ops/skills/dokploy-ops) | devops | [1.1.0](plugins/dokploy-ops/skills/dokploy-ops/CHANGELOG.md) | Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. | `node` |
+| [`hetzner-ops`](plugins/hetzner-ops/skills/hetzner-ops) | devops | [1.1.0](plugins/hetzner-ops/skills/hetzner-ops/CHANGELOG.md) | Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. | `node` |
+| [`namecheap-ops`](plugins/namecheap-ops/skills/namecheap-ops) | devops | [1.1.0](plugins/namecheap-ops/skills/namecheap-ops/CHANGELOG.md) | Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. | `node` |
+| [`watch-video`](plugins/watch-video/skills/watch-video) | media | [1.2.0](plugins/watch-video/skills/watch-video/CHANGELOG.md) | Let the agent watch a video — any of 1750+ sites or a local file. | `ffmpeg`, `yt-dlp` |
+| [`toolkit-credentials`](plugins/toolkit-credentials/skills/toolkit-credentials) | productivity | [1.1.0](plugins/toolkit-credentials/skills/toolkit-credentials/CHANGELOG.md) | Shared credential setup and storage for skills that need an API key or token. | `node` |
+| [`toolkit-updates`](plugins/toolkit-updates/skills/toolkit-updates) | productivity | [1.0.0](plugins/toolkit-updates/skills/toolkit-updates/CHANGELOG.md) | Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. | `node` |
 <!-- skills:end -->
 
 ---

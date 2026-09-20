@@ -13,7 +13,7 @@
 #   (no skill names)   install every skill in this repo
 #
 #   --project          install into ./.agents/skills (ship skills with a repository)
-#   --claude           also install into ~/.claude/skills (keeps .claude-plugin/)
+#   --claude           also install into ~/.claude/skills (as a plain skill)
 #   --all              install to the neutral path AND every detected agent's own path
 #   --target DIR       install into an explicit directory instead
 #
@@ -122,16 +122,14 @@ want() {
   return 1
 }
 
-# Claude Code loads a skill folder containing .claude-plugin/ as a full plugin, so keep
-# it there. Every other agent ignores the directory, so strip it to stay clean.
-keeps_plugin_dir() { case "$1" in *"/.claude/skills") return 0;; *) return 1;; esac; }
-
 shopt -s nullglob
 for target in "${TARGETS[@]}"; do
   echo "→ $target"
   [ "$DRY" -eq 1 ] || mkdir -p "$target"
 
-  for skill_dir in "$REPO_ROOT"/skills/*/; do
+  # Each plugin keeps its skill folder at plugins/<name>/skills/<name>/. That folder is the
+  # unit every agent reads, so it is what gets installed. The plugin manifests stay behind.
+  for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
     [ -f "${skill_dir}SKILL.md" ] || continue
     name="$(basename "$skill_dir")"
     want "$name" || continue
@@ -166,11 +164,7 @@ for target in "${TARGETS[@]}"; do
       echo "    copy     $name"
       if [ "$DRY" -eq 0 ]; then
         mkdir -p "$dst"
-        if keeps_plugin_dir "$target"; then
-          (cd "$src" && tar -cf - .) | (cd "$dst" && tar -xf -)
-        else
-          (cd "$src" && tar --exclude='./.claude-plugin' -cf - .) | (cd "$dst" && tar -xf -)
-        fi
+        (cd "$src" && tar -cf - .) | (cd "$dst" && tar -xf -)
       fi
     fi
     installed=$((installed+1))

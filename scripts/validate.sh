@@ -33,7 +33,8 @@ fm_field() {
 }
 
 shopt -s nullglob
-for skill_dir in "$REPO_ROOT"/skills/*/; do
+# Items live at plugins/<name>/skills/<name>/. The skill folder is what other agents install.
+for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
   name="$(basename "$skill_dir")"
   want "$name" || continue
   checked=$((checked+1))
@@ -114,7 +115,8 @@ for skill_dir in "$REPO_ROOT"/skills/*/; do
   done < <(grep -oE '(scripts|references|assets)/[A-Za-z0-9._/-]+' "$skill_md" | sort -u)
 
   # --- Claude packaging agreement, when present
-  plugin_json="${skill_dir}.claude-plugin/plugin.json"
+  plugin_root="${skill_dir}../../"
+  plugin_json="${plugin_root}.claude-plugin/plugin.json"
   if [ -f "$plugin_json" ]; then
     p_name=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
     [ "$p_name" = "$name" ] || err "plugin.json name '$p_name' must match directory name '$name'"
@@ -124,8 +126,8 @@ for skill_dir in "$REPO_ROOT"/skills/*/; do
     if [ -n "$p_ver" ] && [ -n "$m_ver" ] && [ "$p_ver" != "$m_ver" ]; then
       err "version mismatch: plugin.json says $p_ver, marketplace.json says $m_ver"
     fi
-    grep -q "\"source\"[[:space:]]*:[[:space:]]*\"\./skills/$name\"" "$REPO_ROOT/.claude-plugin/marketplace.json" \
-      || warn "no marketplace.json entry with source ./skills/$name — Claude Code users will not see this skill"
+    grep -q "\"source\"[[:space:]]*:[[:space:]]*\"\./plugins/$name\"" "$REPO_ROOT/.claude-plugin/marketplace.json" \
+      || warn "no marketplace.json entry with source ./plugins/$name — Claude Code users will not see this skill"
   fi
 
   [ -f "${skill_dir}README.md" ] || warn "no README.md — this is what catalog reviewers read"
@@ -158,7 +160,7 @@ fi
 if command -v uvx >/dev/null 2>&1; then
   echo "skills-ref (upstream reference validator)"
   dirs=()
-  for skill_dir in "$REPO_ROOT"/skills/*/; do
+  for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
     want "$(basename "$skill_dir")" && dirs+=("${skill_dir%/}")
   done
   # One process for every skill. See scripts/lib/skills-ref-all.py for why.

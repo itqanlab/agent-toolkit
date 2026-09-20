@@ -29,4 +29,4 @@ jobs:
         run: bash scripts/validate.sh
 
       - name: Shell scripts
-        run: shellcheck -S warning scripts/*.sh skills/*/scripts/*.sh
+        run: shellcheck -S warning scripts/*.sh plugins/*/skills/*/scripts/*.sh

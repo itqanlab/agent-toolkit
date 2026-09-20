@@ -10,14 +10,14 @@
   "plugins": [
     {
       "name": "cloudflare-ops",
-      "source": "./skills/cloudflare-ops",
+      "source": "./plugins/cloudflare-ops",
       "description": "Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions, and the token is never typed into the chat.",
       "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/cloudflare-ops",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/cloudflare-ops",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "devops",
@@ -33,14 +33,14 @@
     },
     {
       "name": "dokploy-ops",
-      "source": "./skills/dokploy-ops",
+      "source": "./plugins/dokploy-ops",
       "description": "Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. Adopts a key the machine already has, and keeps several installations apart by name.",
       "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/dokploy-ops",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/dokploy-ops",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "devops",
@@ -55,14 +55,14 @@
     },
     {
       "name": "hetzner-ops",
-      "source": "./skills/hetzner-ops",
+      "source": "./plugins/hetzner-ops",
       "description": "Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. Adopts a token the machine already has, and keeps several projects apart by name.",
       "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/hetzner-ops",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/hetzner-ops",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "devops",
@@ -78,14 +78,14 @@
     },
     {
       "name": "namecheap-ops",
-      "source": "./skills/namecheap-ops",
+      "source": "./plugins/namecheap-ops",
       "description": "Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. Handles Namecheap's address whitelist, including through an SSH server with a fixed address. Adopts a key the machine already has, and keeps several accounts apart by name.",
       "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/namecheap-ops",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/namecheap-ops",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "devops",
@@ -100,14 +100,14 @@
     },
     {
       "name": "watch-video",
-      "source": "./skills/watch-video",
+      "source": "./plugins/watch-video",
       "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
       "version": "1.2.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/watch-video",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/watch-video",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "media",
@@ -126,14 +126,14 @@
     },
     {
       "name": "toolkit-credentials",
-      "source": "./skills/toolkit-credentials",
+      "source": "./plugins/toolkit-credentials",
       "description": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
       "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/toolkit-credentials",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/toolkit-credentials",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "productivity",
@@ -148,14 +148,14 @@
     },
     {
       "name": "toolkit-updates",
-      "source": "./skills/toolkit-updates",
+      "source": "./plugins/toolkit-updates",
       "description": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
       "version": "1.0.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/skills/toolkit-updates",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/toolkit-updates",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "productivity",

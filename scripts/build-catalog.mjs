@@ -19,7 +19,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readSkills, deps } from './lib/catalog.mjs';
+import { readPlugins, readSkills, deps, SITE_URL } from './lib/catalog.mjs';
 import { parseChangelog } from './lib/changelog.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,6 +39,13 @@ const repoUrl = existing.owner.url;
 const errors = [];
 const fail = (skill, msg) => errors.push(`${skill}: ${msg}`);
 
+// Each plugin must hold exactly one skill, named like the plugin. Bundles come later.
+for (const pl of readPlugins(ROOT)) {
+  if (!pl.manifest) fail(pl.name, 'no .claude-plugin/plugin.json');
+  else if (pl.skills.length !== 1) fail(pl.name, `a plugin holds one skill for now, found ${pl.skills.length} in skills/`);
+  else if (pl.skills[0].name !== pl.name) fail(pl.name, `the skill inside is "${pl.skills[0].name}". It must be named like the plugin`);
+}
+
 const skills = readSkills(ROOT).map((s) => {
   const meta = s.fm.metadata || {};
   const p = s.plugin;
@@ -56,7 +63,7 @@ const skills = readSkills(ROOT).map((s) => {
   if (meta.featured !== undefined && !['true', 'false'].includes(meta.featured)) {
     fail(s.name, `metadata.featured must be "true" or "false", not "${meta.featured}"`);
   }
-  const home = `${repoUrl}/tree/main/skills/${s.name}`;
+  const home = `${repoUrl}/tree/main/plugins/${s.name}`;
   if (p.homepage !== home) fail(s.name, `plugin.json homepage should be ${home}`);
 
   // The changelog is how an agent learns what changed, so it is checked hard.
@@ -70,8 +77,9 @@ const skills = readSkills(ROOT).map((s) => {
     if (top && top.version !== p.version) {
       fail(s.name, `CHANGELOG.md newest entry is ${top.version} but the version is ${p.version}. Add an entry for ${p.version}.`);
     }
-    const raw = `${repoUrl.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/main/skills/${s.name}/CHANGELOG.md`;
-    if (changelog.latestUrl && changelog.latestUrl !== raw) fail(s.name, `CHANGELOG.md "Latest:" should be ${raw}`);
+    // The site address, not a path in the repository, so it survives another re-layout.
+    const latest = `${SITE_URL}/s/${s.name}/CHANGELOG.md`;
+    if (changelog.latestUrl && changelog.latestUrl !== latest) fail(s.name, `CHANGELOG.md "Latest:" should be ${latest}`);
   }
   if (!read(join(s.base, 'SKILL.md')).includes('CHANGELOG.md')) {
     fail(s.name, 'SKILL.md does not point the agent at CHANGELOG.md (add the "Updates" section)');
@@ -94,7 +102,7 @@ skills.sort((a, b) =>
 
 const entries = skills.map(({ name, p, meta }) => ({
   name,
-  source: `./skills/${name}`,
+  source: `./plugins/${name}`,
   description: p.description,
   version: p.version,
   author: p.author,
@@ -113,7 +121,7 @@ const marketplace = `${JSON.stringify({ ...existing, plugins: entries }, null, 2
 const firstSentence = (s) => s.split(/(?<=[.!?])\s/)[0];
 const rows = skills.map(({ name, p, meta, fm }) => {
   const needs = deps(fm.compatibility).map((d) => `\`${d}\``).join(', ') || 'nothing';
-  return `| [\`${name}\`](skills/${name}) | ${meta.category} | [${p.version}](skills/${name}/CHANGELOG.md) | ${firstSentence(p.description)} | ${needs} |`;
+  return `| [\`${name}\`](plugins/${name}/skills/${name}) | ${meta.category} | [${p.version}](plugins/${name}/skills/${name}/CHANGELOG.md) | ${firstSentence(p.description)} | ${needs} |`;
 });
 const table = [START, '| Skill | Category | Version | Does | Needs |', '| :-- | :-- | :-- | :-- | :-- |', ...rows, END].join('\n');
 
