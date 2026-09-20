@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
+import { frontmatter, splitDescription, deps } from '../scripts/lib/catalog.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -33,56 +34,6 @@ const SITE = {
 const read = (p) => readFileSync(p, 'utf8');
 const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-// Minimal frontmatter reader. The spec allows only scalars and a flat metadata
-// map, so a full YAML parser would be more surface than the format needs.
-function frontmatter(src) {
-  if (!src.startsWith('---')) return { data: {}, body: src };
-  const end = src.indexOf('\n---', 3);
-  if (end === -1) return { data: {}, body: src };
-  const raw = src.slice(4, end);
-  const body = src.slice(end + 4).replace(/^\n/, '');
-  const data = {};
-  let mapKey = null;
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    const nested = line.match(/^\s+([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (nested && mapKey) {
-      data[mapKey][nested[1]] = unquote(nested[2]);
-      continue;
-    }
-    const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!m) continue;
-    if (m[2] === '') { mapKey = m[1]; data[mapKey] = {}; }
-    else { mapKey = null; data[m[1]] = unquote(m[2]); }
-  }
-  return { data, body };
-}
-const unquote = (v) => v.replace(/^["']|["']$/g, '').trim();
-
-// Triggers are written into the description as: Triggers: 'a', 'b', 'c'.
-// Pulling them out gives the catalog real search terms instead of invented tags.
-//
-// The separator is matched loosely. A skill that writes "Triggers," instead of
-// "Triggers:" is following the convention in spirit, and silently dropping its
-// whole trigger list — which is what the page leads with — is far worse than
-// accepting a comma. validate.sh warns when the canonical form is not used.
-function splitDescription(desc = '') {
-  const i = desc.search(/Triggers?\s*[:,—-]/i);
-  if (i === -1) return { summary: desc.trim(), triggers: [] };
-  const summary = desc.slice(0, i).trim();
-  const triggers = [...desc.slice(i).matchAll(/'([^']+)'/g)].map((m) => m[1]);
-  return { summary, triggers };
-}
-
-// "Requires ffmpeg, and yt-dlp for URL sources." -> ['ffmpeg', 'yt-dlp']
-function deps(compat = '') {
-  const found = new Set();
-  for (const m of compat.matchAll(/\b(ffmpeg|yt-dlp|python|node|uv|git|docker|jq|pandoc|imagemagick)\b/gi)) {
-    found.add(m[1].toLowerCase());
-  }
-  return [...found];
-}
 
 const marketplace = JSON.parse(read(join(ROOT, '.claude-plugin', 'marketplace.json')));
 const agentData = JSON.parse(read(join(HERE, 'data', 'agents.json')));
