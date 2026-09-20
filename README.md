@@ -125,6 +125,7 @@ mcp/                              MCP servers, npm workspaces
 catalog/                          the list of categories
 .claude-plugin/marketplace.json   Claude Code catalog, generated. Id: itqan
 .agents/plugins/marketplace.json  Codex catalog, generated
+.agents/skills/                    a copy of every skill folder for Amp, generated. Edit plugins/, not this
 scripts/                          install · validate · build-catalog
 site/                             generated site → agent-toolkit.itqanlab.com
 docs/                             COMPATIBILITY · AUTHORING · PUBLISHING

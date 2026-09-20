@@ -41,7 +41,7 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 3. Write `plugins/<name>/skills/<name>/README.md`: what it does, requirements, usage, an example
 4. Write `plugins/<name>/.claude-plugin/plugin.json`. Give it `name`, `version`, `description`, `author`, `license`, `keywords` and a `homepage` of `https://github.com/itqanlab/agent-toolkit/tree/main/plugins/<name>`. The `version` must equal `metadata.version` in `SKILL.md`.
 5. Write `plugins/<name>/skills/<name>/CHANGELOG.md`, and add the Updates section to `SKILL.md` (see Changelog below).
-6. Run `npm run catalog`. It writes the Claude Code entry in `.claude-plugin/marketplace.json`, the Codex entry in `.agents/plugins/marketplace.json`, the Codex manifest `plugins/<name>/.codex-plugin/plugin.json`, and the row in the root `README.md` table. Do not edit those by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
+6. Run `npm run catalog`. It writes the Claude Code entry in `.claude-plugin/marketplace.json`, the Codex entry in `.agents/plugins/marketplace.json`, the Codex manifest `plugins/<name>/.codex-plugin/plugin.json`, a copy of the skill folder in `.agents/skills/<name>/` (so Amp can find it), and the row in the root `README.md` table. Do not edit those by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
 7. Validate and actually run it:
    ```bash
    ./scripts/validate.sh <name>              # spec, portability rules, the catalog check, and Codex's validator when present

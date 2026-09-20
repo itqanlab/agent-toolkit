@@ -32,7 +32,7 @@ The generator supports one skill per plugin, named like the plugin. Bundles come
 
 ## What is generated
 
-`npm run catalog` writes `.codex-plugin/plugin.json` in every plugin, `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` at the root, and the table in the root README. `scripts/validate.sh` fails if any of them is out of date. See [docs/AUTHORING.md](../docs/AUTHORING.md).
+`npm run catalog` writes `.codex-plugin/plugin.json` in every plugin, `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` at the root, and the table in the root README. It also copies every skill folder into `.agents/skills/<name>/`, because Amp cannot find a skill under `plugins/`. Edit the skill under `plugins/`, never the copy. `scripts/validate.sh` fails if any of these is out of date. See [docs/AUTHORING.md](../docs/AUTHORING.md).
 
 ## Portability
 

@@ -8,7 +8,7 @@ One repo serves every channel and every component type. Nothing here needs a rep
 | Plugins (`plugins/`) | Claude Code marketplace, and Codex marketplace | Claude Code, Codex |
 | MCP servers (`mcp/`) | npm, plus optional marketplace entry | Any MCP client |
 
-The reason one folder can serve every channel is that each item is a plugin folder holding a plain [Agent Skills](https://agentskills.io) folder in `skills/<name>/`. Claude Code and Codex read the plugin. Every other agent reads just the skill folder. Vendor manifests sit in `.claude-plugin/` and `.codex-plugin/`, which the other agents never look at. Nothing is copied: the Codex manifest and both catalogs are generated from the source by `npm run catalog`.
+The reason one folder can serve every channel is that each item is a plugin folder holding a plain [Agent Skills](https://agentskills.io) folder in `skills/<name>/`. Claude Code and Codex read the plugin. Every other agent reads just the skill folder. Vendor manifests sit in `.claude-plugin/` and `.codex-plugin/`, which the other agents never look at. The Codex manifest and both catalogs are generated from the source by `npm run catalog`. So is one copy of each skill folder in `.agents/skills/<name>/`, which exists only because Amp does not look inside `plugins/`. Edit the skill under `plugins/`. The copy is checked byte for byte, so a hand edit fails `validate.sh`.
 
 ## 1. Any conformant agent — the vendor-neutral path
 
