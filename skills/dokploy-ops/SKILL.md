@@ -6,6 +6,7 @@ compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scri
 metadata:
   author: itqanlab
   version: 1.0.0
+  category: devops
 ---
 
 # Dokploy

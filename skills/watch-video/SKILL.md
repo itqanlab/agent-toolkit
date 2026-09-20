@@ -6,6 +6,7 @@ compatibility: Runs on macOS and Linux — both scripts are bash. On Windows use
 metadata:
   author: itqanlab
   version: "1.1.1"
+  category: media
 ---
 
 # watch-video

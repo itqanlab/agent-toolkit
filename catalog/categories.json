@@ -1,0 +1,19 @@
+{
+  "categories": [
+    {
+      "id": "devops",
+      "label": "DevOps",
+      "description": "Servers, deployments, DNS and domains. Run your infrastructure from the agent."
+    },
+    {
+      "id": "media",
+      "label": "Media",
+      "description": "Video, audio and images. Let the agent work with files it cannot open on its own."
+    },
+    {
+      "id": "productivity",
+      "label": "Productivity",
+      "description": "Shared setup and helpers that other skills build on."
+    }
+  ]
+}

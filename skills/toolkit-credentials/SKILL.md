@@ -6,6 +6,7 @@ compatibility: Requires Node 18 or newer — every script here is written in it.
 metadata:
   author: itqanlab
   version: 1.0.0
+  category: productivity
 ---
 
 # Toolkit credentials
