@@ -81,7 +81,8 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'skills'
-          $out = & .\scripts\install.ps1 -Target $target 2>&1 | Out-String
+          # Write-Host does not go through 2>&1. *>&1 captures every stream, so the text can be checked.
+          $out = & .\scripts\install.ps1 -Target $target *>&1 | Out-String
           Write-Host $out
           $count = (Get-ChildItem $target -Directory).Count
           if ($count -ne 7) { throw "installed $count skills, expected 7" }
