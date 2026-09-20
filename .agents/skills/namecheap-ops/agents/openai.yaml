@@ -1,0 +1,4 @@
+interface:
+  display_name: "Namecheap Ops"
+  short_description: "Domains, nameservers and DNS on Namecheap"
+  default_prompt: "Use $namecheap-ops to list my domains and when they expire."

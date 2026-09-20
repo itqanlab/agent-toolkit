@@ -13,11 +13,12 @@
 //
 //   .agents/plugins/marketplace.json  the catalog Codex reads
 //   plugins/<name>/.codex-plugin/plugin.json   the manifest Codex reads, one per plugin
+//   .agents/skills/<name>/            a copy of each skill folder, for Amp (see below)
 //
 // It also fails, in both modes, on a skill that is missing a piece the catalog needs,
 // including a CHANGELOG.md whose newest entry is not the skill's current version.
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPlugins, readSkills, deps, splitDescription, SITE_URL } from './lib/catalog.mjs';
@@ -213,6 +214,37 @@ const codex = `${JSON.stringify({
   })),
 }, null, 2)}\n`;
 
+/* ------------------------------------------------------- .agents/skills copy */
+
+// Amp reads a repository's skills from skills/, .agents/skills/, .claude/skills/, the root and
+// one folder below it. It does not look in plugins/<name>/skills/<name>, so without this copy
+// `amp skills add itqanlab/agent-toolkit` finds nothing. It also skips symbolic links, so a link
+// would not help. Only a real copy works, and this is it. Edit the skill under plugins/, never
+// this copy. Codex, Claude Code, Gemini and Copilot read plugins/ or an explicit path, and
+// `npx skills` reads this folder and plugins/ and lists each skill once.
+const MIRROR = join(ROOT, '.agents', 'skills');
+const overlay = new Map(openaiYaml.map(([path, text]) => [path, text]));
+const listFiles = (dir) => readdirSync(dir, { recursive: true, withFileTypes: true })
+  .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
+
+const mirrorFiles = skills.flatMap(({ name, base }) => listFiles(base).map((file) => {
+  const rel = file.slice(base.length + 1).split('\\').join('/');
+  // A file this script writes is copied from what it will write, so a stale one on disk cannot leak in.
+  const text = overlay.get(file);
+  const body = text === undefined ? readFileSync(file) : Buffer.from(text);
+  return { path: join(MIRROR, name, ...rel.split('/')), body, from: file, label: `.agents/skills/${name}/${rel}` };
+}));
+const mirrorPaths = new Set(mirrorFiles.map((f) => f.path));
+const sameBytes = (path, body) => {
+  if (!existsSync(path)) return false;
+  const now = readFileSync(path);
+  // Text is compared as LF, like every other generated file, so a CRLF checkout is not "stale".
+  return now.equals(body) || (!body.includes(0) && read(path) === body.toString('utf8').replace(/\r\n?/g, '\n'));
+};
+const leftovers = existsSync(MIRROR)
+  ? listFiles(MIRROR).filter((f) => !mirrorPaths.has(f))
+  : [];
+
 /* ------------------------------------------------------------------ write */
 
 const targets = [
@@ -224,10 +256,12 @@ const targets = [
 ];
 
 if (check) {
-  const stale = targets.filter(([path, next]) => !existsSync(path) || read(path) !== next);
+  const stale = targets.filter(([path, next]) => !existsSync(path) || read(path) !== next).map(([, , label]) => label);
+  for (const f of mirrorFiles) if (!sameBytes(f.path, f.body)) stale.push(f.label);
+  for (const f of leftovers) stale.push(`${f.slice(ROOT.length + 1).split('\\').join('/')} (not in any skill)`);
   if (stale.length) {
     console.error('catalog: out of date. Run: node scripts/build-catalog.mjs');
-    for (const [, , label] of stale) console.error(`  ✘ ${label}`);
+    for (const label of stale) console.error(`  ✘ ${label}`);
     process.exit(1);
   }
   console.log(`catalog: up to date (${skills.length} skills)`);
@@ -239,5 +273,20 @@ if (check) {
       console.log(`wrote ${label}`);
     }
   }
+  let copied = 0;
+  for (const f of mirrorFiles) {
+    if (sameBytes(f.path, f.body)) continue;
+    mkdirSync(dirname(f.path), { recursive: true });
+    writeFileSync(f.path, f.body, { mode: statSync(f.from).mode });
+    copied++;
+  }
+  for (const f of leftovers) rmSync(f);
+  if (existsSync(MIRROR)) {
+    // Drop folders a removed skill or file left empty, deepest first.
+    const dirs = readdirSync(MIRROR, { recursive: true, withFileTypes: true }).filter((e) => e.isDirectory())
+      .map((e) => join(e.parentPath, e.name)).sort((a, b) => b.length - a.length);
+    for (const d of dirs) if (readdirSync(d).length === 0) rmSync(d, { recursive: true });
+  }
+  if (copied || leftovers.length) console.log(`wrote .agents/skills (${copied} files copied, ${leftovers.length} removed)`);
   console.log(`catalog: ${skills.length} skills`);
 }

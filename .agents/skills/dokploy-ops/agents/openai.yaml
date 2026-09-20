@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dokploy Ops"
+  short_description: "Deploy and watch apps on self-hosted Dokploy"
+  default_prompt: "Use $dokploy-ops to tell me why the last deploy failed."

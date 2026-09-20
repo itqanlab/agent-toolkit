@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cloudflare Ops"
+  short_description: "DNS, Pages, Workers and R2 from your agent"
+  default_prompt: "Use $cloudflare-ops to add a subdomain that points to my server."
