@@ -79,6 +79,8 @@ Prints per-agent coverage when it finishes.
 
 **Codex** runs commands in a sandbox with no network by default. The installer prints the settings that let skills call a web API and save a credential. Details and test results: [Codex](docs/COMPATIBILITY.md#codex).
 
+**Gemini CLI, Copilot CLI and Amp** have their own install commands too, and they work with this repository. Amp adds one skill at a time, by path. See [COMPATIBILITY](docs/COMPATIBILITY.md#tested-on-the-real-tools).
+
 **Stay current.** Every skill keeps a `CHANGELOG.md`. All releases are listed at [/updates](https://agent-toolkit.itqanlab.com/updates/), and as JSON at [/updates.json](https://agent-toolkit.itqanlab.com/updates.json). An agent can compare what is installed with that list and tell you exactly what changed before it updates.
 
 ---

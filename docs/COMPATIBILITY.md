@@ -30,12 +30,14 @@ The table above comes from each vendor's documentation. This one comes from runn
 | Claude Code | Not applicable. It does not read that path | `claude plugin marketplace add itqanlab/agent-toolkit`, then install: works |
 | Codex 0.150.0 | 7 of 7 reach the model | `codex plugin marketplace add itqanlab/agent-toolkit`, then `codex plugin add`: works |
 | Gemini CLI 0.60.0 | 7 of 7 in `gemini skills list` | `gemini skills install <repo> --path plugins/<name>/skills/<name>`: installed `watch-video` from GitHub |
-| OpenCode 1.18.31 | 7 of 7 in `opencode debug skill` | None used |
+| OpenCode 1.18.31 | 7 of 7 in `opencode debug skill`, if the output goes to a file. See below | None used |
 | GitHub Copilot CLI 1.0.86 | 7 of 7 in `copilot skill list` | `copilot plugin marketplace add itqanlab/agent-toolkit`: lists all 7, installed one |
-| Amp | Not tested. It asks for a login even to list skills | Not tested |
+| Amp 0.0.1789934445 | 7 of 7 in `amp skills list`. Its own 12 built-in skills were the only ones in the control | `amp skills add itqanlab/agent-toolkit/plugins/<name>/skills/<name>`: installed `watch-video` from GitHub. **`amp skills add itqanlab/agent-toolkit` finds nothing.** See below |
 | Cursor, Goose | Not tested. One is an editor, the other a binary | Not tested |
 
-One odd result: the first OpenCode run listed 6 of 7 and missed `toolkit-credentials`. Six later runs, four of them on fresh homes, all listed 7. I could not reproduce the miss and cannot explain it.
+**OpenCode's debug output is cut when piped.** A first run listed 6 of 7 skills, and it looked like a discovery bug. It was not. `opencode debug skill` prints about 80,000 bytes, because it includes every skill's full text. When its output goes into a pipe, it stops at exactly 65,536 bytes, one pipe buffer, and leaves broken JSON. Which skills get cut depends on scan order. Fifteen runs on fresh homes reproduced it every time when piped, and never when written to a file, where all 7 are present. So OpenCode finds everything, and only its debug printer truncates. Redirect the output to a file when you test it. A tool that waits for the pipe, such as Python, prints 70,000 characters through a pipe without loss.
+
+**Amp finds skills in `skills/`, `.agents/skills/`, `.claude/skills/`, the repository root and one level below it, and nowhere else.** Tested with small layouts. It does not look in `plugins/<name>/skills/<name>`, or three folders down. Our old `skills/<name>` layout was found, so moving to the plugin layout broke the whole-repository command `amp skills add itqanlab/agent-toolkit`. Adding by path still works, and so does the neutral folder. We keep the layout, because Codex requires it and a committed symlink would break on Windows. The `npx skills` tool and Gemini and Copilot are not affected.
 
 ## What this means for distribution
 
@@ -92,7 +94,9 @@ writable_roots = ["/home/you/.itqan-agent-toolkit"]
 - `/tmp` is writable by design in `workspace-write`, so a test that writes under `/tmp` proves nothing.
 - The credential folder does not have to exist before you list it.
 
-**Not checked.** Codex on Windows. Nothing here has run on a real Windows machine, so `.github/workflows/compat.yml` runs the Codex install, the PowerShell installer and the line-ending checks on Windows, macOS and Linux runners. Until that workflow has passed on Windows, treat Codex on Windows as unverified.
+**Versions.** The local tests used Codex 0.150.0. The compatibility workflow installs the latest Codex from npm on each run, and it passed with 0.155.1 on Windows, macOS and Linux.
+
+**Not checked.** How the Codex sandbox behaves on Windows. It has a different implementation, and the settings above were measured on macOS. The Codex desktop app, as opposed to the command line.
 
 ## Claude Code
 
@@ -109,7 +113,9 @@ Two things differ from a plain skill folder, and both are measured:
 
 ## Windows
 
-A simulated Windows checkout found a real bug. Git for Windows checks files out with CRLF line endings by default. Our parsers split on `\n`, so every frontmatter value came out empty, the generator refused to build, and the update checker would have read the version as `1.2.0\r`. Two fixes went in. `.gitattributes` keeps every file LF on every machine, and the parsers and the generator now read CRLF as LF anyway, for a download that never went through Git. A `.sh` file with CRLF still cannot run, which is why the attribute matters. The simulation is not a real Windows run. `.github/workflows/compat.yml` is.
+Checked on a real Windows runner (Windows Server 2025) by `.github/workflows/compat.yml`. Every step passed: the generated files match, the checkout is LF, the validator runs, a real Codex installs all seven plugins and shows them to the model, the PowerShell installer copies all seven skills, and the update checker finds the seven copies in Codex's plugin cache. The same workflow passes on macOS and Linux.
+
+The run found two real bugs, and a simulated checkout found a third. A simulated Windows checkout found the first. Git for Windows checks files out with CRLF line endings by default. Our parsers split on `\n`, so every frontmatter value came out empty, the generator refused to build, and the update checker would have read the version as `1.2.0\r`. Two fixes went in. `.gitattributes` keeps every file LF on every machine, and the parsers and the generator now read CRLF as LF anyway, for a download that never went through Git. A `.sh` file with CRLF still cannot run, which is why the attribute matters. The second bug was found on the real runner. The Windows console defaults to cp1252, and the Python validator crashed printing a check mark, so it now writes UTF-8. The third was a mistake in the workflow's own test, not in the product: `Write-Host` output does not go through `2>&1`, so the installer's Codex text was captured with `*>&1`. On Windows the installer printed `writable_roots = ["C:/Users/.../.itqan-agent-toolkit"]`, a valid TOML path with forward slashes.
 
 ## Overlap is safe
 
