@@ -29,14 +29,16 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 
 ## 🧠 Skills
 
-| Skill | Does | Needs |
-| :-- | :-- | :-- |
-| [`watch-video`](skills/watch-video) | Turns a video URL or local file into a transcript + frames the agent can read, so it can actually *watch* it | `ffmpeg`, `yt-dlp` |
-| [`toolkit-credentials`](skills/toolkit-credentials) | One store for API keys and tokens, shared by every skill. Walks any user through getting a credential — without it ever being typed into the chat | `node` |
-| [`cloudflare-ops`](skills/cloudflare-ops) | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions | `node` |
-| [`hetzner-ops`](skills/hetzner-ops) | Run your Hetzner Cloud servers from the agent — create, resize, reboot, DNS, and what it all costs. Adopts a token the machine already has, and keeps several projects apart by name | `node` |
-| [`dokploy-ops`](skills/dokploy-ops) | Run what is deployed on your self-hosted Dokploy installations — deploy and *wait for the build to actually finish*, read logs, restart, check health. Several installations, kept apart by name | `node` |
-| [`namecheap-ops`](skills/namecheap-ops) | Run your Namecheap domains from the agent — what expires, nameservers, availability, prices, DNS records. Handles Namecheap's IP whitelist, even from a laptop whose address keeps changing, by sending requests through your own server | `node` |
+<!-- skills:start -->
+| Skill | Category | Does | Needs |
+| :-- | :-- | :-- | :-- |
+| [`cloudflare-ops`](skills/cloudflare-ops) | devops | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. | `node` |
+| [`dokploy-ops`](skills/dokploy-ops) | devops | Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. | `node` |
+| [`hetzner-ops`](skills/hetzner-ops) | devops | Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. | `node` |
+| [`namecheap-ops`](skills/namecheap-ops) | devops | Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. | `node` |
+| [`watch-video`](skills/watch-video) | media | Let the agent watch a video — any of 1750+ sites or a local file. | `ffmpeg`, `yt-dlp` |
+| [`toolkit-credentials`](skills/toolkit-credentials) | productivity | Shared credential setup and storage for skills that need an API key or token. | `node` |
+<!-- skills:end -->
 
 ---
 

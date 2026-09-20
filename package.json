@@ -10,6 +10,8 @@
   "scripts": {
     "install:skills": "bash scripts/install.sh",
     "detect": "bash scripts/install.sh --detect",
+    "catalog": "node scripts/build-catalog.mjs",
+    "catalog:check": "node scripts/build-catalog.mjs --check",
     "validate": "bash scripts/validate.sh && claude plugin validate .",
     "prepare": "husky"
   },
