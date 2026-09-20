@@ -1,7 +1,7 @@
 {
   "name": "toolkit-credentials",
   "description": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"

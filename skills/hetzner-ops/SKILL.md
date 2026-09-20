@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Hetzner Cloud API. Endpoint lookup downloads Hetzner's API description once (about 3 MB) and caches it. Covers Hetzner Cloud only — dedicated servers and storage boxes are a different service with separate credentials."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: devops
 ---
 
@@ -183,3 +183,9 @@ It also does not configure anything **inside** a server. Creating the machine is
 ## Failure messages
 
 Errors are rewritten for people who do not know Hetzner's error codes. A refused change explains that the token is probably read-only and how to replace it; a sold-out server type says to try another location rather than repeating the request. Keep that habit for anything added here: say what happened, then what to do next.
+
+## Updates
+
+This skill is versioned. Its version is `metadata.version` in the header of this file. `CHANGELOG.md` in this folder lists what changed in each version, newest first.
+
+To check for a newer version, open the address on the `Latest:` line of `CHANGELOG.md` and compare its top version with the installed one. If the newer one is ahead, read every entry between the two and tell the user what changed before anything is updated. A `Breaking` section means the user has to do something. To update, reinstall the skill from its source repository, the same way it was installed.

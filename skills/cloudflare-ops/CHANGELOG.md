@@ -1,0 +1,24 @@
+# Changelog
+
+Latest: https://raw.githubusercontent.com/itqanlab/agent-toolkit/main/skills/cloudflare-ops/CHANGELOG.md
+
+What changed in `cloudflare-ops`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.1.0 were rebuilt from the git history.
+
+## [1.1.0] - 2026-09-20
+
+### Added
+
+- This changelog, so you can see what changed in each version.
+- An Updates section in `SKILL.md`. It tells the agent how to check for a newer version, and to report what changed before it updates.
+
+## [1.0.0] - 2026-08-11
+
+### Added
+
+- Connect a Cloudflare account in two steps. The token needs three checkboxes and is never typed into the chat.
+- Manage DNS records and subdomains.
+- Publish a Pages site from start to finish, with a custom domain.
+- Deploy a Worker and route a hostname to it.
+- Manage R2 buckets.
+- Look up any Cloudflare API endpoint instead of guessing at it.
+- Declare the Node requirement, and offer to install Node when it is missing.

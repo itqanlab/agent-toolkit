@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Node 18 or newer — every script here is written in it. Run scripts/setup.sh (or scripts/setup.ps1 on Windows) to check for Node and install it if it is missing. Nothing else is needed; network access is only whatever the provider being connected requires.
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: productivity
 ---
 
@@ -168,3 +168,9 @@ When a call is refused for lack of permission, name the exact permission to add 
 - Verification makes a real call and reports the account identity, never the value.
 - Every documented permission or scope is listed in full, with the provider's own wording.
 - The credential's id is recorded, so revoking it later does not require a dashboard hunt.
+
+## Updates
+
+This skill is versioned. Its version is `metadata.version` in the header of this file. `CHANGELOG.md` in this folder lists what changed in each version, newest first.
+
+To check for a newer version, open the address on the `Latest:` line of `CHANGELOG.md` and compare its top version with the installed one. If the newer one is ahead, read every entry between the two and tell the user what changed before anything is updated. A `Breaking` section means the user has to do something. To update, reinstall the skill from its source repository, the same way it was installed.

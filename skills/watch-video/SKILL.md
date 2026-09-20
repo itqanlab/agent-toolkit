@@ -5,7 +5,7 @@ license: MIT
 compatibility: Runs on macOS and Linux — both scripts are bash. On Windows use WSL or Git Bash; there is no native PowerShell path. Requires ffmpeg, and yt-dlp for URL sources; run scripts/setup.sh to check for either (--check) or install them (--yes). An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
-  version: "1.1.1"
+  version: "1.2.0"
   category: media
 ---
 
@@ -83,3 +83,9 @@ Any source yt-dlp supports — 1750+ sites including YouTube, TikTok, Instagram,
 - A playlist URL downloads a single video unless you pass `--playlist N`.
 - Downloaded video is deleted after framing unless you pass `--keep-video`. Frames and transcript remain.
 - If a source that used to work stops downloading, the usual cause is an out-of-date yt-dlp. `scripts/setup.sh` will update it.
+
+## Updates
+
+This skill is versioned. Its version is `metadata.version` in the header of this file. `CHANGELOG.md` in this folder lists what changed in each version, newest first.
+
+To check for a newer version, open the address on the `Latest:` line of `CHANGELOG.md` and compare its top version with the installed one. If the newer one is ahead, read every entry between the two and tell the user what changed before anything is updated. A `Breaking` section means the user has to do something. To update, reinstall the skill from its source repository, the same way it was installed.

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a site to Pages or a Worker additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login. Endpoint lookup downloads Cloudflare's API description once (about 22 MB) and caches it."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: devops
 ---
 
@@ -147,3 +147,9 @@ Everything else on this account — DNS, subdomains, Pages, Workers, R2, zones �
 ## Failure messages
 
 Errors are rewritten for people who do not know Cloudflare's error codes. A refused call explains that a permission is probably missing and gives the command to fix it; an unrecognised credential says it may have been deleted, and how to replace it. Keep that habit for anything added here: say what happened, then what to do next.
+
+## Updates
+
+This skill is versioned. Its version is `metadata.version` in the header of this file. `CHANGELOG.md` in this folder lists what changed in each version, newest first.
+
+To check for a newer version, open the address on the `Latest:` line of `CHANGELOG.md` and compare its top version with the installed one. If the newer one is ahead, read every entry between the two and tell the user what changed before anything is updated. A `Breaking` section means the user has to do something. To update, reinstall the skill from its source repository, the same way it was installed.
