@@ -38,11 +38,18 @@ export function frontmatter(source) {
 // "Triggers:" is following the convention in spirit, and silently dropping its
 // whole trigger list is worse than accepting a comma. validate.sh warns when the
 // canonical form is not used.
+//
+// The list can sit early, with more text after it. It ends at the first quote followed by a
+// full stop. Everything else, before and after the list, is the summary.
 export function splitDescription(desc = '') {
   const i = desc.search(/Triggers?\s*[:,—-]/i);
   if (i === -1) return { summary: desc.trim(), triggers: [] };
-  const summary = desc.slice(0, i).trim();
-  const triggers = [...desc.slice(i).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const tail = desc.slice(i);
+  const end = tail.search(/'\.(\s|$)/);
+  const list = end === -1 ? tail : tail.slice(0, end + 2);
+  const after = end === -1 ? '' : tail.slice(end + 2);
+  const triggers = [...list.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const summary = `${desc.slice(0, i).trim()} ${after.trim()}`.trim();
   return { summary, triggers };
 }
 

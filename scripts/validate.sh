@@ -81,6 +81,15 @@ for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
           || warn "description mentions triggers but not in the form 'Triggers: '...', '...'' — the catalog and site parse that exact form"
         printf '%s' "$fm_desc" | grep -q "'" \
           || warn "description has a Triggers section with no single-quoted phrases in it — nothing will be extracted"
+        # Codex shows a fixed amount of skill text to the model, about 23,000 characters in all.
+        # Past roughly 20 installed skills it shortens every description from the END, and at 80
+        # skills each keeps only about 190 characters. Trigger phrases at the end are cut first.
+        case "$fm_desc" in
+          *"Triggers:"*)
+            pre="${fm_desc%%Triggers:*}"
+            [ ${#pre} -le 200 ] \
+              || warn "the trigger phrases start at character ${#pre}. Codex shortens long skill lists from the end, so put 'Triggers: ...' within the first 200 characters, right after one short sentence";;
+        esac
         ;;
       *) warn "description has no 'Triggers: ...' section — agents and the catalog use those phrases to match user requests";;
     esac

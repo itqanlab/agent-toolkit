@@ -1,6 +1,6 @@
 ---
 name: toolkit-updates
-description: "Check whether the toolkit skills installed on this machine are up to date, and say exactly what changed in each newer version before anything is updated. Reads the toolkit's public update feed and compares it with the version each installed skill declares. Read-only: it never installs, changes or deletes anything. Needs network access to read the feed. Triggers: 'are my toolkit skills up to date', 'check for updates', 'what changed in the toolkit', 'is there a new version of watch-video', 'update my skills', 'what is new in the toolkit', 'toolkit updates'."
+description: "Check whether the toolkit skills installed on this machine are up to date, and say exactly what changed in each newer version before anything is updated. Triggers: 'are my toolkit skills up to date', 'check for updates', 'what changed in the toolkit', 'is there a new version of watch-video', 'update my skills', 'what is new in the toolkit', 'toolkit updates'. Reads the toolkit's public update feed and compares it with the version each installed skill declares. Read-only: it never installs, changes or deletes anything. Needs network access to read the feed."
 license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to read the update feed. Reads the folders agents keep skills in and writes nothing."
 metadata:
