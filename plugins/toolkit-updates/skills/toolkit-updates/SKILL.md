@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to read the update feed. Reads the folders agents keep skills in and writes nothing."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: productivity
   short: "See what changed in your installed toolkit skills"
   access: read

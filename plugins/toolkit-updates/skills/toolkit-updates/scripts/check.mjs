@@ -75,14 +75,27 @@ const skillRoots = [
 const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
 const subdirs = (p) => (isDir(p) ? readdirSync(p).map((n) => join(p, n)).filter(isDir) : []);
 
-// Claude Code keeps a plugin at <cache>/<marketplace>/<plugin>/<version>/, SKILL.md at the top.
-const pluginCache = join(HOME, '.claude', 'plugins', 'cache');
-const pluginCopies = subdirs(pluginCache).flatMap((m) => subdirs(m).flatMap((p) => subdirs(p)));
+// Claude Code and Codex both keep an installed plugin at <cache>/<marketplace>/<plugin>/<version>/.
+// The skill sits in skills/<name>/ there. Older toolkit releases put SKILL.md at the top, so
+// that shape is read too. Old versions can stay on disk, so only the newest one counts below.
+const pluginCaches = [
+  { agent: 'claude', dir: join(HOME, '.claude', 'plugins', 'cache') },
+  { agent: 'codex', dir: join(CODEX_HOME, 'plugins', 'cache') },
+];
+const cacheInfo = new Map(); // skill folder -> { agent, market, plugin }
+const cachedCopies = pluginCaches.flatMap(({ agent, dir }) => subdirs(dir).flatMap((market) =>
+  subdirs(market).flatMap((plugin) => subdirs(plugin).flatMap((versionDir) => {
+    const folders = existsSync(join(versionDir, 'SKILL.md')) ? [versionDir] : subdirs(join(versionDir, 'skills'));
+    return folders.filter((f) => existsSync(join(f, 'SKILL.md'))).map((folder) => {
+      cacheInfo.set(folder, { agent, market: market.split(sep).pop(), plugin: plugin.split(sep).pop(), root: dir });
+      return folder;
+    });
+  }))));
 
 const candidates = [
-  ...skillRoots.flatMap(subdirs),
-  ...pluginCopies,
-].filter((d) => existsSync(join(d, 'SKILL.md')));
+  ...skillRoots.flatMap(subdirs).filter((d) => existsSync(join(d, 'SKILL.md'))),
+  ...cachedCopies,
+];
 
 // Only what the frontmatter says: name, and metadata.author / metadata.version.
 function readHeader(dir) {
@@ -153,28 +166,60 @@ for (const dir of candidates) {
   copies.set(real, entry);
 }
 
+// A plugin cache can hold several versions of the same plugin. Only the newest one is the
+// installed copy, so an older folder left on disk is not reported as behind.
+const newestCached = new Map();
+for (const [real, entry] of copies) {
+  const info = cacheInfo.get(entry.at[0]);
+  if (!info) continue;
+  const key = `${info.agent}:${info.market}:${info.plugin}`;
+  const best = newestCached.get(key);
+  if (!best || cmp(entry.version, best.entry.version) > 0) newestCached.set(key, { real, entry });
+}
+for (const [real, entry] of [...copies]) {
+  const info = cacheInfo.get(entry.at[0]);
+  if (!info) continue;
+  if (newestCached.get(`${info.agent}:${info.market}:${info.plugin}`).real !== real) copies.delete(real);
+}
+
+// The feed names the repository. Older feeds did not, so fall back to the changelog address.
 const repoOf = (item) => {
+  if (feed.repository) return feed.repository;
   const m = String(item.changelog || '').match(/raw\.githubusercontent\.com\/([^/]+\/[^/]+)\//);
   return m ? `https://github.com/${m[1]}` : null;
 };
 
 function locationKind(entry) {
   const p = entry.at[0];
-  if (p.startsWith(pluginCache + sep)) return 'plugin-cache';
-  if (entry.real !== p && !entry.real.startsWith(pluginCache + sep)) return 'link';
+  const info = cacheInfo.get(p);
+  if (info) return `${info.agent}-plugin`;
+  if (entry.real !== p) return 'link';
   if (p.startsWith(cwd + sep)) return 'project';
   if (p.startsWith(join(HOME, '.claude') + sep)) return 'claude-skills';
   return 'user';
 }
+
+const KIND_LABEL = {
+  'claude-plugin': 'Claude Code plugin',
+  'codex-plugin': 'Codex plugin',
+  link: 'linked to a clone',
+  project: 'this project',
+  'claude-skills': 'Claude Code skills folder',
+  user: 'skills folder',
+};
 
 function howToUpdate(entry, item) {
   const repo = repoOf(item) || 'the source repository';
   const kind = locationKind(entry);
   const clone = `In a clone of ${repo} (git clone it if you have none): git pull`;
   switch (kind) {
-    case 'plugin-cache': {
-      const market = entry.at[0].slice(pluginCache.length + 1).split(sep)[0];
+    case 'claude-plugin': {
+      const { market } = cacheInfo.get(entry.at[0]);
       return `/plugin marketplace update ${market}, then /plugin install ${item.name}@${market}`;
+    }
+    case 'codex-plugin': {
+      const { market } = cacheInfo.get(entry.at[0]);
+      return `codex plugin marketplace upgrade ${market}, then codex plugin add ${item.name}@${market}. Start a new session afterwards.`;
     }
     case 'link': return `${clone}. This copy is a link to ${entry.real}, so pulling is enough.`;
     case 'project': return `${clone}, then from this project run: <clone>/scripts/install.sh --project --force ${item.name}`;
@@ -229,9 +274,10 @@ if (!results.length) {
   console.log('If they live somewhere else, run this again with --dir <folder>.');
 }
 for (const r of results) {
-  if (r.status === 'current') { console.log(`${r.name}  ${r.installed}  up to date`); continue; }
-  if (r.status === 'ahead') { console.log(`${r.name}  ${r.installed}  newer than the feed (${r.latest}). A development copy, most likely.`); continue; }
-  console.log(`${r.name}  ${r.installed} -> ${r.latest}  UPDATE AVAILABLE${r.breaking ? '  (breaking change, you must act)' : ''}`);
+  const where = `[${KIND_LABEL[r.kind] || r.kind}]`;
+  if (r.status === 'current') { console.log(`${r.name}  ${r.installed}  up to date  ${where}`); continue; }
+  if (r.status === 'ahead') { console.log(`${r.name}  ${r.installed}  newer than the feed (${r.latest}). A development copy, most likely.  ${where}`); continue; }
+  console.log(`${r.name}  ${r.installed} -> ${r.latest}  UPDATE AVAILABLE${r.breaking ? '  (breaking change, you must act)' : ''}  ${where}`);
   for (const l of r.locations) console.log(`  installed at ${tilde(l)}`);
   console.log('  What changed:');
   for (const rel of r.releases) {

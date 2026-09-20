@@ -1,7 +1,7 @@
 {
   "name": "toolkit-updates",
   "description": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"

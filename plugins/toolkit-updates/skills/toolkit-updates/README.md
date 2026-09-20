@@ -35,11 +35,11 @@ watch-video  1.0.0 -> 1.2.0  UPDATE AVAILABLE
 
 ## How it works
 
-1. It looks in the folders agents keep skills in, in your current project, and in Claude Code's plugin folder. A symlinked install counts once.
+1. It looks in the folders agents keep skills in, in your current project, and in the plugin folders of Claude Code and Codex. A symlinked install counts once.
 2. It keeps only skills whose header says they come from this publisher. A skill with the same name from someone else is ignored.
 3. It reads the version each copy declares, then reads the public update feed.
 4. For every copy that is behind, it lists each release in between, oldest first. A breaking release is marked, and its `Breaking` lines come first.
-5. It prints the update command that fits how that copy was installed. A copy from the Claude Code marketplace gets the marketplace command. A linked copy only needs a `git pull`.
+5. It prints the update command that fits how that copy was installed. A Claude Code plugin gets the marketplace command, a Codex plugin gets the Codex one, and a linked copy only needs a `git pull`.
 
 It never writes, installs or deletes anything.
 
@@ -77,6 +77,7 @@ It needs network access to read the feed.
 - It reports and advises. It does not update by itself, on purpose.
 - If the feed is down, it says so and stops. It does not guess a version.
 - A copy whose header has no version shows as `0.0.0`, so it always looks behind.
+- Plugin caches can keep old versions on disk. It treats the newest cached version as the installed one. It does not read the agent's own record of which version is enabled.
 
 ## Install
 
@@ -86,4 +87,5 @@ It needs network access to read the feed.
 
 ```
 /plugin install toolkit-updates@itqan         # Claude Code
+codex plugin add toolkit-updates@itqan       # Codex, after: codex plugin marketplace add itqanlab/agent-toolkit
 ```
