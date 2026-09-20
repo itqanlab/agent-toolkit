@@ -11,6 +11,9 @@ from pathlib import Path
 
 from skills_ref import validate
 
+# The Windows console defaults to cp1252, which cannot print the check mark below.
+sys.stdout.reconfigure(encoding="utf-8")
+
 failed = 0
 for arg in sys.argv[1:]:
     path = Path(arg)
