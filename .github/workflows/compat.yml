@@ -73,8 +73,16 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
-          bash scripts/install.sh
+          bash scripts/install.sh | tee "$RUNNER_TEMP/installer.txt"
           [ "$(ls "$HOME/.agents/skills" | wc -l)" -eq 7 ]
+          # The Codex settings it prints must give a workspace-write session with the network on.
+          export CODEX_HOME="$RUNNER_TEMP/codex-settings"; mkdir -p "$CODEX_HOME" "$RUNNER_TEMP/settings-cwd"
+          sed -n '/^  sandbox_mode = /,/^  writable_roots = /p' "$RUNNER_TEMP/installer.txt" | sed 's/^  //' > "$CODEX_HOME/config.toml"
+          cat "$CODEX_HOME/config.toml"
+          cd "$RUNNER_TEMP/settings-cwd"
+          codex debug prompt-input hello > "$RUNNER_TEMP/settings-prompt.txt"
+          grep -q 'workspace-write' "$RUNNER_TEMP/settings-prompt.txt"
+          grep -q 'Network access is enabled' "$RUNNER_TEMP/settings-prompt.txt"
 
       - name: PowerShell installer
         if: runner.os == 'Windows'
@@ -90,6 +98,22 @@ jobs:
           # Codex is on the path here, so the installer prints its sandbox settings. The path in
           # them must be a valid TOML string, so it uses forward slashes.
           if ($out -notmatch 'writable_roots = \["[A-Za-z]:/') { throw 'the Codex settings do not carry a forward-slash Windows path' }
+          # The settings it prints must give a workspace-write session with the network on. On a
+          # fresh Windows machine that also proves a hand-written [windows] line is enough.
+          $lines = $out -split "`r?`n"
+          $start = ($lines | Select-String -Pattern '^  sandbox_mode = ' | Select-Object -First 1).LineNumber - 1
+          $end = ($lines | Select-String -Pattern '^  writable_roots = ' | Select-Object -First 1).LineNumber - 1
+          $cfg = ($lines[$start..$end] | ForEach-Object { $_ -replace '^  ', '' }) -join "`n"
+          $env:CODEX_HOME = Join-Path $env:RUNNER_TEMP 'codex-settings'
+          New-Item -ItemType Directory -Force $env:CODEX_HOME | Out-Null
+          Set-Content -Path (Join-Path $env:CODEX_HOME 'config.toml') -Value $cfg -Encoding utf8
+          Write-Host $cfg
+          Push-Location $env:RUNNER_TEMP
+          $prompt = & codex debug prompt-input hello 2>&1 | Out-String
+          Pop-Location
+          foreach ($needle in 'workspace-write', 'Network access is enabled') {
+            if ($prompt -notmatch [regex]::Escape($needle)) { throw "the installer's Codex settings did not give: $needle" }
+          }
 
       - name: The update checker reads a real Codex plugin cache
         shell: bash
