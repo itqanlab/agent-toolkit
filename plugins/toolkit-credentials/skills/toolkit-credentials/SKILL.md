@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Node 18 or newer — every script here is written in it. Run scripts/setup.sh (or scripts/setup.ps1 on Windows) to check for Node and install it if it is missing. Nothing else is needed; network access is only whatever the provider being connected requires.
 metadata:
   author: itqanlab
-  version: 1.1.0
+  version: 1.2.0
   category: productivity
   short: "Set up and keep API keys safely"
 ---

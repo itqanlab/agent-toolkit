@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Hetzner Cloud API. Endpoint lookup downloads Hetzner's API description once (about 3 MB) and caches it. Covers Hetzner Cloud only — dedicated servers and storage boxes are a different service with separate credentials."
 metadata:
   author: itqanlab
-  version: 1.1.0
+  version: 1.2.0
   category: devops
   short: "Run your Hetzner Cloud servers from your agent"
 ---

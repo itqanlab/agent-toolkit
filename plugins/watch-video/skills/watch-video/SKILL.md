@@ -5,7 +5,7 @@ license: MIT
 compatibility: Runs on macOS and Linux — both scripts are bash. On Windows use WSL or Git Bash; there is no native PowerShell path. Requires ffmpeg, and yt-dlp for URL sources; run scripts/setup.sh to check for either (--check) or install them (--yes). An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
-  version: "1.2.0"
+  version: "1.3.0"
   category: media
   short: "Let your agent watch and transcribe any video"
 ---

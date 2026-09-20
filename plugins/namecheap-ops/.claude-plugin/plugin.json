@@ -1,7 +1,7 @@
 {
   "name": "namecheap-ops",
   "description": "Connect one or more Namecheap accounts, then run the domains from the agent — expiry and auto-renew, nameservers, availability, prices and DNS records. Handles Namecheap's address whitelist, including through an SSH server with a fixed address. Adopts a key the machine already has, and keeps several accounts apart by name.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"

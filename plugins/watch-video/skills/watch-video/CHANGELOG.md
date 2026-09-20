@@ -4,6 +4,16 @@ Latest: https://agent-toolkit.itqanlab.com/s/watch-video/CHANGELOG.md
 
 What changed in `watch-video`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.2.0 were rebuilt from the git history.
 
+## [1.3.0] - 2026-09-20
+
+### Added
+
+- Can be installed as a Codex plugin, from the same source as everything else.
+
+### Changed
+
+- The changelog address now points to the site, so it keeps working if the repository layout changes.
+
 ## [1.2.0] - 2026-09-20
 
 ### Added
