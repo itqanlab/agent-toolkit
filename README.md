@@ -19,11 +19,11 @@ Skills · MCP servers · Plugins — one repo, eight agents.
 
 | | Component | Portable to | Lives in |
 | :-: | :-- | :-- | :-- |
-| 🧠 | **Skills** | All 8 agents | [`skills/`](skills) |
+| 🧠 | **Skills** | All 8 agents | [`plugins/*/skills/`](plugins) |
+| 🧩 | **Plugins**, the packaging every item ships in. Later also bundles, subagents, hooks | Claude Code, Codex | [`plugins/`](plugins) |
 | 🔌 | **MCP servers** | Any MCP client | [`mcp/`](mcp) |
-| 🧩 | **Plugins** — multi-skill bundles, subagents, hooks, commands | Claude Code | [`plugins/`](plugins) |
 
-Skills are the flagship: written to the open standard, they work everywhere unchanged. Subagents and hooks have no cross-agent equivalent, so they ship as Claude Code plugins.
+Skills are the flagship: written to the open standard, they work everywhere unchanged. Every skill also ships as a plugin, so Claude Code and Codex can install and update it natively. Subagents and hooks have no cross-agent equivalent, so they stay Claude Code only.
 
 ---
 
@@ -52,6 +52,13 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 /plugin install watch-video@itqan
 ```
 
+**Codex**
+
+```
+codex plugin marketplace add itqanlab/agent-toolkit
+codex plugin add watch-video@itqan
+```
+
 **Everything else** — writes to `~/.agents/skills/`, the vendor-neutral path
 
 ```bash
@@ -70,7 +77,7 @@ git clone https://github.com/itqanlab/agent-toolkit && cd agent-toolkit
 
 Prints per-agent coverage when it finishes.
 
-**Codex** runs commands in a sandbox with no network by default. The installer prints the two settings that let skills call a web API and save a credential. Details and test results: [Codex](docs/COMPATIBILITY.md#codex).
+**Codex** runs commands in a sandbox with no network by default. The installer prints the settings that let skills call a web API and save a credential. Details and test results: [Codex](docs/COMPATIBILITY.md#codex).
 
 **Stay current.** Every skill keeps a `CHANGELOG.md`. All releases are listed at [/updates](https://agent-toolkit.itqanlab.com/updates/), and as JSON at [/updates.json](https://agent-toolkit.itqanlab.com/updates.json). An agent can compare what is installed with that list and tell you exactly what changed before it updates.
 
@@ -97,25 +104,31 @@ Verified paths, precedence and sources → [docs/COMPATIBILITY.md](docs/COMPATIB
 
 ## 🗂 Layout
 
-A single-skill directory **is** its own Claude plugin. One copy, no build step, no per-agent variants.
+One source, no copies. Every item is a plugin folder, and the skill sits inside it in the shape Codex requires and every other agent already reads.
 
 ```
-skills/<name>/
-├── SKILL.md            # portable to all 8 agents
-├── scripts/            # referenced by relative path
-├── README.md
-└── .claude-plugin/     # Claude only; stripped on neutral installs
+plugins/<name>/
+├── .claude-plugin/plugin.json    # Claude Code manifest, written by hand
+├── .codex-plugin/plugin.json     # Codex manifest, generated
+└── skills/<name>/                # the skill, portable to all 8 agents
+    ├── SKILL.md
+    ├── README.md
+    ├── CHANGELOG.md
+    └── scripts/                  # referenced by relative path
 ```
 
 ```
-skills/                           portable skills
-plugins/                          multi-component Claude Code bundles
+plugins/                          every item: a plugin folder holding its skill
 mcp/                              MCP servers, npm workspaces
-.claude-plugin/marketplace.json   marketplace catalog — id: itqan
-scripts/                          install · validate
+catalog/                          the list of categories
+.claude-plugin/marketplace.json   Claude Code catalog, generated. Id: itqan
+.agents/plugins/marketplace.json  Codex catalog, generated
+scripts/                          install · validate · build-catalog
 site/                             generated site → agent-toolkit.itqanlab.com
 docs/                             COMPATIBILITY · AUTHORING · PUBLISHING
 ```
+
+Other agents install just the skill folder. It carries its own README and CHANGELOG.
 
 ---
 
@@ -125,7 +138,7 @@ docs/                             COMPATIBILITY · AUTHORING · PUBLISHING
 ./scripts/validate.sh
 ```
 
-Checks spec `name`/`description` rules, name↔directory match, referenced scripts exist and are executable, version agreement between `plugin.json` and `marketplace.json`, and that no vendor variable or absolute path leaked into a `SKILL.md`. Runs the upstream reference validator from the spec authors when `uv` is present. Wired into `pre-commit`.
+Checks spec `name`/`description` rules, name↔directory match, referenced scripts exist and are executable, that the generated catalogs and manifests match the source, and that no vendor variable or absolute path leaked into a `SKILL.md`. Runs the upstream reference validator from the spec authors when `uv` is present, and Codex's own plugin validator when Codex is installed. Wired into `pre-commit`, and run again in CI.
 
 ---
 

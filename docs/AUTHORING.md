@@ -36,25 +36,25 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 
 ## Adding a skill
 
-1. `mkdir -p skills/<name>/scripts`
-2. Write `skills/<name>/SKILL.md`. The frontmatter `name` must match `<name>`. Under `metadata:` set `version` and `category`. The category must be one of the ids in `catalog/categories.json`.
-3. Write `skills/<name>/README.md`: what it does, requirements, usage, an example
-4. Write `skills/<name>/.claude-plugin/plugin.json`. Give it `name`, `version`, `description`, `author`, `license`, `keywords` and a `homepage` of `https://github.com/itqanlab/agent-toolkit/tree/main/skills/<name>`. The `version` must equal `metadata.version` in `SKILL.md`.
-5. Write `skills/<name>/CHANGELOG.md`, and add the Updates section to `SKILL.md` (see Changelog below).
-6. Run `npm run catalog`. It writes the entry in `.claude-plugin/marketplace.json` and the row in the root `README.md` table. Do not edit those two by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
+1. `mkdir -p plugins/<name>/.claude-plugin plugins/<name>/skills/<name>/scripts`
+2. Write `plugins/<name>/skills/<name>/SKILL.md`. The frontmatter `name` must match `<name>`. Under `metadata:` set `version`, `category` and `short`. The category must be one of the ids in `catalog/categories.json`. `short` is a line of up to 80 characters for the plugin card in Codex. Add `access: read` if the skill changes nothing.
+3. Write `plugins/<name>/skills/<name>/README.md`: what it does, requirements, usage, an example
+4. Write `plugins/<name>/.claude-plugin/plugin.json`. Give it `name`, `version`, `description`, `author`, `license`, `keywords` and a `homepage` of `https://github.com/itqanlab/agent-toolkit/tree/main/plugins/<name>`. The `version` must equal `metadata.version` in `SKILL.md`.
+5. Write `plugins/<name>/skills/<name>/CHANGELOG.md`, and add the Updates section to `SKILL.md` (see Changelog below).
+6. Run `npm run catalog`. It writes the Claude Code entry in `.claude-plugin/marketplace.json`, the Codex entry in `.agents/plugins/marketplace.json`, the Codex manifest `plugins/<name>/.codex-plugin/plugin.json`, and the row in the root `README.md` table. Do not edit those by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
 7. Validate and actually run it:
    ```bash
-   ./scripts/validate.sh <name>              # spec, portability rules, and the catalog check
-   claude plugin validate skills/<name>
+   ./scripts/validate.sh <name>              # spec, portability rules, the catalog check, and Codex's validator when present
+   claude plugin validate plugins/<name>
    claude plugin validate .
    ./scripts/install.sh <name> --link --force
    ```
 
 `scripts/validate.sh` enforces every rule above that can be checked mechanically, and exits non-zero on failure. It is the gate; run it before every push. The eight agents it protects against are listed in [COMPATIBILITY.md](COMPATIBILITY.md).
 
-The `metadata.pluginRoot` shorthand for marketplace sources is documented upstream but is rejected by `claude plugin validate`, so use the explicit `./skills/<name>` path.
+The `metadata.pluginRoot` shorthand for marketplace sources is documented upstream but is rejected by `claude plugin validate`, so use the explicit `./plugins/<name>` path.
 
-Plugin manifests cannot reference paths containing `..` — the validator blocks it as path traversal. That is precisely why the skill directory and the plugin directory are the same directory.
+Plugin manifests cannot reference paths containing `..`, and Codex requires a plugin's skills to sit in `skills/<name>/` inside the plugin. That is why the skill lives inside its plugin folder. One layout satisfies both, and the skill folder is still a plain open-standard skill.
 
 ## Changelog
 
@@ -65,7 +65,7 @@ The format is strict on purpose, so it can be parsed without guessing:
 ```markdown
 # Changelog
 
-Latest: https://raw.githubusercontent.com/itqanlab/agent-toolkit/main/skills/<name>/CHANGELOG.md
+Latest: https://agent-toolkit.itqanlab.com/s/<name>/CHANGELOG.md
 
 ## [1.2.0] - 2026-09-20
 
@@ -84,7 +84,7 @@ Rules the generator enforces:
 - Sections are `Breaking`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`. Nothing else.
 - Every release has at least one change.
 - The newest entry must equal the item's version in `plugin.json` and `metadata.version`. So a version bump without an entry fails.
-- The `Latest:` line must be the raw address of this same file on `main`.
+- The `Latest:` line must be the site address of this same file, as shown above. It is the site and not a path in the repository, so it survives a re-layout. The site serves a copy of every changelog at that address.
 - `SKILL.md` must mention `CHANGELOG.md`. Copy the "Updates" section from any existing skill.
 
 Use `### Breaking` whenever the user has to do something after updating: run a command, change a setting, or re-connect an account. The site and the feed mark those releases.
@@ -98,13 +98,13 @@ The site turns these files into `/updates/` for people and `/updates.json` for a
 Today the catalog holds skills. It is meant to hold more: MCP servers, connectors and bundles. Two rules keep that possible.
 
 - Every kind of item keeps its own `CHANGELOG.md` and version, with the same format and the same checks.
-- Anything shipped for Codex lives in `plugins/<name>/` with a `.codex-plugin/plugin.json`. Codex plugins are how it bundles skills with `.mcp.json` and `.app.json` files. See [COMPATIBILITY.md](COMPATIBILITY.md#codex).
+- Every item lives in `plugins/<name>/`. A Codex plugin bundles skills with `.mcp.json` and `.app.json` files, and Claude Code reads the same `.mcp.json`. So an MCP server or connector goes in the same plugin folder as the skills it belongs with. See [COMPATIBILITY.md](COMPATIBILITY.md#codex).
 
-The generator and the site only walk `skills/` today. Adding a new kind means teaching them one more folder. The changelog parser in `scripts/lib/changelog.mjs` does not care what the item is.
+The generator supports one skill per plugin today. Adding a new kind means teaching `scripts/build-catalog.mjs` and the site one more component. The changelog parser in `scripts/lib/changelog.mjs` does not care what the item is.
 
 ## Categories, and leading the home page
 
-Categories come from one list, `catalog/categories.json`. Each entry has an `id`, a `label` and a one-line `description`. To add a category, add an entry to that list. A skill uses it by setting `metadata.category` to the id. The generator rejects any id that is not in the list, so a typo cannot create a new category by accident.
+Categories come from one list, `catalog/categories.json`. Each entry has an `id`, a `label`, a one-line `description` and a `codex` value, which is the category Codex shows. Codex's own set includes Developer Tools, Productivity and Creativity. To add a category, add an entry to that list. A skill uses it by setting `metadata.category` to the id. The generator rejects any id that is not in the list, so a typo cannot create a new category by accident.
 
 The site shows a filter and a page for every category that has at least one skill. An empty category shows nothing.
 
@@ -114,17 +114,14 @@ To put a skill first on the home page, set `featured: "true"` under `metadata:` 
 
 | You have | Put it in |
 | :-- | :-- |
-| One skill, scripts only | `skills/<name>/` |
-| Several related skills | `plugins/<name>/skills/` |
-| A skill plus a subagent, hook, or command | `plugins/<name>/` |
-| An MCP server users install via `/plugin` | `plugins/<name>/` with `.mcp.json` |
+| One skill, scripts only | `plugins/<name>/skills/<name>/` |
+| A skill plus a subagent, hook, or command | The same plugin folder, next to `skills/` |
+| An MCP server or connector | The same plugin folder, as `.mcp.json` or `.app.json` |
 | A standalone MCP server published to npm | `mcp/<name>/` |
 
-Default to `skills/<name>/`. A single-skill plugin puts `SKILL.md` at the plugin root, which is what makes one directory serve both the open standard and Claude Code — it stays a valid Agent Skills directory that all eight agents can read.
+Subagents, hooks and commands are **Claude Code specific**; other agents ignore them entirely. So express a capability as a skill whenever instructions plus a script can do the job, and reserve Claude-only components for things that genuinely cannot be, such as a hook that must fire on a tool event, or a subagent that needs its own context window.
 
-Move to `plugins/<name>/` only when the bundle needs components the standard has no concept of. Subagents, hooks and commands are **Claude Code specific**; other agents ignore them entirely. So express a capability as a skill whenever instructions plus a script can do the job, and reserve Claude-only components for things that genuinely cannot be — a hook that must fire on a tool event, or a subagent that needs its own context window.
-
-Note that `scripts/install.sh` only walks `skills/` at the repo root. A skill bundled inside `plugins/<name>/skills/` is therefore not installed for other agents automatically, which is another reason to keep portable skills at the top level.
+`scripts/install.sh` copies `plugins/*/skills/*/`, the skill folders, for every other agent. The plugin manifests stay behind, and that is fine: those agents only read the skill. Anything a user needs at run time, the README and the CHANGELOG included, must therefore sit inside the skill folder.
 
 ## Versioning
 

@@ -1,39 +1,39 @@
 # Plugins
 
-Multi-component bundles for Claude Code: a plugin that ships **more than one skill**, or that combines skills with subagents, hooks, commands, or MCP server wiring.
+Every item in this catalog lives here, as `plugins/<name>/`. A plugin holds its skill in a `skills/` folder.
 
 ```
 plugins/<name>/
-├── .claude-plugin/plugin.json
-├── skills/<skill-name>/SKILL.md    # one or more
-├── agents/<agent-name>.md          # subagent definitions
-├── commands/<command>.md           # flat command files
-├── hooks/hooks.json                # lifecycle hooks
-└── .mcp.json                       # MCP servers this plugin provides
+├── .claude-plugin/plugin.json      # Claude Code manifest, written by hand
+├── .codex-plugin/plugin.json       # Codex manifest, generated. Do not edit
+├── skills/<name>/                  # the skill: SKILL.md, README.md, CHANGELOG.md, scripts/
+├── agents/<agent-name>.md          # later: subagent definitions (Claude Code)
+├── hooks/hooks.json                # later: lifecycle hooks (Claude Code)
+├── .mcp.json                       # later: MCP servers this plugin provides
+└── .app.json                       # later: connectors (Codex)
 ```
 
-Register each bundle in `.claude-plugin/marketplace.json` with `"source": "./plugins/<name>"`.
+## Why the skill is nested
 
-## When to put something here instead of `skills/`
+Codex requires it. A Codex plugin must keep its skills in `skills/<name>/`, and Codex's own validator rejects any other place. Claude Code and the open standard accept the same shape. So this one layout serves every agent from a single source, with no copies, no extra branch and no install flags.
 
-A single skill with no other components belongs in [`skills/`](../skills), where the skill directory doubles as its own plugin root. That layout keeps the directory portable — it is a valid Agent Skills directory that any of the eight supported agents can read directly.
+The skill folder is still a plain open-standard skill. `scripts/install.sh` copies just that folder for every other agent, and it carries its own README and CHANGELOG.
 
-Use `plugins/` only when the bundle genuinely needs more:
+## What goes here
 
 | You have | Put it in |
 | :-- | :-- |
-| One skill, scripts only | `skills/<name>/` |
-| Several related skills | `plugins/<name>/skills/` |
-| A skill plus a subagent, hook, or command | `plugins/<name>/` |
-| An MCP server users install via `/plugin` | `plugins/<name>/` with `.mcp.json` |
+| One skill, scripts only | `plugins/<name>/skills/<name>/` |
+| A skill plus a subagent, hook or command | The same plugin folder, next to `skills/` |
+| An MCP server or a connector | The same plugin folder, as `.mcp.json` or `.app.json` |
 | A standalone MCP server published to npm | [`mcp/<name>/`](../mcp) |
+
+The generator supports one skill per plugin, named like the plugin. Bundles come later. Add the folders above when the first one is needed, and teach `scripts/build-catalog.mjs` about it.
+
+## What is generated
+
+`npm run catalog` writes `.codex-plugin/plugin.json` in every plugin, `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` at the root, and the table in the root README. `scripts/validate.sh` fails if any of them is out of date. See [docs/AUTHORING.md](../docs/AUTHORING.md).
 
 ## Portability
 
-Skills are portable across all eight agents in [docs/COMPATIBILITY.md](../docs/COMPATIBILITY.md). Subagents, hooks and commands are **Claude Code specific** — no equivalent exists in the Agent Skills standard, and other agents ignore them.
-
-That asymmetry decides the split. Anything portable should be expressed as a skill so every agent benefits. Reach for a Claude-only component when the capability genuinely cannot be expressed as instructions plus a script — a hook that must fire on a tool event, or a subagent that needs its own context window.
-
-A plugin's skills stay portable even inside a bundle: `plugins/<name>/skills/<skill>/` can still be copied to `~/.agents/skills/` by hand. `scripts/install.sh` only walks `skills/` at the repo root, so bundled skills are not installed for other agents automatically.
-
-Empty for now — nothing has been migrated here yet.
+Skills are portable across all eight agents. See [docs/COMPATIBILITY.md](../docs/COMPATIBILITY.md). Subagents, hooks and commands are Claude Code specific. Express a capability as a skill whenever instructions plus a script can do the job.

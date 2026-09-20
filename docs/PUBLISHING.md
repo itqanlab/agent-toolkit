@@ -4,12 +4,11 @@ One repo serves every channel and every component type. Nothing here needs a rep
 
 | Component | Channel | Reaches |
 | :-- | :-- | :-- |
-| Skills (`skills/`) | Neutral path, plus the marketplace | All 8 agents |
-| Plugins (`plugins/`) | Marketplace | Claude Code |
+| Skills (`plugins/*/skills/`) | Neutral path | All 8 agents |
+| Plugins (`plugins/`) | Claude Code marketplace, and Codex marketplace | Claude Code, Codex |
 | MCP servers (`mcp/`) | npm, plus optional marketplace entry | Any MCP client |
-| Bundles for Codex (`plugins/`, with a `.codex-plugin/plugin.json`) | `.agents/plugins/marketplace.json`, generated | Codex |
 
-The reason a single directory can serve two audiences is that `skills/<name>/` is simultaneously a conformant [Agent Skills](https://agentskills.io) directory and a Claude Code plugin directory. Vendor packaging sits in `.claude-plugin/`, which every other agent ignores.
+The reason one folder can serve every channel is that each item is a plugin folder holding a plain [Agent Skills](https://agentskills.io) folder in `skills/<name>/`. Claude Code and Codex read the plugin. Every other agent reads just the skill folder. Vendor manifests sit in `.claude-plugin/` and `.codex-plugin/`, which the other agents never look at. Nothing is copied: the Codex manifest and both catalogs are generated from the source by `npm run catalog`.
 
 ## 1. Any conformant agent — the vendor-neutral path
 
@@ -28,7 +27,7 @@ Never commit a symlink inside a skill directory. Git stores symlinks as a specia
 
 ## 2. Claude Code marketplace — native, zero infrastructure
 
-The repo root **is** the marketplace. `.claude-plugin/marketplace.json` is the catalog; each entry's `source` points at `./skills/<name>`. The file is generated from the skill folders by `npm run catalog`, so do not edit its `plugins` list by hand.
+The repo root **is** the marketplace. `.claude-plugin/marketplace.json` is the catalog; each entry's `source` points at `./plugins/<name>`. The file is generated from the plugin folders by `npm run catalog`, so do not edit its `plugins` list by hand.
 
 ```bash
 claude plugin validate .
@@ -50,11 +49,22 @@ Notes that matter:
 - Marketplace names that impersonate Anthropic are blocked, and a set of official names is reserved — `agent-skills` among them. `itqan` is safe.
 - `claude plugin tag` creates a `{name}--v{version}` git tag and checks that `plugin.json` and the marketplace entry agree on the version. Use it for releases.
 
+### Codex marketplace
+
+`.agents/plugins/marketplace.json` is the catalog Codex reads, and it reads it before the Claude one. It is generated too. Users run:
+
+```
+codex plugin marketplace add itqanlab/agent-toolkit
+codex plugin add watch-video@itqan
+```
+
+A plain `add` from GitHub works. It needs no `--ref` and no `--sparse`, because every plugin sits at a fixed path on `main`. To update, run `codex plugin marketplace upgrade itqan` and then `codex plugin add <name>@itqan` again. Codex replaces the installed version and starts using it in a new session.
+
 ## 3. Skill indexes and community catalogs
 
 Directories like skills.sh and the `awesome-claude-*` lists are catalogs of links, not package registries. They point at a repo and a path, so a monorepo is the common case.
 
-For each submission supply: repo URL, the `skills/<name>` subdirectory path, a one-line description, and the install commands above. Keep the per-skill `README.md` good — that is what a reviewer reads.
+For each submission supply: repo URL, the `plugins/<name>/skills/<name>` subdirectory path, a one-line description, and the install commands above. Keep the per-skill `README.md` good — that is what a reviewer reads.
 
 Submission requirements change; check each index's current CONTRIBUTING before submitting.
 
@@ -73,10 +83,10 @@ Skills and MCP servers solve different problems and are not alternatives. A skil
 ## Release checklist
 
 1. `./scripts/validate.sh` passes (it runs the upstream `skills-ref` reference validator when `uv` is installed)
-2. `claude plugin validate .` and `claude plugin validate skills/<name>` pass
+2. `claude plugin validate .` and `claude plugin validate plugins/<name>` pass. On a machine with Codex, `validate.sh` also runs Codex's own plugin validator
 3. Version bumped in `plugin.json` and the skill's `metadata.version`, a `CHANGELOG.md` entry added for it, then `npm run catalog` run and its output committed
 4. Skill `README.md` reflects any new flags
 5. `./scripts/install.sh <name> --link --force`, then run the skill once, end to end
-6. No vendor variables or absolute paths: `grep -rn 'CLAUDE_PLUGIN_ROOT\|/Users/\|~/\.claude' skills/*/SKILL.md skills/*/scripts/` returns nothing
+6. No vendor variables or absolute paths: `grep -rn 'CLAUDE_PLUGIN_ROOT\|/Users/\|~/\.claude' plugins/*/skills/*/SKILL.md plugins/*/skills/*/scripts/` returns nothing
 7. No secrets: confirm `.env`, tokens and account IDs are absent
-8. Push, `claude plugin tag skills/<name>`, then install from scratch in a clean session to confirm
+8. Push, `claude plugin tag plugins/<name>`, then install from scratch in a clean session to confirm. For Codex, run `codex plugin marketplace add itqanlab/agent-toolkit` and `codex plugin add <name>@itqan` in a throwaway `CODEX_HOME`, then `codex debug prompt-input hello` to see that the skill reaches the model

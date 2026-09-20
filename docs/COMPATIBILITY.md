@@ -31,17 +31,28 @@ None of these require a manifest, registration, or enablement step. Dropping a v
 /plugin marketplace add itqanlab/agent-toolkit
 ```
 
-`./scripts/install.sh --claude` is the fallback for anyone who would rather copy into `~/.claude/skills/` than register a marketplace. Because each skill folder carries a `.claude-plugin/plugin.json`, Claude Code loads a folder dropped there as a plugin named `<name>@skills-dir`, so it keeps full plugin capability either way. That file is stripped when installing to the neutral path, where other agents have no use for it.
+`./scripts/install.sh --claude` is the fallback for anyone who would rather copy into `~/.claude/skills/` than register a marketplace. It installs the skill folder as a plain skill, which is all a single skill needs. The marketplace remains the route for updates and for anything that later bundles more than a skill.
 
 ## Codex
 
-Everything below was measured on 2026-09-20 with codex-cli 0.150.0. Two commands made it possible without calling a model: `codex debug prompt-input` prints exactly what the model is shown, and `codex sandbox` runs a command under the sandbox. Run them again after a Codex upgrade.
+Measured on 2026-09-20 and 2026-09-21 with codex-cli 0.150.0, in a throwaway `CODEX_HOME`. Two commands make this possible without calling a model. `codex debug prompt-input` prints exactly what the model is shown, and `codex sandbox` runs a command under the sandbox. Run the tests again after a Codex upgrade.
 
-**Installing skills works through the neutral path.** After `./scripts/install.sh`, all six skills were visible to the model. A project's `.agents/skills` worked the same way.
+**Two ways in. Both work.**
 
-**The Codex plugin route does not work for plain skills.** `codex plugin marketplace add` reads our Claude catalog, and `codex plugin add` then reports "installed, enabled". But the model sees nothing. A Codex plugin needs a `.codex-plugin/plugin.json` and its skills in a `skills/<name>/` subfolder. Our skill folders keep `SKILL.md` at the top, which is what the open standard and Claude Code want. So `.agents/plugins/marketplace.json` exists to stop that false success. Codex reads it before the Claude catalog, and it lists only bundles that carry a Codex manifest. Today that list is empty. `scripts/build-catalog.mjs` writes it.
+```
+codex plugin marketplace add itqanlab/agent-toolkit      # then: codex plugin add <name>@itqan
+./scripts/install.sh                                     # the neutral path, ~/.agents/skills
+```
 
-**Codex plugins are also the way to ship more than skills.** A Codex plugin can bundle skills, an `.mcp.json` file (MCP servers) and an `.app.json` file (connectors). When MCP servers or connectors join this catalog, they go in `plugins/<name>/` with a `.codex-plugin/plugin.json`, and the generator will list them.
+A plain `add` from real GitHub, with no `--ref` and no `--sparse`, offered all seven plugins. All seven installed at the right versions and reached the model. The neutral install and a project's `.agents/skills` worked the same way.
+
+**Why every item is a plugin folder.** A Codex plugin must keep its skills in `skills/<name>/`. Codex's own validator says the manifest's `skills` field "must resolve to `skills`". A `SKILL.md` at the top of a plugin cannot work with any manifest value. We tried `./`, `.` and `./skills/`. Before this layout, `codex plugin add` reported "installed, enabled" while the model saw nothing. The alternatives all cost something: generated copies double every change on `main`, a generated branch needs `--ref`, committed symlinks break on Windows checkouts, and one big plugin removes per-skill install. So each item lives at `plugins/<name>/` with its skill folder inside. There is one source and no copies.
+
+**What is generated.** `.agents/plugins/marketplace.json` is the catalog Codex reads first. Each plugin's `.codex-plugin/plugin.json` carries the `interface` block Codex shows on the plugin card. `npm run catalog` writes both from the skill's own data, and `validate.sh` fails if they drift. Each manifest also passes Codex's own validator, which `validate.sh` runs when Codex is installed.
+
+**Updating.** For a git marketplace, run `codex plugin marketplace upgrade itqan`, then `codex plugin add <name>@itqan`. Re-adding installed the newer version, and Codex removed the old version folder from its cache. Start a new session afterwards. `codex plugin marketplace upgrade` works only on a git marketplace. On a local folder it says so and stops.
+
+**Codex plugins also carry more than skills.** A plugin can bundle `.mcp.json` (MCP servers) and `.app.json` (connectors). When those join this catalog, they go in the same plugin folder.
 
 **The sandbox blocks most of our skills until you allow two things.** With no config, a Codex session is `read-only` with the network restricted. In the usual `workspace-write` mode the network is still off, and writes outside the workspace are blocked. That includes the credential store, `~/.itqan-agent-toolkit`, or the path in `AGENT_TOOLKIT_HOME`. Skills that call a web API, or save a credential, fail without these lines in `~/.codex/config.toml`:
 
@@ -59,7 +70,20 @@ writable_roots = ["/home/you/.itqan-agent-toolkit"]
 - `/tmp` is writable by design in `workspace-write`, so a test that writes under `/tmp` proves nothing.
 - The credential folder does not have to exist before you list it.
 
-Not checked: the optional `agents/openai.yaml` file that Codex uses for display names, and how Codex limits the total size of skill descriptions when many are installed. Neither is used here yet.
+**Not checked.** The optional `agents/openai.yaml` file that Codex uses for display names. How Codex limits the total size of skill descriptions when many are installed. The `git-subdir` and `npm` source types that the Codex binary mentions. Codex on Windows.
+
+## Claude Code
+
+The same folders work in Claude Code, and it was tested from real GitHub too. `claude plugin marketplace add itqanlab/agent-toolkit` and `claude plugin install watch-video@itqan` both worked, and `claude plugin details` listed the skill.
+
+Two things differ from a plain skill folder, and both are measured:
+
+- **The name has the plugin in front.** Installed as a plugin, the skill is `watch-video:watch-video` and the slash command is `/watch-video:watch-video`. A copy in `~/.claude/skills`, which `./scripts/install.sh --claude` makes, keeps the plain name. Asking in words is unaffected, because the agent picks a skill from its description.
+- **Old versions stay in the cache.** After `claude plugin update`, both the old and the new version folder were on disk. Codex removes the old one. `toolkit-updates` only checks the newest.
+
+## Other tools that read skills
+
+`npx skills add itqanlab/agent-toolkit --list` found all seven skills in the nested layout, and `--skill watch-video` installed one into `./.agents/skills/`. So indexes that scan a repository for `SKILL.md` folders still find them.
 
 ## Overlap is safe
 
