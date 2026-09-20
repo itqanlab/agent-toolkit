@@ -77,7 +77,7 @@ It needs network access to read the feed.
 - It reports and advises. It does not update by itself, on purpose.
 - If the feed is down, it says so and stops. It does not guess a version.
 - A copy whose header has no version shows as `0.0.0`, so it always looks behind.
-- Plugin caches can keep old versions on disk. It treats the newest cached version as the installed one. It does not read the agent's own record of which version is enabled.
+- Claude Code keeps old versions in its plugin cache after an update. Codex replaces them. It treats the newest cached version as the installed one, and does not read the agent's own record of which version is enabled.
 
 ## Install
 

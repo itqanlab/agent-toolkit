@@ -13,6 +13,7 @@ What changed in `toolkit-credentials`, newest version first. To see if a newer v
 ### Changed
 
 - The changelog address now points to the site, so it keeps working if the repository layout changes.
+- Installed as a Claude Code plugin, the slash command is now `/toolkit-credentials:toolkit-credentials`, with the plugin name in front. Asking in words works as before, and a copy in a skills folder keeps the plain name `/toolkit-credentials`.
 
 ## [1.1.0] - 2026-09-20
 

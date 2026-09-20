@@ -15,8 +15,9 @@ What changed in `toolkit-updates`, newest version first. To see if a newer versi
 
 ### Changed
 
-- If old versions are left in a plugin cache, only the newest one is checked. An old folder is no longer reported as behind.
+- Claude Code keeps old versions in its plugin cache after an update. Only the newest one is checked now, so an old folder is no longer reported as behind.
 - The changelog address now points to the site, so it keeps working if the repository layout changes.
+- Installed as a Claude Code plugin, the slash command is now `/toolkit-updates:toolkit-updates`, with the plugin name in front. Asking in words works as before, and a copy in a skills folder keeps the plain name `/toolkit-updates`.
 
 ## [1.0.0] - 2026-09-20
 

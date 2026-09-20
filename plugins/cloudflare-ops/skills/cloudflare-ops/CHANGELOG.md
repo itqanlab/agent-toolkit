@@ -13,6 +13,7 @@ What changed in `cloudflare-ops`, newest version first. To see if a newer versio
 ### Changed
 
 - The changelog address now points to the site, so it keeps working if the repository layout changes.
+- Installed as a Claude Code plugin, the slash command is now `/cloudflare-ops:cloudflare-ops`, with the plugin name in front. Asking in words works as before, and a copy in a skills folder keeps the plain name `/cloudflare-ops`.
 
 ## [1.1.0] - 2026-09-20
 
