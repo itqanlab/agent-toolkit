@@ -1,0 +1,4 @@
+interface:
+  display_name: "Toolkit Credentials"
+  short_description: "Set up and keep API keys safely"
+  default_prompt: "Use $toolkit-credentials to set up the API key this skill needs."

@@ -8,6 +8,7 @@ metadata:
   version: 1.2.0
   category: devops
   short: "Domains, nameservers and DNS on Namecheap"
+  starter: "list my domains and when they expire"
 ---
 
 # Namecheap

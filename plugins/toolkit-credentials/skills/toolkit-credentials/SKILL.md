@@ -8,6 +8,7 @@ metadata:
   version: 1.2.0
   category: productivity
   short: "Set up and keep API keys safely"
+  starter: "set up the API key this skill needs"
 ---
 
 # Toolkit credentials

@@ -8,6 +8,7 @@ metadata:
   version: 1.1.0
   category: productivity
   short: "See what changed in your installed toolkit skills"
+  starter: "check which of my toolkit skills are out of date"
   access: read
 ---
 

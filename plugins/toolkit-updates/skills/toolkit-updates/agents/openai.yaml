@@ -1,0 +1,4 @@
+interface:
+  display_name: "Toolkit Updates"
+  short_description: "See what changed in your installed toolkit skills"
+  default_prompt: "Use $toolkit-updates to check which of my toolkit skills are out of date."

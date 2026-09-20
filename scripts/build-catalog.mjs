@@ -66,8 +66,11 @@ const skills = readSkills(ROOT).map((s) => {
     fail(s.name, `category "${meta.category}" is not in catalog/categories.json (${categoryIds.join(', ')})`);
   }
   // Codex shows a short line and starter prompts. The short line is written by hand.
-  if (!meta.short) fail(s.name, 'SKILL.md metadata has no short description (a line of up to 80 characters for the Codex plugin card)');
-  else if (meta.short.length > 80) fail(s.name, `metadata.short is ${meta.short.length} characters, the limit is 80`);
+  // Codex asks for 25 to 64 characters, so the line scans well in its skill list.
+  if (!meta.short) fail(s.name, 'SKILL.md metadata has no short description (25 to 64 characters, for the Codex plugin card and skill list)');
+  else if (meta.short.length < 25 || meta.short.length > 64) fail(s.name, `metadata.short is ${meta.short.length} characters. Codex asks for 25 to 64`);
+  if (!meta.starter) fail(s.name, 'SKILL.md metadata has no starter (what to ask, for example "tell me why the last deploy failed"; up to 100 characters)');
+  else if (meta.starter.length > 100) fail(s.name, `metadata.starter is ${meta.starter.length} characters, the limit is 100`);
   if (meta.access !== undefined && meta.access !== 'read') fail(s.name, 'metadata.access can only be "read". Leave it out for a skill that changes things');
   if (!p.author || !p.author.name) fail(s.name, 'plugin.json has no author.name');
   if (splitDescription(s.fm.description).triggers.filter(isPrompt).length === 0) {
@@ -184,6 +187,21 @@ const codexManifests = skills.map(({ name, p, meta, fm, pluginRoot }) => {
     `plugins/${name}/.codex-plugin/plugin.json`];
 });
 
+// agents/openai.yaml is what Codex reads for the skill list: a display name, a short line and a
+// starter prompt. It sits inside the skill folder, so it travels with every install. Other agents
+// ignore it. The values are JSON strings, which are valid YAML, so quoting is never wrong.
+const openaiYaml = skills.map(({ name, p, meta, base }) => [
+  join(base, 'agents', 'openai.yaml'),
+  [
+    'interface:',
+    `  display_name: ${JSON.stringify(p.displayName || titleCase(name))}`,
+    `  short_description: ${JSON.stringify(meta.short)}`,
+    `  default_prompt: ${JSON.stringify(`Use $${name} to ${meta.starter}.`)}`,
+    '',
+  ].join('\n'),
+  `plugins/${name}/skills/${name}/agents/openai.yaml`,
+]);
+
 const codex = `${JSON.stringify({
   name: existing.name,
   interface: { displayName: 'Itqan Agent Toolkit' },
@@ -202,6 +220,7 @@ const targets = [
   [README, nextReadme, 'README.md'],
   [CODEX, codex, '.agents/plugins/marketplace.json'],
   ...codexManifests,
+  ...openaiYaml,
 ];
 
 if (check) {

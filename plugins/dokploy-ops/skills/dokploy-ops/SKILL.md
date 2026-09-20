@@ -8,6 +8,7 @@ metadata:
   version: 1.2.0
   category: devops
   short: "Deploy and watch apps on self-hosted Dokploy"
+  starter: "tell me why the last deploy failed"
 ---
 
 # Dokploy

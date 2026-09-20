@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hetzner Ops"
+  short_description: "Run your Hetzner Cloud servers from your agent"
+  default_prompt: "Use $hetzner-ops to show my servers and what they cost."

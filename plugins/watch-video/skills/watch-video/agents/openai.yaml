@@ -1,0 +1,4 @@
+interface:
+  display_name: "Watch Video"
+  short_description: "Let your agent watch and transcribe any video"
+  default_prompt: "Use $watch-video to tell me why the hook of this video works."

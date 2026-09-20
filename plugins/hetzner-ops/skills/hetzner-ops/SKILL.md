@@ -8,6 +8,7 @@ metadata:
   version: 1.2.0
   category: devops
   short: "Run your Hetzner Cloud servers from your agent"
+  starter: "show my servers and what they cost"
 ---
 
 # Hetzner Cloud

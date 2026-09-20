@@ -8,6 +8,7 @@ metadata:
   version: "1.3.0"
   category: media
   short: "Let your agent watch and transcribe any video"
+  starter: "tell me why the hook of this video works"
 ---
 
 # watch-video

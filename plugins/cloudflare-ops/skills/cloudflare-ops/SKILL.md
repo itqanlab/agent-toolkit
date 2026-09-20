@@ -8,6 +8,7 @@ metadata:
   version: 1.2.0
   category: devops
   short: "DNS, Pages, Workers and R2 from your agent"
+  starter: "add a subdomain that points to my server"
 ---
 
 # Cloudflare
