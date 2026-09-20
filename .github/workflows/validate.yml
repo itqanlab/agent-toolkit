@@ -1,0 +1,27 @@
+name: Validate
+
+# The pre-commit hook runs the same checks, but hooks are local and can be
+# skipped with --no-verify. This is the check that cannot be skipped.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # validate.sh runs the upstream skills-ref validator when uvx exists.
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Skill spec and portability rules
+        run: bash scripts/validate.sh
+
+      - name: Shell scripts
+        run: shellcheck -S warning scripts/*.sh skills/*/scripts/*.sh
