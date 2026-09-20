@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Dokploy installation itself, which is self-hosted — some are only reachable over a VPN. Endpoint lookup reads the API description from that installation, so it always matches the version actually running."
 metadata:
   author: itqanlab
-  version: 1.2.0
+  version: 2.0.0
   category: devops
   short: "Deploy and watch apps on self-hosted Dokploy"
   starter: "tell me why the last deploy failed"

@@ -4,6 +4,20 @@ Latest: https://agent-toolkit.itqanlab.com/s/dokploy-ops/CHANGELOG.md
 
 What changed in `dokploy-ops`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.1.0 were rebuilt from the git history.
 
+## [2.0.0] - 2026-09-21
+
+### Breaking
+
+- Installed as a Claude Code plugin, the slash command is now `/dokploy-ops:dokploy-ops`, with the plugin name in front. This has been true since 1.2.0, and this release marks it as breaking. Use the new name, or ask in words, which works as before. A copy in a skills folder keeps the plain name `/dokploy-ops`.
+
+### Added
+
+- Codex now shows a display name, a short line and a starter prompt for the skill in its skill list. They come from a generated `agents/openai.yaml` inside the skill folder. Other agents ignore that file.
+
+### Changed
+
+- The description now leads with what the skill does, then its trigger phrases, then the detail. Codex shortens long skill lists from the end, so the phrases that route a request now survive far longer. With 40 skills installed, 95% of the phrases stay visible instead of 8%.
+
 ## [1.2.0] - 2026-09-20
 
 ### Added
@@ -13,7 +27,6 @@ What changed in `dokploy-ops`, newest version first. To see if a newer version e
 ### Changed
 
 - The changelog address now points to the site, so it keeps working if the repository layout changes.
-- Installed as a Claude Code plugin, the slash command is now `/dokploy-ops:dokploy-ops`, with the plugin name in front. Asking in words works as before, and a copy in a skills folder keeps the plain name `/dokploy-ops`.
 
 ## [1.1.0] - 2026-09-20
 
