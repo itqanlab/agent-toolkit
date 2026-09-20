@@ -99,7 +99,7 @@ const candidates = [
 
 // Only what the frontmatter says: name, and metadata.author / metadata.version.
 function readHeader(dir) {
-  const text = readFileSync(join(dir, 'SKILL.md'), 'utf8');
+  const text = readFileSync(join(dir, 'SKILL.md'), 'utf8').replace(/\r\n?/g, '\n'); // CRLF-safe
   if (!text.startsWith('---')) return null;
   const end = text.indexOf('\n---', 3);
   if (end === -1) return null;

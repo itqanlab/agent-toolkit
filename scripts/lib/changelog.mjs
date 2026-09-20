@@ -4,7 +4,7 @@
 // parse without guessing. It is a subset of Keep a Changelog:
 //
 //   # Changelog
-//   Latest: <raw address of this same file on the main branch>
+//   Latest: <site address of this same file>
 //
 //   ## [1.2.0] - 2026-09-20
 //   ### Added
@@ -31,7 +31,8 @@ const isRealDate = (s) => {
 
 // Returns { latestUrl, releases, unreleased, errors }.
 // A release is { version, date, sections: { Added: [..] }, breaking }.
-export function parseChangelog(text) {
+export function parseChangelog(source) {
+  const text = source.replace(/\r\n?/g, '\n'); // tolerate CRLF from a Windows checkout
   const errors = [];
   const releases = [];
   let unreleased = null;

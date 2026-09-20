@@ -31,7 +31,8 @@ const START = '<!-- skills:start -->';
 const END = '<!-- skills:end -->';
 const check = process.argv.includes('--check');
 
-const read = (p) => readFileSync(p, 'utf8');
+// CRLF is read as LF, so a Windows working tree does not look out of date.
+const read = (p) => readFileSync(p, 'utf8').replace(/\r\n?/g, '\n');
 const existing = JSON.parse(read(MARKETPLACE));
 const categories = JSON.parse(read(join(ROOT, 'catalog', 'categories.json'))).categories;
 const categoryIds = categories.map((c) => c.id);

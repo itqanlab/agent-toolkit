@@ -24,6 +24,7 @@ want() {
 # Extract a top-level scalar from the YAML frontmatter block.
 fm_field() {
   awk -v key="$1" '
+    { sub(/\r$/, "") }
     NR==1 && $0=="---" { inside=1; next }
     inside && $0=="---" { exit }
     inside && index($0, key ":")==1 {

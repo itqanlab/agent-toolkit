@@ -8,7 +8,9 @@ const unquote = (v) => v.replace(/^["']|["']$/g, '').trim();
 
 // Minimal frontmatter reader. The spec allows only scalars and a flat metadata
 // map, so a full YAML parser would be more surface than the format needs.
-export function frontmatter(src) {
+export function frontmatter(source) {
+  // A file that went through a Windows checkout or a zip can carry CRLF. Read it as LF.
+  const src = source.replace(/\r\n?/g, '\n');
   if (!src.startsWith('---')) return { data: {}, body: src };
   const end = src.indexOf('\n---', 3);
   if (end === -1) return { data: {}, body: src };
