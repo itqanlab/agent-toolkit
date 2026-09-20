@@ -36,6 +36,7 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 | [`cloudflare-ops`](skills/cloudflare-ops) | Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions | `node` |
 | [`hetzner-ops`](skills/hetzner-ops) | Run your Hetzner Cloud servers from the agent — create, resize, reboot, DNS, and what it all costs. Adopts a token the machine already has, and keeps several projects apart by name | `node` |
 | [`dokploy-ops`](skills/dokploy-ops) | Run what is deployed on your self-hosted Dokploy installations — deploy and *wait for the build to actually finish*, read logs, restart, check health. Several installations, kept apart by name | `node` |
+| [`namecheap-ops`](skills/namecheap-ops) | Run your Namecheap domains from the agent — what expires, nameservers, availability, prices, DNS records. Handles Namecheap's IP whitelist, even from a laptop whose address keeps changing, by sending requests through your own server | `node` |
 
 ---
 
