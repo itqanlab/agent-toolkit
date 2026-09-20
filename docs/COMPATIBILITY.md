@@ -33,7 +33,8 @@ The table above comes from each vendor's documentation. This one comes from runn
 | OpenCode 1.18.31 | 7 of 7 in `opencode debug skill`, if the output goes to a file. See below | None used |
 | GitHub Copilot CLI 1.0.86 | 7 of 7 in `copilot skill list` | `copilot plugin marketplace add itqanlab/agent-toolkit`: lists all 7, installed one |
 | Amp 0.0.1789934445 | 7 of 7 in `amp skills list`. Its own 12 built-in skills were the only ones in the control | `amp skills add itqanlab/agent-toolkit/plugins/<name>/skills/<name>`: installed `watch-video` from GitHub. **`amp skills add itqanlab/agent-toolkit` finds nothing.** See below |
-| Cursor, Goose | Not tested. One is an editor, the other a binary | Not tested |
+| Goose 1.51.0 | 7 of 7 in `goose skills list`. The control showed only its two built-in skills. It also prints each skill's token cost | None used |
+| Cursor | Not tested. Its command line keeps the login in the macOS keychain, which a scratch home cannot isolate, and it stopped at an existing login. It needs an API key | Not tested |
 
 **OpenCode's debug output is cut when piped.** A first run listed 6 of 7 skills, and it looked like a discovery bug. It was not. `opencode debug skill` prints about 80,000 bytes, because it includes every skill's full text. When its output goes into a pipe, it stops at exactly 65,536 bytes, one pipe buffer, and leaves broken JSON. Which skills get cut depends on scan order. Fifteen runs on fresh homes reproduced it every time when piped, and never when written to a file, where all 7 are present. So OpenCode finds everything, and only its debug printer truncates. Redirect the output to a file when you test it. A tool that waits for the pipe, such as Python, prints 70,000 characters through a pipe without loss.
 
@@ -74,7 +75,9 @@ A plain `add` from real GitHub, with no `--ref` and no `--sparse`, offered all s
 
 **How much description Codex shows the model.** Measured with skills that use our real descriptions. Codex gives the skill list a budget of about 23,200 characters. Below that, every description is shown in full. Above it, every description is shortened by the same amount, **from the end**, and the skill names always stay. It is about 20 skills at 766 characters each, then 446 characters each at 40 skills, and about 190 at 80. Our descriptions used to end with the trigger phrases, so at 40 installed skills only 8% of the phrases were visible. Now a description leads with one short sentence, then the trigger phrases, then the detail. At 40 skills 95% stay visible, and at 80 skills 34% do. `validate.sh` warns when the phrases start later than character 200. Only installed skills count, so a catalog of 100 is fine. The limit matters to someone who installs dozens.
 
-**Other plugin sources.** Besides `local`, Codex accepts `git-subdir` and `npm`. A `git-subdir` entry installed our `watch-video` plugin straight from `plugins/watch-video` in this repository, and the model saw it. So another marketplace can list one of our plugins without copying it. An `npm` entry started npm, and failed only because the test package did not exist. An unknown source type is ignored without an error. We use `local`.
+**Other plugin sources.** Besides `local`, Codex accepts `git-subdir` and `npm`. A `git-subdir` entry installed our `watch-video` plugin straight from `plugins/watch-video` in this repository, and the model saw it. So another marketplace can list one of our plugins without copying it. An `npm` entry, written `{"source": "npm", "package": "@scope/name"}`, installed a real package as a plugin at the version in the package, and the model saw the skill. That was tested against a local registry, with nothing published. The package name must be a valid npm name. A file path is silently ignored. An unknown source type is also ignored without an error. We use `local`.
+
+**What the plugin card shows.** Codex's app-server `plugin/list` call returns the fields a card is drawn from. For all seven plugins it returned the display name, the short line, the category, the capabilities, the developer, the site link and three starter prompts, exactly as generated. The desktop app reads the same call. Whether the app draws them correctly on screen was not checked, because it cannot be driven from here. One cosmetic point: starter prompts made from questions have no question mark.
 
 **Codex plugins also carry more than skills.** A plugin can bundle `.mcp.json` (MCP servers) and `.app.json` (connectors). When those join this catalog, they go in the same plugin folder.
 
@@ -88,7 +91,7 @@ network_access = true
 writable_roots = ["/home/you/.itqan-agent-toolkit"]
 ```
 
-`install.sh` and `install.ps1` print this, with your real path, when they find Codex. They never edit your config. Three details from the tests:
+`install.sh` and `install.ps1` print this, with your real path, when they find Codex. They never edit your config. The Windows one adds two lines. See the Windows section below. The compatibility workflow takes the exact text each installer prints, writes it as a config file, and checks that Codex then reports a `workspace-write` session with the network on, on all three systems. Three details from the tests:
 
 - `sandbox_mode` must be there. With only the two settings under `[sandbox_workspace_write]`, the session stayed read-only with no network.
 - `/tmp` is writable by design in `workspace-write`, so a test that writes under `/tmp` proves nothing.
@@ -96,7 +99,7 @@ writable_roots = ["/home/you/.itqan-agent-toolkit"]
 
 **Versions.** The local tests used Codex 0.150.0. The compatibility workflow installs the latest Codex from npm on each run, and it passed with 0.155.1 on Windows, macOS and Linux.
 
-**Not checked.** How the Codex sandbox behaves on Windows. It has a different implementation, and the settings above were measured on macOS. The Codex desktop app, as opposed to the command line.
+**Not checked.** How the desktop app draws the cards, and the Linux sandbox, which the workflow only reaches as far as the config Codex reports.
 
 ## Claude Code
 
@@ -116,6 +119,17 @@ Two things differ from a plain skill folder, and both are measured:
 Checked on a real Windows runner (Windows Server 2025) by `.github/workflows/compat.yml`. Every step passed: the generated files match, the checkout is LF, the validator runs, a real Codex installs all seven plugins and shows them to the model, the PowerShell installer copies all seven skills, and the update checker finds the seven copies in Codex's plugin cache. The same workflow passes on macOS and Linux.
 
 The run found two real bugs, and a simulated checkout found a third. A simulated Windows checkout found the first. Git for Windows checks files out with CRLF line endings by default. Our parsers split on `\n`, so every frontmatter value came out empty, the generator refused to build, and the update checker would have read the version as `1.2.0\r`. Two fixes went in. `.gitattributes` keeps every file LF on every machine, and the parsers and the generator now read CRLF as LF anyway, for a download that never went through Git. A `.sh` file with CRLF still cannot run, which is why the attribute matters. The second bug was found on the real runner. The Windows console defaults to cp1252, and the Python validator crashed printing a check mark, so it now writes UTF-8. The third was a mistake in the workflow's own test, not in the product: `Write-Host` output does not go through `2>&1`, so the installer's Codex text was captured with `*>&1`. On Windows the installer printed `writable_roots = ["C:/Users/.../.itqan-agent-toolkit"]`, a valid TOML path with forward slashes.
+
+## The Codex sandbox on Windows
+
+Measured on a real Windows runner with Codex 0.155.1. It works differently from macOS in four ways.
+
+- **The `[windows]` line is required.** With only the settings above, a Windows session stayed `read-only` with the network restricted. Add `[windows]` and `sandbox = "elevated"`. Codex's own setup writes that line too. A hand-written line was enough on a fresh machine: the session became `workspace-write` with the network on, and writes to the store worked.
+- **`elevated` enforces the network block and `unelevated` does not.** In `elevated` mode Node's `fetch` failed with `EACCES` until `network_access = true` was set. In `unelevated` mode it worked with no permission granted. On a fresh machine with a hand-written config and no setup, it also worked. Our skills only need the network allowed, so all of these work for them.
+- **The credential folder must exist first.** Creating it inside the sandbox was denied even with the path listed. Once it existed and was listed, `cmd` and Node could both write to it. A folder that was not listed, and any other place, stayed blocked. On macOS the folder did not need to exist. `install.ps1` prints the command to create it.
+- **`curl.exe` fails with a TLS error under the sandbox** (exit 35), even with the network allowed. Node's `fetch` works. Our skills use Node, so this only matters to a script that uses Windows curl.
+
+`codex sandbox` ignores `sandbox_mode` from the config file on Windows too, so the direct tests pass it as a flag.
 
 ## Overlap is safe
 
