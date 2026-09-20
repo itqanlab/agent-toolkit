@@ -33,6 +33,34 @@ None of these require a manifest, registration, or enablement step. Dropping a v
 
 `./scripts/install.sh --claude` is the fallback for anyone who would rather copy into `~/.claude/skills/` than register a marketplace. Because each skill folder carries a `.claude-plugin/plugin.json`, Claude Code loads a folder dropped there as a plugin named `<name>@skills-dir`, so it keeps full plugin capability either way. That file is stripped when installing to the neutral path, where other agents have no use for it.
 
+## Codex
+
+Everything below was measured on 2026-09-20 with codex-cli 0.150.0. Two commands made it possible without calling a model: `codex debug prompt-input` prints exactly what the model is shown, and `codex sandbox` runs a command under the sandbox. Run them again after a Codex upgrade.
+
+**Installing skills works through the neutral path.** After `./scripts/install.sh`, all six skills were visible to the model. A project's `.agents/skills` worked the same way.
+
+**The Codex plugin route does not work for plain skills.** `codex plugin marketplace add` reads our Claude catalog, and `codex plugin add` then reports "installed, enabled". But the model sees nothing. A Codex plugin needs a `.codex-plugin/plugin.json` and its skills in a `skills/<name>/` subfolder. Our skill folders keep `SKILL.md` at the top, which is what the open standard and Claude Code want. So `.agents/plugins/marketplace.json` exists to stop that false success. Codex reads it before the Claude catalog, and it lists only bundles that carry a Codex manifest. Today that list is empty. `scripts/build-catalog.mjs` writes it.
+
+**Codex plugins are also the way to ship more than skills.** A Codex plugin can bundle skills, an `.mcp.json` file (MCP servers) and an `.app.json` file (connectors). When MCP servers or connectors join this catalog, they go in `plugins/<name>/` with a `.codex-plugin/plugin.json`, and the generator will list them.
+
+**The sandbox blocks most of our skills until you allow two things.** With no config, a Codex session is `read-only` with the network restricted. In the usual `workspace-write` mode the network is still off, and writes outside the workspace are blocked. That includes the credential store, `~/.itqan-agent-toolkit`, or the path in `AGENT_TOOLKIT_HOME`. Skills that call a web API, or save a credential, fail without these lines in `~/.codex/config.toml`:
+
+```toml
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = ["/home/you/.itqan-agent-toolkit"]
+```
+
+`install.sh` and `install.ps1` print this, with your real path, when they find Codex. They never edit your config. Three details from the tests:
+
+- `sandbox_mode` must be there. With only the two settings under `[sandbox_workspace_write]`, the session stayed read-only with no network.
+- `/tmp` is writable by design in `workspace-write`, so a test that writes under `/tmp` proves nothing.
+- The credential folder does not have to exist before you list it.
+
+Not checked: the optional `agents/openai.yaml` file that Codex uses for display names, and how Codex limits the total size of skill descriptions when many are installed. Neither is used here yet.
+
 ## Overlap is safe
 
 Several agents read both `~/.agents/skills/` and `~/.claude/skills/`, so installing to both makes the same skill visible twice. This is handled by the agents themselves — Amp, for instance, "uses the first skill with a given frontmatter `name`" in its documented precedence order, and Cursor, Goose and OpenCode treat their vendor paths as backward-compatible fallbacks behind the neutral path. Names stay unique because the directory name, the frontmatter `name`, and the plugin `name` are all required to match.

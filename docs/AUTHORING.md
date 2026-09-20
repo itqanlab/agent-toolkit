@@ -40,8 +40,9 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 2. Write `skills/<name>/SKILL.md`. The frontmatter `name` must match `<name>`. Under `metadata:` set `version` and `category`. The category must be one of the ids in `catalog/categories.json`.
 3. Write `skills/<name>/README.md`: what it does, requirements, usage, an example
 4. Write `skills/<name>/.claude-plugin/plugin.json`. Give it `name`, `version`, `description`, `author`, `license`, `keywords` and a `homepage` of `https://github.com/itqanlab/agent-toolkit/tree/main/skills/<name>`. The `version` must equal `metadata.version` in `SKILL.md`.
-5. Run `npm run catalog`. It writes the entry in `.claude-plugin/marketplace.json` and the row in the root `README.md` table. Do not edit those two by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
-6. Validate and actually run it:
+5. Write `skills/<name>/CHANGELOG.md`, and add the Updates section to `SKILL.md` (see Changelog below).
+6. Run `npm run catalog`. It writes the entry in `.claude-plugin/marketplace.json` and the row in the root `README.md` table. Do not edit those two by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
+7. Validate and actually run it:
    ```bash
    ./scripts/validate.sh <name>              # spec, portability rules, and the catalog check
    claude plugin validate skills/<name>
@@ -54,6 +55,52 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 The `metadata.pluginRoot` shorthand for marketplace sources is documented upstream but is rejected by `claude plugin validate`, so use the explicit `./skills/<name>` path.
 
 Plugin manifests cannot reference paths containing `..` — the validator blocks it as path traversal. That is precisely why the skill directory and the plugin directory are the same directory.
+
+## Changelog
+
+Every item keeps a `CHANGELOG.md` next to its manifest. It is written for people and read by agents. An agent that has the item installed can read its own history from the folder. Then it can open the address on the `Latest:` line, see if a newer version exists, and tell the user exactly what changed before it updates.
+
+The format is strict on purpose, so it can be parsed without guessing:
+
+```markdown
+# Changelog
+
+Latest: https://raw.githubusercontent.com/itqanlab/agent-toolkit/main/skills/<name>/CHANGELOG.md
+
+## [1.2.0] - 2026-09-20
+
+### Added
+
+- One line per change. Say what the user can now do.
+
+### Fixed
+
+- Another line.
+```
+
+Rules the generator enforces:
+
+- Newest version first. Each heading is `## [x.y.z] - YYYY-MM-DD` with a real date.
+- Sections are `Breaking`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`. Nothing else.
+- Every release has at least one change.
+- The newest entry must equal the item's version in `plugin.json` and `metadata.version`. So a version bump without an entry fails.
+- The `Latest:` line must be the raw address of this same file on `main`.
+- `SKILL.md` must mention `CHANGELOG.md`. Copy the "Updates" section from any existing skill.
+
+Use `### Breaking` whenever the user has to do something after updating: run a command, change a setting, or re-connect an account. The site and the feed mark those releases.
+
+Which number to bump: a new capability is a minor version, a fix is a patch, and anything that breaks existing use is a major version.
+
+The site turns these files into `/updates/` for people and `/updates.json` for agents. Each skill page also gets its own `changelog.json`.
+
+## Other kinds of items
+
+Today the catalog holds skills. It is meant to hold more: MCP servers, connectors and bundles. Two rules keep that possible.
+
+- Every kind of item keeps its own `CHANGELOG.md` and version, with the same format and the same checks.
+- Anything shipped for Codex lives in `plugins/<name>/` with a `.codex-plugin/plugin.json`. Codex plugins are how it bundles skills with `.mcp.json` and `.app.json` files. See [COMPATIBILITY.md](COMPATIBILITY.md#codex).
+
+The generator and the site only walk `skills/` today. Adding a new kind means teaching them one more folder. The changelog parser in `scripts/lib/changelog.mjs` does not care what the item is.
 
 ## Categories, and leading the home page
 
@@ -81,6 +128,6 @@ Note that `scripts/install.sh` only walks `skills/` at the repo root. A skill bu
 
 ## Versioning
 
-Bump `version` in `plugin.json` and in the skill's `metadata.version` when behavior changes, then run `npm run catalog`. Claude Code only ships an update when that string changes. The generator refuses to run if the two versions differ.
+Bump `version` in `plugin.json` and in the skill's `metadata.version` when behavior changes, add the matching entry to `CHANGELOG.md`, then run `npm run catalog`. Claude Code only ships an update when that string changes. The generator refuses to run if the two versions differ, or if the changelog does not start with that version.
 
 Breaking a flag, renaming a skill, or changing output layout is a major bump. When renaming or removing a plugin, add the old name to the `renames` map in `.claude-plugin/marketplace.json`, so existing installs migrate instead of breaking. The generator only rewrites the `plugins` list. Every other key in that file is kept, including `renames`.

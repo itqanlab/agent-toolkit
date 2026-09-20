@@ -55,7 +55,7 @@ Full rules in [docs/AUTHORING.md](docs/AUTHORING.md). The mechanical bar:
 ./scripts/validate.sh <name>
 ```
 
-That checks the spec's `name` and `description` rules, that the frontmatter name matches the directory name, that every referenced script exists and is executable, and that no vendor-specific variable or absolute path has crept into `SKILL.md`. It also checks that `marketplace.json` and the README table match the skill folders. If they do not, run `npm run catalog` and commit the result. It also runs the upstream reference validator from the spec authors when `uv` is installed.
+That checks the spec's `name` and `description` rules, that the frontmatter name matches the directory name, that every referenced script exists and is executable, and that no vendor-specific variable or absolute path has crept into `SKILL.md`. It also checks that `marketplace.json`, the Codex catalog and the README table match the skill folders. If they do not, run `npm run catalog` and commit the result. Every change to an item needs a version bump and a `CHANGELOG.md` entry. The check fails when they disagree. It also runs the upstream reference validator from the spec authors when `uv` is installed.
 
 Before opening a PR, install the skill and actually run it:
 

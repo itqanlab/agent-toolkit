@@ -7,6 +7,7 @@ One repo serves every channel and every component type. Nothing here needs a rep
 | Skills (`skills/`) | Neutral path, plus the marketplace | All 8 agents |
 | Plugins (`plugins/`) | Marketplace | Claude Code |
 | MCP servers (`mcp/`) | npm, plus optional marketplace entry | Any MCP client |
+| Bundles for Codex (`plugins/`, with a `.codex-plugin/plugin.json`) | `.agents/plugins/marketplace.json`, generated | Codex |
 
 The reason a single directory can serve two audiences is that `skills/<name>/` is simultaneously a conformant [Agent Skills](https://agentskills.io) directory and a Claude Code plugin directory. Vendor packaging sits in `.claude-plugin/`, which every other agent ignores.
 
@@ -73,7 +74,7 @@ Skills and MCP servers solve different problems and are not alternatives. A skil
 
 1. `./scripts/validate.sh` passes (it runs the upstream `skills-ref` reference validator when `uv` is installed)
 2. `claude plugin validate .` and `claude plugin validate skills/<name>` pass
-3. Version bumped in `plugin.json` and the skill's `metadata.version`, then `npm run catalog` run and its output committed
+3. Version bumped in `plugin.json` and the skill's `metadata.version`, a `CHANGELOG.md` entry added for it, then `npm run catalog` run and its output committed
 4. Skill `README.md` reflects any new flags
 5. `./scripts/install.sh <name> --link --force`, then run the skill once, end to end
 6. No vendor variables or absolute paths: `grep -rn 'CLAUDE_PLUGIN_ROOT\|/Users/\|~/\.claude' skills/*/SKILL.md skills/*/scripts/` returns nothing
