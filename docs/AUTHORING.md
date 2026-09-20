@@ -37,14 +37,13 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 ## Adding a skill
 
 1. `mkdir -p skills/<name>/scripts`
-2. Write `skills/<name>/SKILL.md` — frontmatter `name` identical to `<name>`
-3. Write `skills/<name>/README.md` — what it does, requirements, usage, an example
-4. Write `skills/<name>/.claude-plugin/plugin.json` (`name` is the only required field; fill the rest in for a decent marketplace listing)
-5. Add an entry to `.claude-plugin/marketplace.json` with `"source": "./skills/<name>"`
-6. Add a row to the table in the root `README.md`
-7. Validate and actually run it:
+2. Write `skills/<name>/SKILL.md`. The frontmatter `name` must match `<name>`. Under `metadata:` set `version` and `category`. The category must be one of the ids in `catalog/categories.json`.
+3. Write `skills/<name>/README.md`: what it does, requirements, usage, an example
+4. Write `skills/<name>/.claude-plugin/plugin.json`. Give it `name`, `version`, `description`, `author`, `license`, `keywords` and a `homepage` of `https://github.com/itqanlab/agent-toolkit/tree/main/skills/<name>`. The `version` must equal `metadata.version` in `SKILL.md`.
+5. Run `npm run catalog`. It writes the entry in `.claude-plugin/marketplace.json` and the row in the root `README.md` table. Do not edit those two by hand. The next run would overwrite you, and `validate.sh` fails while they are out of date.
+6. Validate and actually run it:
    ```bash
-   ./scripts/validate.sh <name>              # spec + portability rules
+   ./scripts/validate.sh <name>              # spec, portability rules, and the catalog check
    claude plugin validate skills/<name>
    claude plugin validate .
    ./scripts/install.sh <name> --link --force
@@ -55,6 +54,14 @@ Keep the body under 500 lines and roughly under 5000 tokens; push detail into `r
 The `metadata.pluginRoot` shorthand for marketplace sources is documented upstream but is rejected by `claude plugin validate`, so use the explicit `./skills/<name>` path.
 
 Plugin manifests cannot reference paths containing `..` — the validator blocks it as path traversal. That is precisely why the skill directory and the plugin directory are the same directory.
+
+## Categories, and leading the home page
+
+Categories come from one list, `catalog/categories.json`. Each entry has an `id`, a `label` and a one-line `description`. To add a category, add an entry to that list. A skill uses it by setting `metadata.category` to the id. The generator rejects any id that is not in the list, so a typo cannot create a new category by accident.
+
+The site shows a filter and a page for every category that has at least one skill. An empty category shows nothing.
+
+To put a skill first on the home page, set `featured: "true"` under `metadata:` in its `SKILL.md`. Featured skills come first. The rest fill the six places in name order.
 
 ## Choosing where a component goes
 
@@ -74,6 +81,6 @@ Note that `scripts/install.sh` only walks `skills/` at the repo root. A skill bu
 
 ## Versioning
 
-Bump `version` in both `plugin.json` and the marketplace entry when behavior changes; Claude Code only ships an update when that string changes. Mirror it in the skill's `metadata.version`.
+Bump `version` in `plugin.json` and in the skill's `metadata.version` when behavior changes, then run `npm run catalog`. Claude Code only ships an update when that string changes. The generator refuses to run if the two versions differ.
 
-Breaking a flag, renaming a skill, or changing output layout is a major bump. When renaming or removing a plugin, add the old name to the marketplace `renames` map so existing installs migrate instead of breaking.
+Breaking a flag, renaming a skill, or changing output layout is a major bump. When renaming or removing a plugin, add the old name to the `renames` map in `.claude-plugin/marketplace.json`, so existing installs migrate instead of breaking. The generator only rewrites the `plugins` list. Every other key in that file is kept, including `renames`.

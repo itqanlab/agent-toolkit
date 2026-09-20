@@ -27,7 +27,7 @@ Never commit a symlink inside a skill directory. Git stores symlinks as a specia
 
 ## 2. Claude Code marketplace — native, zero infrastructure
 
-The repo root **is** the marketplace. `.claude-plugin/marketplace.json` is the catalog; each entry's `source` points at `./skills/<name>`.
+The repo root **is** the marketplace. `.claude-plugin/marketplace.json` is the catalog; each entry's `source` points at `./skills/<name>`. The file is generated from the skill folders by `npm run catalog`, so do not edit its `plugins` list by hand.
 
 ```bash
 claude plugin validate .
@@ -73,7 +73,7 @@ Skills and MCP servers solve different problems and are not alternatives. A skil
 
 1. `./scripts/validate.sh` passes (it runs the upstream `skills-ref` reference validator when `uv` is installed)
 2. `claude plugin validate .` and `claude plugin validate skills/<name>` pass
-3. Version bumped in `plugin.json`, the marketplace entry, and the skill's `metadata.version`
+3. Version bumped in `plugin.json` and the skill's `metadata.version`, then `npm run catalog` run and its output committed
 4. Skill `README.md` reflects any new flags
 5. `./scripts/install.sh <name> --link --force`, then run the skill once, end to end
 6. No vendor variables or absolute paths: `grep -rn 'CLAUDE_PLUGIN_ROOT\|/Users/\|~/\.claude' skills/*/SKILL.md skills/*/scripts/` returns nothing
