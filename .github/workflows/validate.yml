@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The catalog check runs build-catalog.mjs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       # validate.sh runs the upstream skills-ref validator when uvx exists.
       - uses: astral-sh/setup-uv@v6
 

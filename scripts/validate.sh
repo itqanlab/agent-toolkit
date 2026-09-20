@@ -136,6 +136,22 @@ if [ "$checked" -eq 0 ]; then
   echo "no skills matched"; exit 1
 fi
 
+# --- the catalog files must match the skill folders. This is also the two-way
+# check: a marketplace entry with no folder, or a folder with no entry, is a diff.
+if command -v node >/dev/null 2>&1; then
+  echo "catalog (marketplace.json and the README table match the skill folders)"
+  if out=$(node "$REPO_ROOT/scripts/build-catalog.mjs" --check 2>&1); then
+    printf '  ✔ %s\n' "$out"
+  else
+    printf '%s\n' "$out" | sed 's/^/  /'
+    errors=$((errors+1))
+  fi
+  echo
+else
+  echo "(skipped the catalog check — install node to run it)"
+  echo
+fi
+
 # --- upstream conformance, via the reference validator from the spec authors.
 # Python package, Apache-2.0, in the official agentskills/agentskills repo.
 # (The unrelated `skills-ref` package on npm is not it — do not use that one.)
