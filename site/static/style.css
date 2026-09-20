@@ -588,3 +588,18 @@ main { min-width: 0; padding: 0 var(--gut); }
 .p-skill .band:first-of-type { padding-top: 24px; }
 .p-skill .sec-h { margin-top: 0; }
 .p-skill .head-skill { padding-bottom: 0; }
+
+/* changelog ---------------------------------------------------------------- */
+.rels { max-width: 74ch; }
+.rel { margin: 0 0 26px; padding-left: 14px; border-left: 2px solid var(--line); }
+.rel-h { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+  margin: 0 0 6px; font: 600 1rem/1.3 var(--mono); }
+.rel-h time { font-weight: 400; font-size: .8rem; color: var(--faint); }
+.rel-name { color: var(--amber); }
+.rel-s { margin: 12px 0 4px; font: 500 .72rem/1 var(--mono);
+  text-transform: uppercase; letter-spacing: .08em; color: var(--slate); }
+.rel ul { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.rel li { margin: 4px 0; }
+.rel code { font-size: .87em; padding: 2px 5px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 3px; }
+.tag-warn { color: var(--amber); border-color: var(--amber); }

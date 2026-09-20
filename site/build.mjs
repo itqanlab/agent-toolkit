@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
 import { frontmatter, splitDescription, deps } from '../scripts/lib/catalog.mjs';
+import { parseChangelog, compareVersions } from '../scripts/lib/changelog.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -50,6 +51,8 @@ function loadSkills() {
       const entry = (marketplace.plugins || []).find((p) => p.name === e.name) || {};
       const { summary, triggers } = splitDescription(data.description);
       const readme = existsSync(join(base, 'README.md')) ? read(join(base, 'README.md')) : '';
+      const changelogRaw = existsSync(join(base, 'CHANGELOG.md')) ? read(join(base, 'CHANGELOG.md')) : '';
+      const changelog = parseChangelog(changelogRaw);
       return {
         type: 'skill',
         name: e.name,
@@ -65,6 +68,9 @@ function loadSkills() {
         category: (data.metadata && data.metadata.category) || entry.category || 'general',
         featured: !!data.metadata && data.metadata.featured === 'true',
         readme,
+        changelog,
+        changelogRaw,
+        released: (changelog.releases[0] && changelog.releases[0].date) || '',
         agents: agentData.agents.length,
         source: `${SITE.repo}/tree/main/skills/${e.name}`,
       };
@@ -95,6 +101,7 @@ const categoryOf = (id) => categoryList.find((c) => c.id === id);
 const NAV = [
   { href: '/', label: 'overview' },
   { href: '/browse/', label: 'browse' },
+  { href: '/updates/', label: 'updates' },
   { href: '/agents/', label: 'agents' },
 ];
 
@@ -486,6 +493,63 @@ function browse() {
 ${colophon()}`;
 }
 
+// One release, as HTML. Used on a skill page and on the updates page.
+function releaseHtml(r, item) {
+  const id = `v${r.version.replace(/\./g, '-')}`;
+  const name = item ? `<a class="rel-name" href="/s/${esc(item.name)}/#${id}">${esc(item.name)}</a>` : '';
+  const sections = Object.entries(r.sections).map(([sec, list]) => `
+    <h4 class="rel-s">${esc(sec)}</h4>
+    <ul>${list.map((b) => `<li>${marked.parseInline(b)}</li>`).join('')}</ul>`).join('');
+  return `<article class="rel" id="${id}">
+  <h3 class="rel-h">${name}<span class="rel-v">${esc(r.version)}</span><time datetime="${r.date}">${r.date}</time>${r.breaking ? '<span class="tag tag-warn">breaking</span>' : ''}</h3>${sections}
+</article>`;
+}
+
+// The same data for machines. One entry per item, newest release first.
+function feedItem(sk) {
+  return {
+    name: sk.name,
+    type: sk.type,
+    category: sk.category,
+    version: sk.version,
+    released: sk.released,
+    page: `${SITE.url}/s/${sk.name}/`,
+    changelog: sk.changelog.latestUrl,
+    releases: sk.changelog.releases.map((r) => ({
+      version: r.version, date: r.date, breaking: r.breaking, changes: r.sections,
+    })),
+  };
+}
+
+function updatesFeed() {
+  return {
+    schema: 1,
+    site: SITE.url,
+    updated: skills.map((sk) => sk.released).sort().pop() || '',
+    how: 'Compare the version you have installed (metadata.version in the skill\'s SKILL.md) with "version" here. '
+      + 'If yours is lower, read every entry in "releases" newer than yours and tell the user what changed before you update. '
+      + 'A release with "breaking": true needs the user to act.',
+    items: skills.map(feedItem),
+  };
+}
+
+function updatesPage() {
+  const all = skills
+    .flatMap((sk) => sk.changelog.releases.map((r) => ({ r, sk })))
+    .sort((a, b) => b.r.date.localeCompare(a.r.date) || a.sk.name.localeCompare(b.sk.name)
+      || compareVersions(b.r.version, a.r.version));
+  return `
+<section class="head">
+  <h1 class="page-h">Updates</h1>
+  <p class="lede">Every release of every tool, newest first. ${all.length} releases across ${skills.length} tools.</p>
+  <p class="band-lede">An agent can read the same list as JSON at
+    <a href="/updates.json"><code>/updates.json</code></a>, compare it with what is installed,
+    and tell you exactly what changed before it updates anything.</p>
+</section>
+<div class="rels">${all.map(({ r, sk }) => releaseHtml(r, sk)).join('')}</div>
+${colophon()}`;
+}
+
 function categoryPage(c) {
   return `
 <section class="head">
@@ -600,6 +664,7 @@ function skillPage(s) {
     examples ? ['examples', 'Examples'] : null,
     how ? ['how', 'How it works'] : null,
     limits ? ['limits', 'Limits'] : null,
+    s.changelog.releases.length ? ['changelog', 'Changelog'] : null,
   ].filter(Boolean);
 
   const body = marked.parse(rest.map((r) => `## ${r.title}\n${r.body}`).join('\n\n'));
@@ -610,6 +675,7 @@ function skillPage(s) {
   <p class="lede">${esc(s.summary)}</p>
   <div class="specs">
     <div><dt>version</dt><dd>${esc(s.version)}</dd></div>
+    ${s.released ? `<div><dt>updated</dt><dd>${esc(s.released)}</dd></div>` : ''}
     <div><dt>works in</dt><dd>every conformant agent</dd></div>
     <div><dt>needs</dt><dd>${s.deps.length ? s.deps.map((d) => esc(d)).join(' · ') : 'nothing'}</dd></div>
     <div><dt>cost</dt><dd>free · no API key</dd></div>
@@ -670,6 +736,14 @@ ${how ? `<section class="band" id="how">
 ${limits ? `<section class="band" id="limits">
   <h2 class="sec-h"><span class="sec-n">Limits</span> what it will not do</h2>
   <div class="prose prose-tight">${marked.parse(limits.body)}</div>
+</section>` : ''}
+
+${s.changelog.releases.length ? `<section class="band" id="changelog">
+  <h2 class="sec-h"><span class="sec-n">Changelog</span> what changed, newest first</h2>
+  <div class="rels">${s.changelog.releases.map((r) => releaseHtml(r)).join('')}</div>
+  <p class="band-lede">An agent that has this installed reads <code>CHANGELOG.md</code> in the skill folder.
+    The same history is at <a href="/s/${esc(s.name)}/changelog.json"><code>changelog.json</code></a>,
+    and every tool's releases are at <a href="/updates.json"><code>/updates.json</code></a>.</p>
 </section>` : ''}
 
 ${rest.length ? `<section class="band prose">${body}</section>` : ''}
@@ -825,7 +899,17 @@ for (const s of skills) {
     og: `/og-${s.name}.png`, path: `/s/${s.name}/`, jsonld: [skillLd(s)],
   }));
   write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary }));
+  write(`s/${s.name}/CHANGELOG.md`, s.changelogRaw);
+  write(`s/${s.name}/changelog.json`, `${JSON.stringify(feedItem(s), null, 2)}\n`);
 }
+
+write('updates/index.html', page({
+  title: `Updates — ${SITE.title}`,
+  desc: 'Every release of every tool in the toolkit, newest first, with exactly what changed. Also available as JSON for agents.',
+  active: '/updates/', body: updatesPage(), cls: 'p-browse', og: '/og-updates.png', path: '/updates/',
+}));
+write('updates.json', `${JSON.stringify(updatesFeed(), null, 2)}\n`);
+write('og-updates.svg', ogSvg({ kicker: 'CHANGELOG', title: 'Updates', sub: 'What changed in each release' }));
 
 write('og.svg', ogSvg({ kicker: 'ITQAN LAB', title: 'Agent Toolkit', sub: SITE.tagline }));
 write('og-browse.svg', ogSvg({ kicker: 'CATALOG', title: 'Browse', sub: `${catalog.length} tools for AI coding agents` }));
@@ -869,7 +953,7 @@ Sitemap: ${SITE.url}/sitemap.xml
 const today = agentData.verified;
 write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[['/', '1.0'], ['/browse/', '0.9'], ['/agents/', '0.9'], ...categories.map((c) => [`/c/${c.id}/`, '0.7']), ...skills.map((s) => [`/s/${s.name}/`, '0.8'])]
+${[['/', '1.0'], ['/browse/', '0.9'], ['/updates/', '0.8'], ['/agents/', '0.9'], ...categories.map((c) => [`/c/${c.id}/`, '0.7']), ...skills.map((s) => [`/s/${s.name}/`, '0.8'])]
     .map(([u, pr]) => `  <url><loc>${SITE.url}${u}</loc><lastmod>${today}</lastmod><priority>${pr}</priority></url>`).join('\n')}
 </urlset>`);
 
@@ -895,6 +979,8 @@ write('llms.txt', `# ${SITE.title}
 
 - [Overview](${SITE.url}/): What agent skills are, the catalog, and how to install.
 - [Browse](${SITE.url}/browse/): All ${catalog.length} skills, MCP servers and plugins, searchable.
+- [Updates](${SITE.url}/updates/): Every release of every tool, newest first, with what changed.
+- [updates.json](${SITE.url}/updates.json): The same list for agents. Compare the installed version with it to see what is new.
 - [Agents](${SITE.url}/agents/): Verified skill discovery paths per agent, with vendor sources.
 ${categories.map((c) => `- [${c.label}](${SITE.url}/c/${c.id}/): ${c.description}`).join('\n')}
 ${skills.map((s) => `- [${s.name}](${SITE.url}/s/${s.name}/): ${s.summary}`).join('\n')}
@@ -928,6 +1014,6 @@ ${skills.map((s) => `- [${s.name}](${SITE.url}/s/${s.name}/): ${s.summary}`).joi
 cpSync(join(HERE, 'static'), OUT, { recursive: true });
 
 console.log(`built → site/dist`);
-console.log(`  pages   ${3 + categories.length + skills.length}`);
+console.log(`  pages   ${4 + categories.length + skills.length}`);
 console.log(`  catalog ${catalog.length} (${counts.skill} skill · ${counts.mcp} mcp · ${counts.plugin} plugin)`);
 console.log(`  agents  ${agentData.agents.length}`);
