@@ -1,0 +1,102 @@
+name: Compatibility
+
+# Runs the checks that only mean something on the real operating system: line endings on a
+# Windows checkout, the PowerShell installer, and a real Codex installing every plugin from
+# this repository and showing it to the model.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  os:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: astral-sh/setup-uv@v6
+
+      # The site build needs its one dependency. Hooks are not needed in CI.
+      - run: npm ci --ignore-scripts
+
+      # The generated files are compared byte for byte. On Windows this fails if the checkout
+      # turns line endings into CRLF, which .gitattributes is there to prevent.
+      - name: Generated files are current
+        run: node scripts/build-catalog.mjs --check
+
+      - name: Line endings in the checkout are LF
+        shell: bash
+        run: |
+          if grep -rlI $'\r' --include='*.md' --include='*.json' --include='*.mjs' --include='*.sh' \
+               --exclude-dir=node_modules --exclude-dir=.git . | head -5 | grep .; then
+            echo "these files have CRLF line endings" >&2; exit 1
+          fi
+
+      - name: Validator
+        shell: bash
+        run: bash scripts/validate.sh
+
+      - name: Install Codex
+        run: npm install -g @openai/codex
+
+      - name: Codex installs every plugin from this repository and shows it to the model
+        shell: bash
+        run: |
+          export CODEX_HOME="$RUNNER_TEMP/codex-home"
+          mkdir -p "$CODEX_HOME" "$RUNNER_TEMP/codex-cwd"
+          codex --version
+          codex plugin marketplace add "$GITHUB_WORKSPACE"
+          plugins="$(ls plugins | grep -v '^README')"
+          for p in $plugins; do codex plugin add "$p@itqan"; done
+          cd "$RUNNER_TEMP/codex-cwd"
+          codex debug prompt-input hello > "$RUNNER_TEMP/prompt.txt"
+          missing=0
+          for p in $plugins; do
+            grep -q "$p:$p" "$RUNNER_TEMP/prompt.txt" || { echo "not shown to the model: $p" >&2; missing=1; }
+          done
+          [ "$missing" -eq 0 ]
+
+      - name: Bash installer
+        if: runner.os != 'Windows'
+        run: |
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          bash scripts/install.sh
+          [ "$(ls "$HOME/.agents/skills" | wc -l)" -eq 7 ]
+
+      - name: PowerShell installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'skills'
+          $out = & .\scripts\install.ps1 -Target $target 2>&1 | Out-String
+          Write-Host $out
+          $count = (Get-ChildItem $target -Directory).Count
+          if ($count -ne 7) { throw "installed $count skills, expected 7" }
+          if (-not (Test-Path (Join-Path $target 'watch-video\CHANGELOG.md'))) { throw 'CHANGELOG.md did not travel with the skill' }
+          # Codex is on the path here, so the installer prints its sandbox settings. The path in
+          # them must be a valid TOML string, so it uses forward slashes.
+          if ($out -notmatch 'writable_roots = \["[A-Za-z]:/') { throw 'the Codex settings do not carry a forward-slash Windows path' }
+
+      - name: The update checker reads a real Codex plugin cache
+        shell: bash
+        run: |
+          export CODEX_HOME="$RUNNER_TEMP/codex-home"
+          # Both the feed and the local checkout are read as they are. An offline feed file keeps
+          # this step independent of the network.
+          node scripts/build-catalog.mjs --check >/dev/null
+          node site/build.mjs >/dev/null
+          out="$(node plugins/toolkit-updates/skills/toolkit-updates/scripts/check.mjs --feed site/dist/updates.json --json)" || [ $? -eq 10 ]
+          echo "$out" | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); const n=d.installed.length; console.log("copies found:", n); if (n < 7) { console.error("expected the 7 plugins Codex installed"); process.exit(1); }'
