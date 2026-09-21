@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- dokploy-ops. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g>
+    <path class="main tint" d="M256 192 L349.5 246 V354 L256 408 L162.5 354 V246 Z"/>
+    <path class="line" d="M162.5 246 L256 300 L349.5 246 M256 300 V408"/>
+    <path class="acc" d="M256 166 V104 M229 131 L256 104 L283 131"/>
+    <circle class="dot-acc" cx="256" cy="300" r="7"/>
+  </g>
+</svg>

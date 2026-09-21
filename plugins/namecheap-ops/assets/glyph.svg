@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- namecheap-ops. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g transform="translate(-17 0)">
+    <path class="main tint" d="M146 262 a104 104 0 1 0 208 0 a104 104 0 1 0 -208 0 Z"/>
+    <path class="line" d="M250 158 C190 190 190 334 250 366 C310 334 310 190 250 158 M146 262 H354 M164 202 Q250 226 336 202 M164 322 Q250 298 336 322"/>
+    <path class="acc" d="M312 177 L342 147 H388 A12 12 0 0 1 400 159 V195 A12 12 0 0 1 388 207 H342 Z"/>
+    <circle class="dot-acc" cx="349" cy="177" r="5"/>
+  </g>
+</svg>

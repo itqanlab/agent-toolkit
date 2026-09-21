@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ebe8e0"/></linearGradient>
+    <radialGradient id="g" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#d97706" stop-opacity=".13"/><stop offset="1" stop-color="#d97706" stop-opacity="0"/></radialGradient>
+  </defs>
+  <style>
+.main,.line,.acc,.ring,.ring-acc,.ec{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.main,.line,.ring{stroke:#9a6a12}.acc,.ring-acc{stroke:#d97706}
+.main{stroke-width:10}.line{stroke-width:8}.acc{stroke-width:8}.ring,.ring-acc{stroke-width:8}
+.dot{fill:#9a6a12}.dot-acc{fill:#d97706}.dot,.dot-acc{stroke:none}
+.fill{fill:#d97706;fill-opacity:.05;stroke:none}
+.ec{stroke:#d97706}.e0 .ec{stroke-width:7}.e1 .ec{stroke-width:0}
+  </style>
+  <g id="tile"><rect width="512" height="512" rx="112" fill="url(#t)"/><rect x="1.5" y="1.5" width="509" height="509" rx="110.5" fill="none" stroke="#09090B" stroke-opacity=".1" stroke-width="3"/></g>
+  <circle id="glow" cx="236" cy="230" r="210" fill="url(#g)"/>
+  <g id="drawing" transform="translate(256 256) scale(1.14) translate(-256 -256)">
+   <g transform="translate(0 30)">
+    <g id="echo"><g transform="translate(12 10)" opacity=".42"><g class="e0"><g class="echo"><path d="M96 256 Q256 118 416 256 Q256 394 96 256 Z" class="ec"/></g></g></g></g>
+    <g id="tint"><path d="M96 256 Q256 118 416 256 Q256 394 96 256 Z" class="fill"/></g>
+    <path d="M96 256 Q256 118 416 256 Q256 394 96 256 Z" class="main" pathLength="1"/>
+    <g class="node" style="--i:0"><circle cx="256" cy="256" r="58" class="ring"/></g>
+    <path d="M244 232 L284 256 L244 280 Z" class="acc" pathLength="1"/>
+    <path d="M256 152 V126 M186 168 L172 145 M326 168 L340 145" class="line" pathLength="1"/>
+   </g>
+  </g>
+</svg>

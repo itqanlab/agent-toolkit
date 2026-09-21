@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- cloudflare-ops. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g transform="translate(13 -28)">
+    <path class="main tint" d="M148 316 A46 46 0 1 1 160.1 225.6 A72 72 0 0 1 303.6 214.9 A54 54 0 1 1 330 316 Z"/>
+    <path class="acc" d="M239 330 V372 M172 372 H306 M172 372 V400 M306 372 V400 M239 372 V400"/>
+    <circle class="ring" cx="172" cy="416" r="14"/><circle class="dot" cx="172" cy="416" r="4"/>
+    <circle class="ring-acc" cx="239" cy="416" r="14"/><circle class="dot-acc" cx="239" cy="416" r="4"/>
+    <circle class="ring" cx="306" cy="416" r="14"/><circle class="dot" cx="306" cy="416" r="4"/>
+  </g>
+</svg>

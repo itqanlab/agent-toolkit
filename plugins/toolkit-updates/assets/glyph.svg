@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- toolkit-updates. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g>
+    <path class="tint" d="M152 256 a104 104 0 1 0 208 0 a104 104 0 1 0 -208 0 Z"/>
+    <path class="main" d="M158.3 220.4 A104 104 0 0 1 335.7 189.2 M334.6 159.2 L335.7 189.2 L306.3 182.9 M353.7 291.6 A104 104 0 0 1 176.3 322.8 M177.4 352.8 L176.3 322.8 L205.7 329.1"/>
+    <path class="acc" d="M256 292 V224 M230 250 L256 224 L282 250"/>
+  </g>
+</svg>

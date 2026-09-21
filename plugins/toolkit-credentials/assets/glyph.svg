@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- toolkit-credentials. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g>
+    <path class="main tint" d="M140 196 a56 56 0 1 0 112 0 a56 56 0 1 0 -112 0 Z"/>
+    <path class="main" d="M236 236 L352 352"/>
+    <circle class="ring-acc" cx="196" cy="196" r="17"/><circle class="dot-acc" cx="196" cy="196" r="4"/>
+    <path class="acc" d="M306 306 L330 282 M334 334 L358 310"/>
+  </g>
+</svg>

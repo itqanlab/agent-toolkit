@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- hetzner-ops. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g>
+    <path class="main tint" d="M164 128 H328 A18 18 0 0 1 346 146 V174 A18 18 0 0 1 328 192 H164 A18 18 0 0 1 146 174 V146 A18 18 0 0 1 164 128 Z"/>
+    <path class="line" d="M228 160 H316"/>
+    <circle class="ring" cx="188" cy="160" r="9"/><circle class="dot" cx="188" cy="160" r="3"/>
+    <path class="main" d="M164 224 H328 A18 18 0 0 1 346 242 V270 A18 18 0 0 1 328 288 H164 A18 18 0 0 1 146 270 V242 A18 18 0 0 1 164 224 Z"/>
+    <path class="acc" d="M228 256 H316"/>
+    <circle class="ring-acc" cx="188" cy="256" r="9"/><circle class="dot-acc" cx="188" cy="256" r="3"/>
+    <path class="main" d="M164 320 H328 A18 18 0 0 1 346 338 V366 A18 18 0 0 1 328 384 H164 A18 18 0 0 1 146 366 V338 A18 18 0 0 1 164 320 Z"/>
+    <path class="line" d="M228 352 H316"/>
+    <circle class="ring" cx="188" cy="352" r="9"/><circle class="dot" cx="188" cy="352" r="3"/>
+  </g>
+</svg>
