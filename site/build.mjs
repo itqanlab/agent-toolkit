@@ -10,12 +10,13 @@
 //
 // Adding a skill and pushing rebuilds the site. There is nothing to update by hand.
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, cpSync, rmSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
 import { frontmatter, splitDescription, deps, readPlugins, readSkills, SITE_URL } from '../scripts/lib/catalog.mjs';
 import { parseChangelog, compareVersions } from '../scripts/lib/changelog.mjs';
+import { readGlyph, renderIcon } from '../scripts/lib/icons.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -71,6 +72,9 @@ function loadSkills() {
         changelogRaw,
         released: (changelog.releases[0] && changelog.releases[0].date) || '',
         agents: agentData.agents.length,
+        icon: existsSync(join(ROOT, 'plugins', e.name, 'assets', 'icon-dark.svg')),
+        iconStill: existsSync(join(ROOT, 'plugins', e.name, 'assets', 'glyph.svg'))
+          ? renderIcon(readGlyph(join(ROOT, 'plugins', e.name)), { theme: 'dark', size: 'full', motion: false }) : '',
         source: `${SITE.repo}/tree/main/plugins/${e.name}/skills/${e.name}`,
       };
     });
@@ -122,7 +126,7 @@ function tree(active) {
 // Applied before first paint so a saved theme never flashes the wrong ground.
 const THEME_BOOT = `<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})()</script>`;
 
-function page({ title, desc, active, body, cls = '', og = '/og.png', path = '/', jsonld = [] }) {
+function page({ title, desc, active, body, cls = '', og = '/og.png', path = '/', jsonld = [], icon = '/logo.svg', touch = '/logo.svg' }) {
   const canonical = `${SITE.url}${path}`;
   const graph = [...jsonld, ORG_LD, breadcrumbLd(path, title)].filter(Boolean);
   return `<!doctype html>
@@ -148,8 +152,8 @@ function page({ title, desc, active, body, cls = '', og = '/og.png', path = '/',
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(desc)}">
 <meta name="twitter:image" content="${SITE.url}${og}">
-<link rel="icon" href="/logo.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/logo.svg">
+<link rel="icon" href="${icon}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="${touch}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -273,6 +277,15 @@ function convergence() {
 
 /* ---------------------------------------------------------------- cards */
 
+// Two images, one per theme. The stylesheet shows the one that matches the reader's theme,
+// including a choice made with the toggle, which a <picture> media query would ignore.
+// The icon is an SVG with its own motion, so it animates inside a plain <img>.
+function iconImgs(item, px, cls = '') {
+  if (!item.icon) return '';
+  const src = (t) => `/s/${item.name}/icon-${t}.svg`;
+  return `<span class="ic ${cls}" style="--px:${px}px"><img class="ic-l" src="${src('light')}" alt="" width="${px}" height="${px}" loading="lazy"><img class="ic-d" src="${src('dark')}" alt="" width="${px}" height="${px}" loading="lazy"></span>`;
+}
+
 function card(item) {
   if (item.type !== 'skill') {
     return `<article class="card card-soon"><header class="card-head">
@@ -284,8 +297,8 @@ function card(item) {
      data-type="skill" data-category="${esc(item.category)}" data-deps="${esc(item.deps.join(' '))}"
      data-search="${esc([item.name, item.summary, cat ? cat.label : item.category, ...item.triggers, ...item.keywords].join(' ').toLowerCase())}">
   <header class="card-head">
-    <h3 class="card-name">${esc(item.name)}</h3>
-    <span class="card-v">v${esc(item.version)}</span>
+    ${iconImgs(item, 56)}
+    <div class="card-id"><h3 class="card-name">${esc(item.name)}</h3><span class="card-v">v${esc(item.version)}</span></div>
   </header>
   <p class="card-sum">${esc(item.summary)}</p>
   <footer class="card-foot">
@@ -672,7 +685,7 @@ function skillPage(s) {
   return `
 <section class="head head-skill">
   <p class="eyebrow"><a href="/browse/">catalog</a>${categoryOf(s.category) ? ` / <a href="/c/${esc(s.category)}/">${esc(categoryOf(s.category).label)}</a>` : ''} / skill</p>
-  <h1 class="page-h mono">${esc(s.name)}</h1>
+  <div class="skill-title">${iconImgs(s, 116, 'ic-hero')}<h1 class="page-h mono">${esc(s.name)}</h1></div>
   <p class="lede">${esc(s.summary)}</p>
   <div class="specs">
     <div><dt>version</dt><dd>${esc(s.version)}</dd></div>
@@ -792,8 +805,13 @@ function wrapWords(text, maxChars, maxLines) {
   return lines;
 }
 
-function ogSvg({ kicker, title, sub }) {
+function ogSvg({ kicker, title, sub, icon }) {
   const subLines = wrapWords(sub, 54, 2);
+  // A tool's card shows the tool's own icon (which already carries the Itqan mark). Every other
+  // card keeps the plain logo.
+  const mark = icon
+    ? icon.replace(/<svg[^>]*>/, '<svg x="948" y="360" width="212" height="212" viewBox="0 0 512 512">').trim()
+    : `<g transform="translate(1004 434) scale(0.4286)">${LOGO_MARK}</g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#FAFAF9"/>
   <rect x="0" y="0" width="1200" height="10" fill="#d97706"/>
@@ -811,7 +829,7 @@ function ogSvg({ kicker, title, sub }) {
     <rect x="76" y="556" width="330" height="3" fill="#d4a853"/>
     <text x="76" y="592" font-size="20" fill="#A1A1AA">agent-toolkit.itqanlab.com</text>
   </g>
-  <g transform="translate(1004 434) scale(0.4286)">${LOGO_MARK}</g>
+  ${mark}
 </svg>`;
 }
 
@@ -856,6 +874,7 @@ const skillLd = (s) => ({
   applicationCategory: 'DeveloperApplication',
   operatingSystem: 'macOS, Linux, Windows',
   softwareVersion: s.version,
+  ...(s.icon && { image: `${SITE.url}/s/${s.name}/icon-512.png` }),
   license: 'https://opensource.org/licenses/MIT',
   isAccessibleForFree: true,
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -898,8 +917,15 @@ for (const s of skills) {
     desc: s.summary,
     active: '/browse/', body: skillPage(s), cls: 'p-skill',
     og: `/og-${s.name}.png`, path: `/s/${s.name}/`, jsonld: [skillLd(s)],
+    ...(s.icon && { icon: `/s/${s.name}/icon-small-dark.svg`, touch: `/s/${s.name}/icon-512.png` }),
   }));
-  write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary }));
+  write(`og-${s.name}.svg`, ogSvg({ kicker: 'SKILL', title: s.name, sub: s.summary, icon: s.iconStill }));
+  if (s.icon) {
+    for (const f of ['icon-dark.svg', 'icon-light.svg', 'icon-small-dark.svg']) {
+      copyFileSync(join(ROOT, 'plugins', s.name, 'assets', f), join(OUT, 's', s.name, f));
+    }
+    copyFileSync(join(ROOT, 'plugins', s.name, 'assets', 'logo-dark.png'), join(OUT, 's', s.name, 'icon-512.png'));
+  }
   write(`s/${s.name}/CHANGELOG.md`, s.changelogRaw);
   write(`s/${s.name}/changelog.json`, `${JSON.stringify(feedItem(s), null, 2)}\n`);
 }

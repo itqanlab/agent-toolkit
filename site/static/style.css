@@ -266,10 +266,10 @@ main { min-width: 0; padding: 0 var(--gut); }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .card-name { margin: 0; font-family: var(--mono); font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
 .card-v { font-family: var(--mono); font-size: 11px; color: var(--faint); }
-.card-sum { margin: 0; flex: 1; color: var(--ink-2); font-size: .89rem; line-height: 1.55;
+.card-sum { margin: 0; flex: 0 0 auto; color: var(--ink-2); font-size: .89rem; line-height: 1.55;
   display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4;
   -webkit-box-orient: vertical; overflow: hidden; }
-.card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; }
 .card-agents { font-family: var(--mono); font-size: 11px; color: var(--slate); }
 .card-agents b { color: var(--amber); }
 .tag {
@@ -277,6 +277,27 @@ main { min-width: 0; padding: 0 var(--gut); }
   border: 1px solid var(--line); border-radius: 2px; color: var(--slate);
 }
 .card-soon { opacity: .5; }
+/* ---------------------------------------------------------------- tool icons
+   Each tool has a dark and a light icon. Show the one that matches the theme, using the same
+   two-place rule as the colour tokens above so the toggle wins in both directions. */
+.ic { display: inline-block; flex: none; width: var(--px); height: var(--px); line-height: 0; }
+.ic img { width: 100%; height: 100%; }
+.ic .ic-l { display: block; }
+.ic .ic-d { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ic .ic-l { display: none; }
+  :root:not([data-theme="light"]) .ic .ic-d { display: block; }
+}
+:root[data-theme="dark"] .ic .ic-l { display: none; }
+:root[data-theme="dark"] .ic .ic-d { display: block; }
+.card-head:has(.ic) { justify-content: flex-start; align-items: center; gap: 14px; }
+.card-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.card-id .card-name { overflow-wrap: anywhere; }
+.skill-title { display: flex; align-items: center; gap: clamp(16px, 3vw, 28px); margin-bottom: 22px; }
+.skill-title .page-h { margin: 0; }
+.ic-hero { filter: drop-shadow(0 10px 22px rgba(9, 9, 11, .18)); }
+@media (max-width: 560px) { .ic-hero { --px: 84px !important; } }
+
 .more { margin: 22px 0 0; font-family: var(--mono); font-size: 13px; }
 .more a { color: var(--amber); text-decoration: none; }
 .more a:hover { text-decoration: underline; }
