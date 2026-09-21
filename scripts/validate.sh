@@ -164,6 +164,28 @@ else
   echo
 fi
 
+# --- every tool has a drawn icon, and the files drawn from it are current.
+if command -v node >/dev/null 2>&1; then
+  echo "icons (each tool has a glyph.svg and the icon files match it)"
+  icon_missing=0
+  for plugin_dir in "$REPO_ROOT"/plugins/*/; do
+    [ -d "${plugin_dir}skills" ] || continue
+    if [ ! -f "${plugin_dir}assets/glyph.svg" ]; then
+      printf '  ✘ %s has no assets/glyph.svg\n' "$(basename "$plugin_dir")"
+      icon_missing=1
+    fi
+  done
+  if [ "$icon_missing" -eq 1 ]; then
+    errors=$((errors+1))
+  elif out=$(node "$REPO_ROOT/scripts/build-icons.mjs" --check 2>&1); then
+    printf '  ✔ %s\n' "$out"
+  else
+    printf '%s\n' "$out" | sed 's/^/  /'
+    errors=$((errors+1))
+  fi
+  echo
+fi
+
 # --- Codex's own plugin validator, when Codex is installed here. It ships inside Codex, so CI
 # does not have it. It checks the generated .codex-plugin/plugin.json against the real contract.
 codex_validator="${HOME}/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
