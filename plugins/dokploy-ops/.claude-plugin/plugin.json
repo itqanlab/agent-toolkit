@@ -1,7 +1,7 @@
 {
   "name": "dokploy-ops",
   "description": "Connect one or more self-hosted Dokploy installations, then run what is deployed on them from the agent — deploy and watch the build to the end, read logs, restart, check domains and health. Adopts a key the machine already has, and keeps several installations apart by name.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"

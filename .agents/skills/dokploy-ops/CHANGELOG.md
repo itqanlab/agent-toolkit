@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/dokploy-ops/CHANGELOG.md
 
 What changed in `dokploy-ops`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.1.0 were rebuilt from the git history.
 
+## [2.1.0] - 2026-09-21
+
+### Added
+
+- The tool has its own icon, in a dark and a light version. Codex shows it on the plugin card and in the skill list, and the toolkit site shows it on the tool's page and in share previews.
+
 ## [2.0.0] - 2026-09-21
 
 ### Breaking

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Cloudflare API. Deploying a site to Pages or a Worker additionally uses wrangler, which is fetched on demand through npx and needs no separate install or login. Endpoint lookup downloads Cloudflare's API description once (about 22 MB) and caches it."
 metadata:
   author: itqanlab
-  version: 2.0.0
+  version: 2.1.0
   category: devops
   short: "DNS, Pages, Workers and R2 from your agent"
   starter: "add a subdomain that points to my server"

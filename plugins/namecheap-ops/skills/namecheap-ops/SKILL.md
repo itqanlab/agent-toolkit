@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer — run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the Namecheap API. Namecheap must have API access switched on for the account and the calling address on its whitelist; a relay needs an ssh client and a server reachable without a password prompt. Covers domains, DNS and pricing only — not hosting, email or SSL products, and it does not register, renew or transfer domains."
 metadata:
   author: itqanlab
-  version: 2.0.0
+  version: 2.1.0
   category: devops
   short: "Domains, nameservers and DNS on Namecheap"
   starter: "list my domains and when they expire"
