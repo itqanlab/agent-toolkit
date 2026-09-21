@@ -1,6 +1,6 @@
 {
   "name": "hetzner-ops",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Connect one or more Hetzner Cloud projects, then run the servers from the agent — create, resize, reboot, delete, SSH keys, firewalls, DNS and running costs. Adopts a token the machine already has, and keeps several projects apart by name.",
   "author": {
     "name": "Itqan Lab",
@@ -35,6 +35,10 @@
       "Connect my Hetzner",
       "List my servers",
       "Create a server"
-    ]
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
   }
 }

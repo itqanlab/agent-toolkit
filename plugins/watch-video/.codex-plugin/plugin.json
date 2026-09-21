@@ -1,6 +1,6 @@
 {
   "name": "watch-video",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
   "author": {
     "name": "Itqan Lab",
@@ -37,6 +37,10 @@
       "Watch this video",
       "Analyze this short/reel/clip",
       "What happens in this video"
-    ]
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
   }
 }

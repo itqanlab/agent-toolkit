@@ -2,3 +2,6 @@ interface:
   display_name: "Hetzner Ops"
   short_description: "Run your Hetzner Cloud servers from your agent"
   default_prompt: "Use $hetzner-ops to show my servers and what they cost."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"

@@ -1,6 +1,6 @@
 {
   "name": "toolkit-updates",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
   "author": {
     "name": "Itqan Lab",
@@ -32,6 +32,10 @@
       "Are my toolkit skills up to date",
       "Check for updates",
       "What changed in the toolkit"
-    ]
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
   }
 }

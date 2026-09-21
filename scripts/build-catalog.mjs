@@ -161,7 +161,10 @@ const titleCase = (n) => n.split('-').map((w) => w[0].toUpperCase() + w.slice(1)
 const sentenceCase = (t) => t[0].toUpperCase() + t.slice(1);
 const codexCategory = (id) => (categories.find((c) => c.id === id) || {}).codex || 'Other';
 
+// Icons come from scripts/build-icons.mjs. A tool that has none yet simply gets no icon fields.
+const BRAND_COLOR = '#09090B';
 const codexManifests = skills.map(({ name, p, meta, fm, pluginRoot }) => {
+  const hasIcon = existsSync(join(pluginRoot, 'assets', 'logo.png'));
   const manifest = {
     name,
     version: p.version,
@@ -182,6 +185,12 @@ const codexManifests = skills.map(({ name, p, meta, fm, pluginRoot }) => {
       websiteURL: `${SITE_URL}/s/${name}/`,
       defaultPrompt: splitDescription(fm.description).triggers.filter(isPrompt).slice(0, 3)
         .map((t) => sentenceCase(t).slice(0, 128)),
+      ...(hasIcon && {
+        brandColor: BRAND_COLOR,
+        composerIcon: './assets/composer-icon.png',
+        logo: './assets/logo.png',
+        logoDark: './assets/logo-dark.png',
+      }),
     },
   };
   return [join(pluginRoot, '.codex-plugin', 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`,
@@ -198,6 +207,11 @@ const openaiYaml = skills.map(({ name, p, meta, base }) => [
     `  display_name: ${JSON.stringify(p.displayName || titleCase(name))}`,
     `  short_description: ${JSON.stringify(meta.short)}`,
     `  default_prompt: ${JSON.stringify(`Use $${name} to ${meta.starter}.`)}`,
+    ...(existsSync(join(base, 'assets', 'icon-large.png')) ? [
+      '  icon_small: "./assets/icon-small.png"',
+      '  icon_large: "./assets/icon-large.png"',
+      `  brand_color: ${JSON.stringify(BRAND_COLOR)}`,
+    ] : []),
     '',
   ].join('\n'),
   `plugins/${name}/skills/${name}/agents/openai.yaml`,

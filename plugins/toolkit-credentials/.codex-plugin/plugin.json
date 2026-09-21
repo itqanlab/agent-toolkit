@@ -1,6 +1,6 @@
 {
   "name": "toolkit-credentials",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Shared credential setup and storage for skills that need an API key or token. Guides any user through obtaining and storing a credential without it ever being typed into the conversation. macOS, Windows and Linux.",
   "author": {
     "name": "Itqan Lab",
@@ -34,6 +34,10 @@
       "Set up my credentials",
       "Connect my account",
       "Add an API key"
-    ]
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
   }
 }
