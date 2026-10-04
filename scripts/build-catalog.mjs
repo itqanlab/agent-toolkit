@@ -77,6 +77,9 @@ const skills = readSkills(ROOT).map((s) => {
   if (splitDescription(s.fm.description).triggers.filter(isPrompt).length === 0) {
     fail(s.name, 'the description needs at least one trigger phrase of 12 or more characters, for the Codex starter prompts');
   }
+  // A phrase with no letter or digit in it means the list was split in the wrong place.
+  const brokenPhrase = splitDescription(s.fm.description).triggers.find((t) => !/[A-Za-z0-9]/.test(t));
+  if (brokenPhrase !== undefined) fail(s.name, `a trigger phrase is not a phrase: "${brokenPhrase}". Check the quotes in the description`);
   if (meta.featured !== undefined && !['true', 'false'].includes(meta.featured)) {
     fail(s.name, `metadata.featured must be "true" or "false", not "${meta.featured}"`);
   }

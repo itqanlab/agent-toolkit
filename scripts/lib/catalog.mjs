@@ -48,7 +48,14 @@ export function splitDescription(desc = '') {
   const end = tail.search(/'\.(\s|$)/);
   const list = end === -1 ? tail : tail.slice(0, end + 2);
   const after = end === -1 ? '' : tail.slice(end + 2);
-  const triggers = [...list.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  // Phrases are 'a', 'b', 'c'. Split on the quote-comma-quote between them, not on every quote,
+  // so an apostrophe inside a phrase ("what is my server's IP") stays inside it.
+  // With no closing quote-and-full-stop the list has no known end, so keep the plain quote scan.
+  const open = list.indexOf("'");
+  const triggers = end === -1
+    ? [...list.matchAll(/'([^']+)'/g)].map((m) => m[1])
+    : open === -1 ? [] : list.slice(open + 1).replace(/'\.?\s*$/, '')
+      .split(/'\s*,\s*'/).map((t) => t.trim()).filter(Boolean);
   const summary = `${desc.slice(0, i).trim()} ${after.trim()}`.trim();
   return { summary, triggers };
 }
