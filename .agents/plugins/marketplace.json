@@ -53,6 +53,18 @@
       "category": "Developer Tools"
     },
     {
+      "name": "elevenlabs-studio",
+      "source": {
+        "source": "local",
+        "path": "./plugins/elevenlabs-studio"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
       "name": "watch-video",
       "source": {
         "source": "local",

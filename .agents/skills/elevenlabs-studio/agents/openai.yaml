@@ -1,0 +1,7 @@
+interface:
+  display_name: "ElevenLabs Studio"
+  short_description: "Voice-over, sound effects and music, on a budget"
+  default_prompt: "Use $elevenlabs-studio to make a voice-over for this script without wasting credits."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"

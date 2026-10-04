@@ -1,0 +1,22 @@
+{
+  "name": "elevenlabs-studio",
+  "displayName": "ElevenLabs Studio",
+  "version": "1.0.0",
+  "description": "Make voice-over, sound effects and music with ElevenLabs from the agent, and spend the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/elevenlabs-studio",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "elevenlabs",
+    "text-to-speech",
+    "voiceover",
+    "sound-effects",
+    "music",
+    "audio",
+    "credits"
+  ]
+}

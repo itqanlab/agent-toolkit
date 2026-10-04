@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- elevenlabs-studio. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g transform="translate(0 6)">
+    <path class="main tint" d="M216 112 A40 40 0 0 1 296 112 V236 A40 40 0 0 1 216 236 Z"/>
+    <path class="line" d="M176 220 A80 80 0 0 0 336 220 M256 300 V352 M212 352 H300"/>
+    <path class="acc" d="M136 176 V252 M376 176 V252 M104 198 V230 M408 198 V230"/>
+    <circle class="ring-acc" cx="256" cy="168" r="14"/><circle class="dot-acc" cx="256" cy="168" r="4"/>
+  </g>
+</svg>
