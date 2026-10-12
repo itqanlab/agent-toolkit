@@ -689,6 +689,11 @@ function skillPage(s) {
     s.changelog.releases.length ? ['changelog', 'Changelog'] : null,
   ].filter(Boolean);
 
+  // The tool itself is always free. What the service behind it costs is read from the skill's own
+  // compatibility line, so a paid API is never shown as free.
+  const costOf = (x) => /credits|billed|paid/i.test(x.compatibility)
+    ? 'tool free · the service bills per use'
+    : /\bapi\b|api key|token|account|installation|signed in|mcp server/i.test(x.compatibility) ? 'free · uses your own account' : 'free · no account';
   const body = marked.parse(rest.map((r) => `## ${r.title}\n${r.body}`).join('\n\n'));
   return `
 <section class="head head-skill">
@@ -700,7 +705,7 @@ function skillPage(s) {
     ${s.released ? `<div><dt>updated</dt><dd>${esc(s.released)}</dd></div>` : ''}
     <div><dt>works in</dt><dd>every conformant agent</dd></div>
     <div><dt>needs</dt><dd>${s.deps.length ? s.deps.map((d) => esc(d)).join(' · ') : 'nothing'}</dd></div>
-    <div><dt>cost</dt><dd>free · no API key</dd></div>
+    <div><dt>cost</dt><dd>${esc(costOf(s))}</dd></div>
     <div><dt>license</dt><dd>${esc(s.license)}</dd></div>
   </div>
 </section>
