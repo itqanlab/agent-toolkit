@@ -2,6 +2,20 @@
 
 Latest: https://agent-toolkit.itqanlab.com/s/higgsfield-studio/CHANGELOG.md
 
+## [1.1.0] - 2026-10-13
+
+### Added
+
+- A project can pin the Higgsfield account in .higgsfield/config.json (or HF_ACCOUNT). A paid job on any other signed-in account is refused before it runs, since the login is machine-wide and a free account looks just like the paid one.
+- The reserve can be set per project in the same file.
+- create no longer waits inside the CLI. It saves the job id at once and polls with a deadline (--timeout, 900 s by default). If it stops early, running the same command again picks the job up without paying again.
+
+### Fixed
+
+- Paid jobs run one at a time per project, so two jobs started together no longer count each other's charges.
+- A fresh sign-in with no billing workspace selected now says how to pick one.
+- Running scripts/hf.mjs through a symlinked install now works. Before, it exited without doing anything.
+
 ## [1.0.0] - 2026-10-12
 
 ### Added

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer and the Higgsfield command line tool, through the higgsfield-studio skill in the same plugin. Needs network access and a Higgsfield account. Generating spends its credits."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: media
   display: "Higgsfield Video Explainer"
   short: "Narrated explainer videos, priced block by block"

@@ -23,16 +23,24 @@
 // the CLI's credential file.
 
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync, statSync, unlinkSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname, resolve, extname, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+export const home = () => resolve(process.env.HIGGSFIELD_HOME || join(process.cwd(), '.higgsfield'));
+
+// A project can pin its settings in <home>/config.json: { "account": "...", "reserve": 10 }.
+// The account matters because the CLI login is machine-wide, and a free account looks just like
+// the paid one until a job runs on the wrong side.
+const config = (() => {
+  try { return JSON.parse(readFileSync(join(home(), 'config.json'), 'utf8')); } catch { return {}; }
+})();
+const ACCOUNT = process.env.HF_ACCOUNT || config.account || null;
+
 // Basic plans hold tens of credits, so the default is small: enough to stop a loop from taking
 // the account to zero, not so large that it blocks normal work. Raise it on bigger plans.
-export const RESERVE = Number(process.env.HF_RESERVE ?? 5);
-
-export const home = () => resolve(process.env.HIGGSFIELD_HOME || join(process.cwd(), '.higgsfield'));
+export const RESERVE = Number(process.env.HF_RESERVE ?? config.reserve ?? 5);
 const cacheDir = () => join(home(), 'cache');
 const ledgerPath = () => join(home(), 'ledger.jsonl');
 const uploadsPath = () => join(home(), 'uploads.json');
@@ -84,6 +92,10 @@ function explain(text) {
       '  higgsfield auth login\n' +
       'It opens the browser. Nothing was charged.';
   }
+  if (/no workspace selected/i.test(said)) {
+    return 'Higgsfield has no billing workspace selected, which happens after a fresh sign-in.\n' +
+      'List them with  higgsfield workspace list  and pick one with  higgsfield workspace set <id>.\nNothing was charged.';
+  }
   if (/insufficient|not enough credits|out of credits/i.test(said)) {
     return `Higgsfield refused for lack of credits: ${said}`;
   }
@@ -110,7 +122,37 @@ async function cliJson(args, opts) {
 
 export async function balance() {
   const s = await cliJson(['account', 'status']);
-  return { credits: Number(s.credits), plan: s.subscription_plan_type || s.plan || 'unknown' };
+  return { credits: Number(s.credits), plan: s.subscription_plan_type || s.plan || 'unknown', email: s.email || null };
+}
+
+/** Refuse to spend on an account other than the one the project names. */
+function checkAccount(b) {
+  if (!ACCOUNT || !b.email || b.email.toLowerCase() === ACCOUNT.toLowerCase()) return;
+  throw new HfError(
+    `refused: signed in as ${b.email} (${b.plan}, ${show(b.credits)} credits), but this project spends from ${ACCOUNT}.\n` +
+    `Switch with  higgsfield auth logout  then  higgsfield auth login  as ${ACCOUNT}. Nothing was spent.`, { code: 4 });
+}
+
+/**
+ * One paid job at a time per project. Spends are matched by time, so two jobs running together
+ * would each count the other's charge (a 0.23 voice line was once logged as 10.23 that way).
+ * A lock left by a process that has died is taken over.
+ */
+async function lock() {
+  const file = join(home(), '.lock');
+  mkdirSync(home(), { recursive: true });
+  for (let waited = 0; ; waited += 1) {
+    try { writeFileSync(file, String(process.pid), { flag: 'wx' }); break; } catch {
+      let alive = false;
+      try { process.kill(Number(readFileSync(file, 'utf8')), 0); alive = true; } catch { /* gone */ }
+      if (!alive) { writeFileSync(file, String(process.pid)); break; }
+      if (waited === 0) console.log('waiting for another paid Higgsfield job in this project to finish...');
+      await wait(3000);
+    }
+  }
+  const release = () => { try { if (readFileSync(file, 'utf8') === String(process.pid)) unlinkSync(file); } catch { /* already gone */ } };
+  process.on('exit', release);
+  return release;
 }
 
 async function transactions() {
@@ -149,7 +191,7 @@ async function measure(before, baseline, expectSpend) {
 // ---------------------------------------------------------------- arguments
 
 const GUARD_BOOL = new Set(['dry', 'fresh', 'yes']);
-const GUARD_VALUE = new Set(['max', 'tag', 'why', 'out', 'prompt-file']);
+const GUARD_VALUE = new Set(['max', 'tag', 'why', 'out', 'prompt-file', 'timeout']);
 
 /** Take this tool's own flags out of argv. The rest goes to the CLI untouched. */
 function splitGuard(argv) {
@@ -289,6 +331,48 @@ function ledger(row) {
 }
 
 const keyOf = (o) => sha(JSON.stringify(o)).slice(0, 16);
+
+/**
+ * Create a job, then poll it ourselves with a deadline. `generate create --wait` once hung for
+ * ten minutes before any job existed. The job id is saved the moment it exists, so a run that
+ * stops early is resumed by running the same command again, never paid for twice.
+ */
+async function createAndPoll(id, flags, timeoutS, ctx = {}) {
+  const pending = join(cacheDir(), `${id}.pending.json`);
+  mkdirSync(cacheDir(), { recursive: true });
+  let jobIds;
+  if (existsSync(pending)) {
+    jobIds = JSON.parse(readFileSync(pending, 'utf8')).jobs;
+    console.log(`resuming job ${jobIds.join(', ')}. It was already paid for.`);
+    ctx.resumed = true;
+  } else {
+    const created = await cliJson(['generate', 'create', ...flags]);
+    const list = Array.isArray(created) ? created : created?.jobs || [created];
+    jobIds = list.map((j) => (typeof j === 'string' ? j : j?.id || j?.job_id)).filter(Boolean);
+    if (!jobIds.length) throw new HfError(`Higgsfield started the job but gave no job id:\n${JSON.stringify(created).slice(0, 300)}`);
+    writeFileSync(pending, JSON.stringify({ at: new Date().toISOString(), jobs: jobIds }));
+  }
+  const deadline = Date.now() + timeoutS * 1000;
+  const done = [];
+  for (const jobId of jobIds) {
+    for (let i = 0; ; i += 1) {
+      const got = await cliJson(['generate', 'get', jobId]);
+      const job = Array.isArray(got) ? got[0] : got;
+      if (job.status === 'completed') { done.push(job); break; }
+      if (/fail|error|cancel|nsfw|reject/i.test(job.status)) {
+        unlinkSync(pending);
+        throw new HfError(`Higgsfield job ${jobId} ended as ${job.status}.`);
+      }
+      if (Date.now() > deadline) {
+        throw new HfError(`job ${jobId} is still ${job.status} after ${timeoutS} s. Run the same command again later: it picks the job up without paying again.`);
+      }
+      if (i % 6 === 0) console.error(`job ${jobId}: ${job.status}...`);
+      await wait(5000);
+    }
+  }
+  unlinkSync(pending);
+  return done;
+}
 const show = (n) => (n === null || n === undefined ? 'unknown' : String(Math.round(n * 100) / 100));
 
 // ---------------------------------------------------------------- the paid door
@@ -335,7 +419,9 @@ async function paid({ kind, key, quote, run, request, g, cache = true }) {
     throw new HfError(`${kind} cannot be priced in advance. Ask the user, then run it again with --yes.`, { code: 3 });
   }
 
+  const release = await lock();
   const before = await balance();
+  checkAccount(before);
   if (est !== null && before.credits - est < RESERVE) {
     throw new HfError(
       `refused: ${show(before.credits)} credits left, this costs ${show(est)}, and the reserve is ${RESERVE}.\n` +
@@ -349,8 +435,12 @@ async function paid({ kind, key, quote, run, request, g, cache = true }) {
   // From here on money may be spent, so a failure is still measured and written down.
   let result = null;
   let failure = null;
-  try { result = await run(); } catch (err) { failure = err; }
-  const m = await measure(before, baseline, est !== 0);
+  // A resumed job was charged on the earlier run, and that run's ledger row holds the cost.
+  const ctx = { resumed: false };
+  try { result = await run(id, ctx); } catch (err) { failure = err; }
+  const m = await measure(before, baseline, est !== 0 && !ctx.resumed);
+  if (ctx.resumed) Object.assign(m, { measured: 0, measured_by: 'resumed' });
+  release();
 
   const urls = result ? [...new Set(resultUrls(result))] : [];
   const files = [];
@@ -366,7 +456,7 @@ async function paid({ kind, key, quote, run, request, g, cache = true }) {
   ledger({
     kind,
     cache: id,
-    quote: est,
+    quote: ctx.resumed ? 0 : est,
     measured: m.measured,
     measured_by: m.measured_by,
     spends: m.items,
@@ -471,13 +561,15 @@ Every paid command also takes:
   --max N      refuse if the quote is above N credits
   --fresh      skip the cache and pay again (needs --why)
   --yes        allow a call Higgsfield cannot price
+  --timeout S  for create: stop waiting after S seconds (default 900). Rerun to resume
   --tag NAME   group this call in the ledger
   --why "..."  one line on what this is for
   --out PATH   where to save the result (a file, or a folder for several)
   --prompt-file FILE   read --prompt from a file (keeps quotes and line breaks)
 
 Cache and ledger: ${home()}   (HIGGSFIELD_HOME moves it)
-Reserve: ${RESERVE} credits   (HF_RESERVE changes it)`;
+Reserve: ${RESERVE} credits   (HF_RESERVE, or "reserve" in <home>/config.json)
+Account: ${ACCOUNT || 'any'}   (HF_ACCOUNT, or "account" in <home>/config.json; others are refused)`;
 
 const COMMANDS = {
   help() { console.log(USAGE); },
@@ -493,6 +585,11 @@ const COMMANDS = {
   async account() {
     const b = await balance();
     console.log(`plan ${b.plan}   credits ${show(b.credits)}`);
+    if (ACCOUNT) {
+      console.log(b.email && b.email.toLowerCase() !== ACCOUNT.toLowerCase()
+        ? `WRONG ACCOUNT: signed in as ${b.email}, but this project spends from ${ACCOUNT}. Paid jobs are refused.`
+        : `account ${ACCOUNT}, as this project requires`);
+    }
     console.log(`reserve ${RESERVE}   so paid calls can spend up to ${show(Math.max(0, b.credits - RESERVE))} now`);
     const t = await transactions().catch(() => []);
     if (t.length) {
@@ -516,9 +613,9 @@ const COMMANDS = {
     const flags = args;
     await paid({
       kind: `create:${rest[0]}`, key, g,
-      request: ['generate', 'create', ...flags, '--wait'],
+      request: ['generate', 'create', ...flags],
       quote: () => quoteOrNull(['generate', 'cost', ...flags]),
-      run: () => cliJson(['generate', 'create', ...flags, '--wait'], { progress: true }),
+      run: (id, ctx) => createAndPoll(id, flags, Number(g.timeout || 900), ctx),
     });
   },
 
@@ -626,7 +723,9 @@ const COMMANDS = {
 };
 
 // pathToFileURL, not string concatenation: a Windows path like C:\... is not a valid URL.
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath first: started through a symlinked install, argv[1] is the link and import.meta.url
+// the real file, and without it the script would exit having done nothing.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   const [cmd = 'help', ...argv] = process.argv.slice(2);
   const handler = COMMANDS[cmd === '--help' || cmd === '-h' ? 'help' : cmd];

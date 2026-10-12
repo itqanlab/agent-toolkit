@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer and the Higgsfield command line tool (npm @higgsfield/cli). Run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for both and install what is missing. Needs network access and a Higgsfield account. Generating spends that account's credits."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: media
   short: "Higgsfield images, video and ads, on a budget"
   starter: "make a short video from this product photo without wasting credits"
@@ -102,6 +102,9 @@ The files in `references/` are Higgsfield's own guides. They show commands as `h
 2. **Never pay twice.** The cache key is the command, every parameter and a hash of every local file used. The same request returns the files already paid for, at 0 credits. `--fresh` is the only way past it, and it needs a reason in `--why`.
 3. **Measure after.** Higgsfield's transaction list shows what each job cost but not which job it was. The script counts the spends that appear after the newest one it saw before the job, and falls back to the balance before and after. A job run at the same time from another place on the same account also counts. The ledger's `measured_by` says which method was used.
 4. **Keep a reserve.** A job that would leave fewer than `HF_RESERVE` credits (default 5) is refused. Basic plans hold tens of credits, so the default is small on purpose. Change it only when the user says so.
+5. **Spend from the right account.** The sign-in is machine-wide, and a free account looks just like the paid one. A project that names its account in `.higgsfield/config.json` (`{"account": "...", "reserve": 10}`, or `HF_ACCOUNT`) has paid jobs on any other account refused before they run. Offer to write that file when a project has a paid account.
+6. **One paid job at a time.** Jobs in the same project wait for each other, so each one's measured cost is its own.
+7. **Never wait blind.** `create` saves the job id the moment it exists and polls with a deadline (`--timeout`, 900 seconds by default). If it stops early, run the same command again: it picks the job up and does not pay twice.
 5. **A failed job is still recorded.** If Higgsfield fails after starting, the script still measures and writes the row, with `ok: false`.
 
 The cache, the upload list and the ledger live in `.higgsfield/` in the folder the command runs from, so each project keeps its own record. `HIGGSFIELD_HOME` moves it. `ledger.jsonl` is worth keeping in version control. `cache/` holds the media files: tell the user to add `.higgsfield/cache/` to `.gitignore`.

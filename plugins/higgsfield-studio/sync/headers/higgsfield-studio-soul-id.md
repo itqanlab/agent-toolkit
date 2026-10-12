@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer and the Higgsfield command line tool, through the higgsfield-studio skill in the same plugin. Soul training needs a paid Higgsfield plan. Needs network access."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: media
   display: "Higgsfield Soul ID"
   short: "Train a face once, reuse it in Higgsfield"

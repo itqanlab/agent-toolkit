@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer, git and the Higgsfield command line tool, through the higgsfield-studio skill in the same plugin. Game art tools in scripts/ need Python 3, and some need Blender. Needs network access and a Higgsfield account."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.1.0
   category: media
   display: "Higgsfield Websites"
   short: "Websites and games hosted by Higgsfield"
