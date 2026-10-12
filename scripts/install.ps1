@@ -105,7 +105,10 @@ foreach ($target in $targets) {
     $name = $_.Name
     $src  = $_.FullName
     if (-not (Test-Path (Join-Path $src 'SKILL.md'))) { return }
-    if ($Skills.Count -gt 0 -and $Skills -notcontains $name) { return }
+    # A name can be a skill or a plugin. Naming a plugin installs every skill in it, because the
+    # skills of one plugin rely on each other (..\<sibling>\scripts\...).
+    $plugin = $_.Parent.Parent.Name
+    if ($Skills.Count -gt 0 -and $Skills -notcontains $name -and $Skills -notcontains $plugin) { return }
 
     $dst = Join-Path $target $name
 

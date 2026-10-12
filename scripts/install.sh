@@ -115,10 +115,12 @@ fi
 TS="$(date +%Y%m%d-%H%M%S)"
 installed=0; skipped=0
 
+# A name can be a skill or a plugin. Naming a plugin installs every skill in it, because the
+# skills of one plugin rely on each other (../<sibling>/scripts/...).
 want() {
   [ ${#WANTED[@]} -eq 0 ] && return 0
-  local n="$1" w
-  for w in "${WANTED[@]}"; do [ "$w" = "$n" ] && return 0; done
+  local n="$1" plugin="$2" w
+  for w in "${WANTED[@]}"; do [ "$w" = "$n" ] || [ "$w" = "$plugin" ] && return 0; done
   return 1
 }
 
@@ -132,7 +134,8 @@ for target in "${TARGETS[@]}"; do
   for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
     [ -f "${skill_dir}SKILL.md" ] || continue
     name="$(basename "$skill_dir")"
-    want "$name" || continue
+    plugin="$(basename "$(dirname "$(dirname "$skill_dir")")")"
+    want "$name" "$plugin" || continue
     src="${skill_dir%/}"
     dst="${target}/${name}"
 

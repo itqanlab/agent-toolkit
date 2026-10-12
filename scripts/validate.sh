@@ -111,8 +111,19 @@ for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
   [ "$lines" -le 500 ] || warn "SKILL.md is $lines lines; the spec recommends under 500, move detail into references/"
 
   # --- referenced scripts must exist and be executable
+  # A skill may use a sibling skill of the same plugin (../<sibling>/scripts/x), because every
+  # skill of a plugin is installed side by side. It may not reach outside its plugin.
+  plugin_dir_name="$(basename "$(cd "${skill_dir}../.." && pwd)")"
   while IFS= read -r ref; do
     [ -z "$ref" ] && continue
+    case "$ref" in
+      ../*)
+        sibling="${ref#../}"; sibling="${sibling%%/*}"
+        if [ "$sibling" != "$plugin_dir_name" ] && [ "${sibling#"$plugin_dir_name"-}" = "$sibling" ]; then
+          err "SKILL.md references '$ref', a skill outside plugin '$plugin_dir_name'"
+          continue
+        fi;;
+    esac
     if [ ! -f "${skill_dir}${ref}" ]; then
       err "SKILL.md references '$ref' which does not exist in the skill directory"
     elif [ ! -x "${skill_dir}${ref}" ] && case "$ref" in
@@ -122,22 +133,26 @@ for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
          esac; then
       warn "'$ref' is not executable (chmod +x), which some agents require"
     fi
-  done < <(grep -oE '(scripts|references|assets)/[A-Za-z0-9._/-]+' "$skill_md" | sort -u)
+  done < <(grep -oE '(\.\./[a-z0-9-]+/)?(scripts|references|assets)/[A-Za-z0-9._/-]+' "$skill_md" | sort -u)
 
   # --- Claude packaging agreement, when present
   plugin_root="${skill_dir}../../"
   plugin_json="${plugin_root}.claude-plugin/plugin.json"
   if [ -f "$plugin_json" ]; then
     p_name=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-    [ "$p_name" = "$name" ] || err "plugin.json name '$p_name' must match directory name '$name'"
+    if [ "$name" = "$plugin_dir_name" ]; then
+      [ "$p_name" = "$name" ] || err "plugin.json name '$p_name' must match directory name '$name'"
+    elif [ "${name#"$p_name"-}" = "$name" ]; then
+      err "skill '$name' is in plugin '$p_name', so it must be named $p_name-<part>"
+    fi
 
     p_ver=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-    m_ver=$(awk -v n="\"$name\"" '$0 ~ n {found=1} found && /"version"/ {gsub(/[^0-9.]/,""); print; exit}' "$REPO_ROOT/.claude-plugin/marketplace.json")
+    m_ver=$(awk -v n="\"$plugin_dir_name\"" '$0 ~ n {found=1} found && /"version"/ {gsub(/[^0-9.]/,""); print; exit}' "$REPO_ROOT/.claude-plugin/marketplace.json")
     if [ -n "$p_ver" ] && [ -n "$m_ver" ] && [ "$p_ver" != "$m_ver" ]; then
       err "version mismatch: plugin.json says $p_ver, marketplace.json says $m_ver"
     fi
-    grep -q "\"source\"[[:space:]]*:[[:space:]]*\"\./plugins/$name\"" "$REPO_ROOT/.claude-plugin/marketplace.json" \
-      || warn "no marketplace.json entry with source ./plugins/$name — Claude Code users will not see this skill"
+    grep -q "\"source\"[[:space:]]*:[[:space:]]*\"\./plugins/$plugin_dir_name\"" "$REPO_ROOT/.claude-plugin/marketplace.json" \
+      || warn "no marketplace.json entry with source ./plugins/$plugin_dir_name — Claude Code users will not see this skill"
   fi
 
   [ -f "${skill_dir}README.md" ] || warn "no README.md — this is what catalog reviewers read"

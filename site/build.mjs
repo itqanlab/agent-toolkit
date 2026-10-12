@@ -42,8 +42,11 @@ const marketplace = JSON.parse(read(join(ROOT, '.claude-plugin', 'marketplace.js
 const agentData = JSON.parse(read(join(HERE, 'data', 'agents.json')));
 const categoryList = JSON.parse(read(join(ROOT, 'catalog', 'categories.json'))).categories;
 
+// One page per plugin. A plugin with more than one skill is shown by its main skill (named
+// like the plugin), and the others are listed on that page as its parts.
 function loadSkills() {
-  return readSkills(ROOT)
+  const all = readSkills(ROOT);
+  return all.filter((sk) => sk.name === sk.pluginName)
     .map((sk) => {
       const base = sk.base;
       const data = sk.fm;
@@ -76,6 +79,10 @@ function loadSkills() {
         iconStill: existsSync(join(ROOT, 'plugins', e.name, 'assets', 'glyph.svg'))
           ? renderIcon(readGlyph(join(ROOT, 'plugins', e.name)), { theme: 'dark', size: 'full', motion: false }) : '',
         source: `${SITE.repo}/tree/main/plugins/${e.name}/skills/${e.name}`,
+        parts: all.filter((x) => x.pluginName === e.name && x.name !== e.name).map((x) => {
+          const d = splitDescription(x.fm.description);
+          return { name: x.name, summary: d.summary.split(/(?<=[.!?])\s/)[0], triggers: d.triggers };
+        }),
       };
     });
 }
@@ -671,6 +678,7 @@ function skillPage(s) {
   // they ask their agent — so the page opens with the sentences that work, and
   // the install step follows for whoever is actually setting the machine up.
   const nav = [
+    s.parts.length ? ['parts', 'Skills'] : null,
     s.triggers.length ? ['say', 'Say this'] : null,
     ['install', 'Install'],
     setup ? ['requirements', 'Requirements'] : null,
@@ -701,7 +709,13 @@ function skillPage(s) {
   ${nav.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
 </nav>
 
-${s.triggers.length ? `<section class="band" id="say">
+${s.parts.length ? `<section class="band" id="parts">
+  <h2 class="sec-h"><span class="sec-n">Skills</span> what else comes in this plugin</h2>
+  <ul class="parts">${s.parts.map((x) => `<li><code>${esc(x.name)}</code> ${esc(x.summary)}${x.triggers.length ? ` <em>Say: “${esc(x.triggers[0])}”</em>` : ''}</li>`).join('')}</ul>
+  <p class="band-lede">They install together, and the agent picks the right one from what you ask.</p>
+</section>
+
+` : ''}${s.triggers.length ? `<section class="band" id="say">
   <h2 class="sec-h"><span class="sec-n">Say this</span> you do not type commands, you ask</h2>
   <ul class="triggers">${s.triggers.map((t) => `<li>“${esc(t)}”</li>`).join('')}</ul>
   <p class="band-lede">Once it is installed, that is the whole interface. Your agent picks the skill

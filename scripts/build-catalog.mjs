@@ -19,7 +19,7 @@
 // including a CHANGELOG.md whose newest entry is not the skill's current version.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPlugins, readSkills, deps, splitDescription, SITE_URL } from './lib/catalog.mjs';
 import { parseChangelog } from './lib/changelog.mjs';
@@ -42,21 +42,31 @@ const repoUrl = existing.owner.url;
 const errors = [];
 const fail = (skill, msg) => errors.push(`${skill}: ${msg}`);
 
-// Each plugin must hold exactly one skill, named like the plugin. Bundles come later.
+// A plugin holds one main skill, named like the plugin, and may hold more. Every other skill
+// in it is named <plugin>-<part>, so a name says where it comes from and cannot clash with a
+// skill from another publisher. The plugin is the unit people install, so it has one version
+// and one CHANGELOG.md, kept in the main skill.
 for (const pl of readPlugins(ROOT)) {
   if (!pl.manifest) fail(pl.name, 'no .claude-plugin/plugin.json');
-  else if (pl.skills.length !== 1) fail(pl.name, `a plugin holds one skill for now, found ${pl.skills.length} in skills/`);
-  else if (pl.skills[0].name !== pl.name) fail(pl.name, `the skill inside is "${pl.skills[0].name}". It must be named like the plugin`);
+  else if (!pl.skills.some((s) => s.name === pl.name)) {
+    fail(pl.name, `no main skill: skills/${pl.name}/ must exist. Found ${pl.skills.map((s) => s.name).join(', ') || 'none'}`);
+  }
+  for (const s of pl.skills) {
+    if (s.name !== pl.name && !s.name.startsWith(`${pl.name}-`)) {
+      fail(s.name, `a second skill in plugin "${pl.name}" must be named ${pl.name}-<part>`);
+    }
+  }
 }
 
 // A trigger phrase is a fine starter prompt when it is a real phrase, not a command.
 const isPrompt = (t) => t.length >= 12 && t.includes(' ') && !t.startsWith('/');
 
-const skills = readSkills(ROOT).map((s) => {
+const allSkills = readSkills(ROOT).map((s) => {
   const meta = s.fm.metadata || {};
   const p = s.plugin;
+  const main = s.name === s.pluginName;
   if (!p) { fail(s.name, 'no .claude-plugin/plugin.json'); return null; }
-  if (p.name !== s.name) fail(s.name, `plugin.json name is "${p.name}"`);
+  if (main && p.name !== s.name) fail(s.name, `plugin.json name is "${p.name}"`);
   if (!p.version) fail(s.name, 'plugin.json has no version');
   if (p.version !== meta.version) {
     fail(s.name, `plugin.json version "${p.version}" differs from SKILL.md metadata.version "${meta.version}"`);
@@ -83,8 +93,20 @@ const skills = readSkills(ROOT).map((s) => {
   if (meta.featured !== undefined && !['true', 'false'].includes(meta.featured)) {
     fail(s.name, `metadata.featured must be "true" or "false", not "${meta.featured}"`);
   }
-  const home = `${repoUrl}/tree/main/plugins/${s.name}`;
-  if (p.homepage !== home) fail(s.name, `plugin.json homepage should be ${home}`);
+  const home = `${repoUrl}/tree/main/plugins/${s.pluginName}`;
+  if (main && p.homepage !== home) fail(s.name, `plugin.json homepage should be ${home}`);
+
+  // A second skill shares the main skill's changelog, so it must not keep one of its own,
+  // and it must point the agent at the main one.
+  if (!main) {
+    if (existsSync(join(s.base, 'CHANGELOG.md'))) {
+      fail(s.name, `keep the plugin's history in skills/${s.pluginName}/CHANGELOG.md only, not in this skill`);
+    }
+    if (!read(join(s.base, 'SKILL.md')).includes(`../${s.pluginName}/CHANGELOG.md`)) {
+      fail(s.name, `SKILL.md does not point the agent at ../${s.pluginName}/CHANGELOG.md (add the "Updates" section)`);
+    }
+    return { ...s, meta, p, changelog: null, main };
+  }
 
   // The changelog is how an agent learns what changed, so it is checked hard.
   const clPath = join(s.base, 'CHANGELOG.md');
@@ -104,8 +126,12 @@ const skills = readSkills(ROOT).map((s) => {
   if (!read(join(s.base, 'SKILL.md')).includes('CHANGELOG.md')) {
     fail(s.name, 'SKILL.md does not point the agent at CHANGELOG.md (add the "Updates" section)');
   }
-  return { ...s, meta, p, changelog };
+  return { ...s, meta, p, changelog, main };
 }).filter(Boolean);
+
+// The catalog lists plugins. Each entry is described by its main skill and names the others.
+const skills = allSkills.filter((s) => s.main)
+  .map((s) => ({ ...s, parts: allSkills.filter((x) => !x.main && x.pluginName === s.name) }));
 
 if (errors.length) {
   console.error('catalog: cannot build');
@@ -139,9 +165,12 @@ const marketplace = `${JSON.stringify({ ...existing, plugins: entries }, null, 2
 /* ------------------------------------------------------------ readme table */
 
 const firstSentence = (s) => s.split(/(?<=[.!?])\s/)[0];
-const rows = skills.map(({ name, p, meta, fm }) => {
+const rows = skills.map(({ name, p, meta, fm, parts }) => {
   const needs = deps(fm.compatibility).map((d) => `\`${d}\``).join(', ') || 'nothing';
-  return `| [\`${name}\`](plugins/${name}/skills/${name}) | ${meta.category} | [${p.version}](plugins/${name}/skills/${name}/CHANGELOG.md) | ${firstSentence(p.description)} | ${needs} |`;
+  const also = parts.length
+    ? ` Also: ${parts.map((x) => `[\`${x.name.slice(name.length + 1)}\`](plugins/${name}/skills/${x.name})`).join(', ')}.`
+    : '';
+  return `| [\`${name}\`](plugins/${name}/skills/${name}) | ${meta.category} | [${p.version}](plugins/${name}/skills/${name}/CHANGELOG.md) | ${firstSentence(p.description)}${also} | ${needs} |`;
 });
 const table = [START, '| Skill | Category | Version | Does | Needs |', '| :-- | :-- | :-- | :-- | :-- |', ...rows, END].join('\n');
 
@@ -203,11 +232,11 @@ const codexManifests = skills.map(({ name, p, meta, fm, pluginRoot }) => {
 // agents/openai.yaml is what Codex reads for the skill list: a display name, a short line and a
 // starter prompt. It sits inside the skill folder, so it travels with every install. Other agents
 // ignore it. The values are JSON strings, which are valid YAML, so quoting is never wrong.
-const openaiYaml = skills.map(({ name, p, meta, base }) => [
+const openaiYaml = allSkills.map(({ name, pluginName, p, meta, base }) => [
   join(base, 'agents', 'openai.yaml'),
   [
     'interface:',
-    `  display_name: ${JSON.stringify(p.displayName || titleCase(name))}`,
+    `  display_name: ${JSON.stringify(meta.display || (name === pluginName ? p.displayName || titleCase(name) : titleCase(name)))}`,
     `  short_description: ${JSON.stringify(meta.short)}`,
     `  default_prompt: ${JSON.stringify(`Use $${name} to ${meta.starter}.`)}`,
     ...(existsSync(join(base, 'assets', 'icon-large.png')) ? [
@@ -217,7 +246,7 @@ const openaiYaml = skills.map(({ name, p, meta, base }) => [
     ] : []),
     '',
   ].join('\n'),
-  `plugins/${name}/skills/${name}/agents/openai.yaml`,
+  `plugins/${pluginName}/skills/${name}/agents/openai.yaml`,
 ]);
 
 const codex = `${JSON.stringify({
@@ -244,7 +273,9 @@ const overlay = new Map(openaiYaml.map(([path, text]) => [path, text]));
 const listFiles = (dir) => readdirSync(dir, { recursive: true, withFileTypes: true })
   .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
 
-const mirrorFiles = skills.flatMap(({ name, base }) => listFiles(base).map((file) => {
+// A file this run writes for the first time is not on disk yet, so it is added from the overlay.
+const filesOf = (base) => [...new Set([...listFiles(base), ...[...overlay.keys()].filter((p) => p.startsWith(base + sep))])];
+const mirrorFiles = allSkills.flatMap(({ name, base }) => filesOf(base).map((file) => {
   const rel = file.slice(base.length + 1).split('\\').join('/');
   // A file this script writes is copied from what it will write, so a stale one on disk cannot leak in.
   const text = overlay.get(file);
@@ -264,6 +295,11 @@ const leftovers = existsSync(MIRROR)
 
 /* ------------------------------------------------------------------ write */
 
+// Worded as before when every plugin holds one skill, so the output reads the same.
+const count = allSkills.length === skills.length
+  ? `${skills.length} skills`
+  : `${skills.length} plugins, ${allSkills.length} skills`;
+
 const targets = [
   [MARKETPLACE, marketplace, '.claude-plugin/marketplace.json'],
   [README, nextReadme, 'README.md'],
@@ -281,7 +317,7 @@ if (check) {
     for (const label of stale) console.error(`  ✘ ${label}`);
     process.exit(1);
   }
-  console.log(`catalog: up to date (${skills.length} skills)`);
+  console.log(`catalog: up to date (${count})`);
 } else {
   for (const [path, next, label] of targets) {
     if (!existsSync(path) || read(path) !== next) {
@@ -305,5 +341,5 @@ if (check) {
     for (const d of dirs) if (readdirSync(d).length === 0) rmSync(d, { recursive: true });
   }
   if (copied || leftovers.length) console.log(`wrote .agents/skills (${copied} files copied, ${leftovers.length} removed)`);
-  console.log(`catalog: ${skills.length} skills`);
+  console.log(`catalog: ${count}`);
 }

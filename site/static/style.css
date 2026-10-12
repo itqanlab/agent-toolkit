@@ -383,6 +383,11 @@ main { min-width: 0; padding: 0 var(--gut); }
   color: var(--ink-2);
 }
 
+.parts { margin: 0 0 16px; padding: 0; list-style: none; max-width: 80ch; }
+.parts li { padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); }
+.parts code { font-family: var(--mono); font-size: 13px; color: var(--ink); margin-right: 8px; }
+.parts em { display: block; font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 4px; }
+
 .prose { max-width: 74ch; }
 .prose h2 { font-family: var(--disp); font-weight: 600; font-size: 1.3rem;
   margin: 38px 0 12px; letter-spacing: -.015em; }

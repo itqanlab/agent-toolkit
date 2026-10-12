@@ -10,8 +10,9 @@
 //   plugins/<name>/assets/logo.png             512, light   Codex plugin card `interface.logo`
 //   plugins/<name>/assets/logo-dark.png        512, dark    Codex `interface.logoDark`
 //   plugins/<name>/assets/composer-icon.png    128, dark    Codex `interface.composerIcon`
-//   plugins/<name>/skills/<name>/assets/icon-large.png   512  Codex openai.yaml icon_large
-//   plugins/<name>/skills/<name>/assets/icon-small.png   128  Codex openai.yaml icon_small
+//   plugins/<name>/skills/<skill>/assets/icon-large.png   512  Codex openai.yaml icon_large
+//   plugins/<name>/skills/<skill>/assets/icon-small.png   128  Codex openai.yaml icon_small
+//   (one pair in every skill of the plugin)
 //
 // The skill copies exist because a skill installed alone (npx skills, ~/.agents/skills)
 // carries only its own folder, and Codex rejects a path that leaves it.
@@ -73,9 +74,14 @@ for (const name of names) {
   emit(join(dir, 'assets', 'logo.png'), raster('light', 'full', 512), true);
   emit(join(dir, 'assets', 'logo-dark.png'), raster('dark', 'full', 512), true);
   emit(join(dir, 'assets', 'composer-icon.png'), raster('dark', 'small', 128), true);
-  const skill = join(dir, 'skills', name, 'assets');
-  emit(join(skill, 'icon-large.png'), raster('dark', 'full', 512), true);
-  emit(join(skill, 'icon-small.png'), raster('dark', 'small', 128), true);
+  // Every skill in the plugin carries the copies. A plugin with more than one skill shares one icon.
+  const skillNames = readdirSync(join(dir, 'skills'), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(join(dir, 'skills', d.name, 'SKILL.md'))).map((d) => d.name);
+  for (const s of skillNames.length ? skillNames : [name]) {
+    const skill = join(dir, 'skills', s, 'assets');
+    emit(join(skill, 'icon-large.png'), raster('dark', 'full', 512), true);
+    emit(join(skill, 'icon-small.png'), raster('dark', 'small', 128), true);
+  }
 }
 
 if (check && problems.length) {

@@ -57,6 +57,20 @@ The `metadata.pluginRoot` shorthand for marketplace sources is documented upstre
 
 Plugin manifests cannot reference paths containing `..`, and Codex requires a plugin's skills to sit in `skills/<name>/` inside the plugin. That is why the skill lives inside its plugin folder. One layout satisfies both, and the skill folder is still a plain open-standard skill.
 
+## A plugin with more than one skill
+
+A plugin may hold more than one skill when the skills only make sense together, for example a vendor's specialist workflows that all spend through one guard script. The rules:
+
+- **One main skill.** `plugins/<name>/skills/<name>/` must exist. It carries the plugin's `CHANGELOG.md`, and the catalog, the README table, the Codex manifest and the site page describe the plugin through it.
+- **The others are named `<name>-<part>`,** so a name says where it comes from and cannot clash with another publisher's skill.
+- **One version.** Every skill's `metadata.version` equals the plugin's `plugin.json` version. A change to any skill bumps the plugin.
+- **One changelog.** The other skills keep no `CHANGELOG.md` of their own. Their "Updates" section points at `../<name>/CHANGELOG.md`.
+- **Siblings may share code** through a path like `../<name>/scripts/tool.mjs`. Every skill of a plugin is installed side by side by the marketplace and by `install.sh <plugin>`. A tool that lets the user pick single skills, such as `npx skills`, can leave one out, so say in the README to install them all. `validate.sh` checks the file exists and refuses a path into another plugin.
+- **Each skill still stands as a skill:** its own `name`, `description` with trigger phrases, `metadata.short`, `metadata.starter`, `README.md` and Codex `agents/openai.yaml`. `metadata.display` sets the name Codex shows, when the title-cased folder name reads badly.
+- **One icon.** `build-icons.mjs` writes the Codex icon copies into every skill of the plugin.
+
+`./scripts/install.sh <plugin>` installs every skill in the plugin. `./scripts/install.sh <skill>` still installs one, which breaks a skill that uses a sibling, so the README of such a plugin names the plugin.
+
 ## Changelog
 
 Every item keeps a `CHANGELOG.md` next to its manifest. It is written for people and read by agents. An agent that has the item installed can read its own history from the folder. Then it can open the address on the `Latest:` line, see if a newer version exists, and tell the user exactly what changed before it updates.
