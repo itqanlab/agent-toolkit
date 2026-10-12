@@ -1,0 +1,22 @@
+{
+  "name": "video-prompt",
+  "displayName": "Video Prompt",
+  "version": "1.0.0",
+  "description": "Write video prompts in the project's brand, sized and timed for each platform, ready for any video generator. Reads the project's own brand file, spells out the motion, logs every prompt so none is written twice, suggests a Higgsfield model, and never spends credits.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/video-prompt",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "prompt",
+    "brand",
+    "reels",
+    "tiktok",
+    "social",
+    "higgsfield"
+  ]
+}

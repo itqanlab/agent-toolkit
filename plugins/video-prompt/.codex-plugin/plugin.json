@@ -1,0 +1,44 @@
+{
+  "name": "video-prompt",
+  "version": "1.0.0",
+  "description": "Write video prompts in the project's brand, sized and timed for each platform, ready for any video generator. Reads the project's own brand file, spells out the motion, logs every prompt so none is written twice, suggests a Higgsfield model, and never spends credits.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/video-prompt",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "prompt",
+    "brand",
+    "reels",
+    "tiktok",
+    "social",
+    "higgsfield"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Video Prompt",
+    "shortDescription": "Brand-aware video prompts, sized and timed per platform",
+    "longDescription": "Write video prompts in the project's brand, sized and timed for each platform, ready for any video generator. Reads the project's own brand file, spells out the motion, logs every prompt so none is written twice, suggests a Higgsfield model, and never spends credits.",
+    "developerName": "Itqan Lab",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/video-prompt/",
+    "defaultPrompt": [
+      "Write a video prompt",
+      "Prompt for a reel",
+      "Make a prompt to animate this photo"
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
+  }
+}

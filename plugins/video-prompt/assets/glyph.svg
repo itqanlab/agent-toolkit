@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- video-prompt. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <path class="main tint" d="M112 136 H400 Q416 136 416 152 V328 Q416 344 400 344 H112 Q96 344 96 328 V152 Q96 136 112 136 Z"/>
+  <path class="line" d="M136 136 V344 M376 136 V344"/>
+  <path class="line" d="M232 196 L304 240 L232 284 Z"/>
+  <path class="acc" d="M136 392 H312 M336 372 V412"/>
+</svg>

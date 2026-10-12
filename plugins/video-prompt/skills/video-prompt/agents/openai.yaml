@@ -1,0 +1,7 @@
+interface:
+  display_name: "Video Prompt"
+  short_description: "Brand-aware video prompts, sized and timed per platform"
+  default_prompt: "Use $video-prompt to write a prompt for a 7 second reel of this product."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"
