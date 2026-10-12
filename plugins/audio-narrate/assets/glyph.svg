@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- audio-narrate. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <path class="main tint" d="M116 150 H330 Q356 150 356 176 V292 Q356 318 330 318 H214 L160 366 V318 H116 Q90 318 90 292 V176 Q90 150 116 150 Z"/>
+  <path class="line" d="M136 206 H300 M136 262 H252"/>
+  <path class="acc" d="M392 196 Q420 234 392 272"/>
+  <path class="acc" d="M424 168 Q472 234 424 300"/>
+</svg>

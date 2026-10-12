@@ -1,0 +1,7 @@
+interface:
+  display_name: "Audio Narrate"
+  short_description: "Free English and Arabic narration from text"
+  default_prompt: "Use $audio-narrate to narrate this script in Arabic, one file per scene."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"

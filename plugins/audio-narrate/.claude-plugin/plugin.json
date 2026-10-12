@@ -1,0 +1,22 @@
+{
+  "name": "audio-narrate",
+  "displayName": "Audio Narrate",
+  "version": "1.0.0",
+  "description": "Turn text into natural English or Arabic narration for free: one file, or one file per scene for a video. Online neural voices by default, an offline engine when there is no internet, and a pronunciation list for words the voice gets wrong. No key and no account.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/audio-narrate",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "text-to-speech",
+    "narration",
+    "voiceover",
+    "arabic",
+    "edge-tts",
+    "piper",
+    "offline"
+  ]
+}

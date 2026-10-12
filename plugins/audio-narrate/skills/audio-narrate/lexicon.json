@@ -1,0 +1,5 @@
+{
+  "_doc": "Built-in pronunciation lexicon for the edge engine (scripts/edge.py). Words the engine says wrong (loanwords, brand names, tech terms) are respelled here before synthesis. Longest keys first, so phrases win over single words. 'ar' and 'en' buckets apply to that language only. Plain substring match, case-insensitive for en. A project adds its own words in narrate-lexicon.json in the folder the command runs from, or with --lexicon FILE; those win over this file. Arabic recipe: explicit tashkeel (fatha), madd or an extra alif for length, sukun to end a consonant crisply, and a comma for a pause.",
+  "ar": {},
+  "en": {}
+}
