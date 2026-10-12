@@ -4,6 +4,21 @@ Latest: https://agent-toolkit.itqanlab.com/s/elevenlabs-studio/CHANGELOG.md
 
 What changed in `elevenlabs-studio`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.1.0] - 2026-10-12
+
+### Added
+
+- Transcribe a recording or a link, with speaker labels, word timings and a list of names to spell right.
+- Change the voice in a recording and keep the performance. Can clean the noise in the same call.
+- Remove background noise and music from a recording.
+- Dub a video or audio file into another language, in voices cloned from the speakers. An interrupted dub resumes instead of paying twice.
+- Support for `eleven_v4`, ElevenLabs' newest voice model. Measured at about 0.11 credits per character, a quarter of `eleven_v3`.
+
+### Changed
+
+- Voice-over now uses `eleven_v4` by default, as ElevenLabs does. Pass `--model eleven_v3` for the old default.
+- Calls priced by the length of a recording refuse to run when the length is unknown. Install ffmpeg, or pass `--seconds`.
+
 ## [1.0.0] - 2026-10-05
 
 ### Added

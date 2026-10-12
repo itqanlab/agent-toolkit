@@ -1,8 +1,8 @@
 {
   "name": "elevenlabs-studio",
   "displayName": "ElevenLabs Studio",
-  "version": "1.0.0",
-  "description": "Make voice-over, sound effects and music with ElevenLabs from the agent, and spend the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
+  "version": "1.1.0",
+  "description": "Voice-over, sound effects, music, transcription, voice changing, noise removal and dubbing with ElevenLabs, from the agent, spending the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"
@@ -17,6 +17,11 @@
     "sound-effects",
     "music",
     "audio",
-    "credits"
+    "credits",
+    "speech-to-text",
+    "transcription",
+    "voice-changer",
+    "voice-isolator",
+    "dubbing"
   ]
 }

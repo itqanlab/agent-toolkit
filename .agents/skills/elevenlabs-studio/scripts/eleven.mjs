@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// eleven.mjs — ElevenLabs voice-over, sound effects and music, spent on purpose.
+// eleven.mjs — ElevenLabs voice-over, sound effects, music, transcription, voice changing,
+// voice isolation and dubbing, spent on purpose.
 //
 // Every paid call goes through one door that prices it before it is made, never
 // pays twice for the same request, and writes down what it actually cost.
@@ -21,16 +22,17 @@
 // The API key is read from the shared credential store and used in-process. It is
 // never printed, never passed on a command line, and never written to the ledger.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { join, dirname, resolve, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readSecrets, providerPath } from '../lib/store.mjs';
 
 const API = 'https://api.elevenlabs.io';
 const PROVIDER = 'elevenlabs';
 const KEY = 'ELEVENLABS_API_KEY';
-const USER_AGENT = 'itqan-agent-toolkit/1.0 (+https://github.com/itqanlab/agent-toolkit)';
+const USER_AGENT = 'itqan-agent-toolkit/1.1 (+https://github.com/itqanlab/agent-toolkit)';
 
 export const RESERVE = Number(process.env.ELEVEN_RESERVE || 1000);
 
@@ -46,8 +48,10 @@ const RATE = {
   // Measured on a Creator plan: eleven_v3 and eleven_multilingual_v2 both cost about 0.45 a
   // character (66 for 151, 51 for 115, and many short lines agree). Published was 1.
   // Flash and turbo at 0.25 is an assumption (half of that), not yet measured.
+  // eleven_v4: measured once, exactly from history, 6 credits for 53 characters (0.11). One
+  // call is not a rate, so the estimate rounds up to 0.15 until more rows agree.
   // Other models keep the published 1.
-  ttsPerChar: (model) => (/flash|turbo/.test(model) ? 0.25 : /eleven_v3|multilingual_v2/.test(model) ? 0.45 : 1),
+  ttsPerChar: (model) => (/^eleven_v4$/.test(model) ? 0.15 : /flash|turbo/.test(model) ? 0.25 : /eleven_v3|multilingual_v2/.test(model) ? 0.45 : 1),
   // Published, used only when the model picks the length.
   sfxPerGen: 200,
   // Measured: with duration_seconds set, 2.6 s cost 29 credits, three times out of three.
@@ -55,6 +59,14 @@ const RATE = {
   // Measured, not published: a 44.5 s music_v1 render cost 612 credits (about 825 a minute).
   // The published figure was 900.
   musicPerMin: 825,
+  // Per minute of input audio. Voice changer: 1000, published in ElevenLabs' own skill guide.
+  // Isolator 1000 and transcription 330 come from third-party pricing write-ups, not
+  // ElevenLabs: assumed. Dubbing v2 is reported anywhere from 2000 to 10000 a minute, so
+  // the guard assumes the top. All four are unmeasured until the ledger says otherwise.
+  stsPerMin: 1000,
+  isolatePerMin: 1000,
+  sttPerMin: 330,
+  dubPerMin: 10000,
 };
 
 // What each kind of call needs switched on for the key, in ElevenLabs' own words.
@@ -64,6 +76,11 @@ const PERMISSION = {
   '/v1/text-to-speech': 'Text to Speech: Access',
   '/v1/sound-generation': 'Sound Effects: Access',
   '/v1/music': 'Music: Access',
+  // These four row names follow the key form's pattern. Not yet checked on the form itself.
+  '/v1/speech-to-text': 'Speech to Text: Access',
+  '/v1/speech-to-speech': 'Speech to Speech: Access',
+  '/v1/audio-isolation': 'Audio Isolation: Access',
+  '/v1/dubbing': 'Dubbing: Access',
   '/v2/voices': 'Voices: Read',
   '/v1/shared-voices': 'Voices: Read',
 };
@@ -129,14 +146,16 @@ function explain(method, path, status, text) {
 
 /** One call against the API. Returns the parsed JSON, or the raw Response with { raw: true }. */
 export async function call(method, path, body, { raw = false, key } = {}) {
+  // A FormData body is an upload. fetch sets its multipart boundary, so no Content-Type here.
+  const form = body instanceof FormData;
   const init = {
     method,
     headers: {
       'xi-api-key': key || getKey(),
       'User-Agent': USER_AGENT,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(body && !form ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: form ? body : body ? JSON.stringify(body) : undefined,
   };
   let res;
   try {
@@ -204,6 +223,51 @@ async function settle(before, poll) {
 }
 
 const hash = (o) => createHash('sha256').update(JSON.stringify(o)).digest('hex').slice(0, 16);
+const fileHash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+
+/**
+ * An upload request: plain fields plus files by path. The cache key hashes the files'
+ * contents, so a renamed copy of the same recording is still a cache hit, and an edited
+ * one is not. The ledger keeps only the file names.
+ */
+function upload(fields, files) {
+  for (const f of Object.values(files)) {
+    if (!existsSync(f)) throw new ElevenError(`no such file: ${f}`);
+  }
+  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+  return {
+    describe: { ...clean, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, basename(f)])) },
+    key: { ...clean, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, fileHash(f)])) },
+    form() {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(clean)) {
+        for (const one of Array.isArray(v) ? v : [v]) fd.append(k, typeof one === 'object' ? JSON.stringify(one) : String(one));
+      }
+      for (const [k, f] of Object.entries(files)) fd.append(k, new Blob([readFileSync(f)]), basename(f));
+      return fd;
+    },
+  };
+}
+
+/**
+ * Length of a recording in seconds, for the estimate. --seconds wins, for a URL source
+ * or a machine without ffprobe. Without either, refuse: a paid call is never made blind.
+ */
+function seconds(A, file) {
+  const given = number(A, 'seconds', 0.1, 36000);
+  if (given !== undefined) return given;
+  if (file) {
+    try {
+      const out = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' });
+      const n = Number(out.trim());
+      if (Number.isFinite(n) && n > 0) return n;
+    } catch { /* not installed, or not a media file */ }
+  }
+  throw new ElevenError(
+    'The length of the audio is needed to price this call, and it could not be read.\n' +
+    'Pass it with --seconds N, or install ffmpeg (which includes ffprobe) so the tool can read it.',
+  );
+}
 
 function extFor(format = '') {
   if (format.startsWith('mp3')) return '.mp3';
@@ -226,8 +290,12 @@ function deliver(cached, out, withMeta) {
 }
 
 // One paid request: estimate, guard, cache, call, measure, ledger.
+// An upload passes upload(...) as body, and a multi-step job passes opts.request, which does
+// the work and returns something with headers.get() and the result.
 async function paid(kind, endpoint, body, opts, estimate, onResponse) {
-  const id = hash({ endpoint, body });
+  const isUpload = body && typeof body.form === 'function';
+  const id = hash({ endpoint, body: isUpload ? body.key : body });
+  const shown = isUpload ? body.describe : body;
   const cached = join(cacheDir(), id + (opts.ext || '.mp3'));
   const hit = existsSync(cached) && !opts.fresh;
   const est = Math.round(estimate);
@@ -236,7 +304,7 @@ async function paid(kind, endpoint, body, opts, estimate, onResponse) {
 
   if (opts.dry) {
     if (opts.max && estimate > Number(opts.max)) console.log(`would be refused: estimate ${est} is above --max ${opts.max}`);
-    console.log(JSON.stringify({ endpoint, body }, null, 2));
+    console.log(JSON.stringify({ endpoint, body: shown }, null, 2));
     console.log('dry run. Nothing was called and nothing was spent.');
     return;
   }
@@ -262,8 +330,10 @@ async function paid(kind, endpoint, body, opts, estimate, onResponse) {
     );
   }
 
-  const res = await call('POST', endpoint, body, { raw: true });
   mkdirSync(cacheDir(), { recursive: true });
+  const res = opts.request
+    ? await opts.request(id)
+    : await call('POST', endpoint, isUpload ? body.form() : body, { raw: true });
   const meta = await onResponse(res, cached);
   // From here on the money is spent, so nothing may throw before the ledger row is written.
   const requestId = res.headers.get('request-id');
@@ -289,7 +359,7 @@ async function paid(kind, endpoint, body, opts, estimate, onResponse) {
     why: typeof opts.why === 'string' ? opts.why : null,
     out: typeof opts.out === 'string' ? opts.out : null,
     request_id: requestId,
-    body,
+    body: shown,
   });
   if (measured === null) {
     console.log('note: the cost could not be measured (no history item, and the balance had not moved or could not be read). The ledger row says settled: false. Check with: node scripts/eleven.mjs account');
@@ -338,7 +408,8 @@ function json(value, name) {
   try { return JSON.parse(value); } catch { throw new ElevenError(`--${name} is not valid JSON: ${value}`); }
 }
 
-const USAGE = `eleven.mjs — ElevenLabs voice-over, sound effects and music, with a credit guard.
+const USAGE = `eleven.mjs — ElevenLabs voice-over, sound effects, music, transcription, voice changing,
+voice isolation and dubbing, with a credit guard.
 
 Free:
   account                                   plan, credits used and left, reset date
@@ -350,11 +421,22 @@ Free:
   ledger                                    what has been spent, by kind and by tag
 
 Paid:
-  tts   --voice ID --text "..." --out f.mp3 [--model eleven_v3] [--timestamps]
+  tts   --voice ID --text "..." --out f.mp3 [--model eleven_v4] [--timestamps]
         [--prev "..."] [--next "..."] [--settings '{"stability":0.5}'] [--lang en] [--format mp3_44100_128]
   sfx   --text "..." --out f.mp3 [--duration 2.5] [--influence 0.6] [--loop] [--format ...]
   music (--plan plan.json | --prompt "..." --ms 45000) --out f.mp3 [--model music_v1]
         [--instrumental] [--format ...]
+  stt     (--file rec.mp3 | --source-url URL --seconds N) --out t.txt [--lang en] [--diarize]
+          [--speakers N] [--keyterms "a,b"] [--clean] [--no-events] [--model scribe_v2]
+                                            text to --out, words and timings to <out>.json
+  change  --voice ID --file take.mp3 --out f.mp3 [--denoise] [--settings '{...}'] [--format ...]
+                                            same performance, another voice. 5 minutes at most
+  isolate --file noisy.mp3 --out clean.mp3  keep the voice, drop the noise and music
+  dub     (--file video.mp4 | --source-url URL --seconds N) --to es --out es.wav [--from en]
+          [--keyterms "Brand,Name"] [--cloning 0-10]
+                                            waits until done; rerun to resume if interrupted
+
+Uploads are priced from their length: ffprobe reads it, or pass --seconds N.
 
 Every paid command also takes:
   --dry        print the estimate and the request, call nothing
@@ -416,17 +498,22 @@ const COMMANDS = {
 
   async tts(A) {
     need(A, 'tts', 'voice', 'text');
-    const model = typeof A.model === 'string' ? A.model : 'eleven_v3';
+    // eleven_v4 is ElevenLabs' own default since October 2026, and measured cheaper than v3.
+    const model = typeof A.model === 'string' ? A.model : 'eleven_v4';
     const format = typeof A.format === 'string' ? A.format : 'mp3_44100_128';
     // eleven_v3 answers previous_text / next_text with a 400 ("not yet supported"). Refuse here,
     // with the fix, instead of a round trip.
     if (model === 'eleven_v3' && (A.prev || A.next)) {
       throw new ElevenError('--prev and --next are not supported on eleven_v3. Drop them, or stitch with --model eleven_multilingual_v2.');
     }
+    const settings = A.settings ? json(A.settings, 'settings') : null;
+    // eleven_v4 takes only stability and similarity_boost. Refuse the rest here, before a round trip.
+    const extra = model.startsWith('eleven_v4') && settings ? Object.keys(settings).filter((k) => !['stability', 'similarity_boost'].includes(k)) : [];
+    if (extra.length) throw new ElevenError(`eleven_v4 only accepts stability and similarity_boost. Drop: ${extra.join(', ')}. Use audio tags such as [whispers] or [laughs] in the text for delivery.`);
     const body = {
       text: A.text,
       model_id: model,
-      ...(A.settings ? { voice_settings: json(A.settings, 'settings') } : {}),
+      ...(settings ? { voice_settings: settings } : {}),
       ...(typeof A.prev === 'string' ? { previous_text: A.prev } : {}),
       ...(typeof A.next === 'string' ? { next_text: A.next } : {}),
       ...(typeof A.lang === 'string' ? { language_code: A.lang } : {}),
@@ -491,6 +578,101 @@ const COMMANDS = {
       body = { prompt: A.prompt, music_length_ms: ms, model_id: model, ...(A.instrumental ? { force_instrumental: true } : {}) };
     }
     await paid('music', `/v1/music?output_format=${format}`, body, { ...A, ext: extFor(format) }, (ms / 60000) * RATE.musicPerMin, saveBinary);
+  },
+
+  async stt(A) {
+    const url = typeof A['source-url'] === 'string' ? A['source-url'] : null;
+    if (!url) need(A, 'stt', 'file');
+    const model = typeof A.model === 'string' ? A.model : 'scribe_v2';
+    const secs = seconds(A, url ? null : A.file);
+    const fields = {
+      model_id: model,
+      ...(url ? { source_url: url } : {}),
+      language_code: typeof A.lang === 'string' ? A.lang : undefined,
+      diarize: A.diarize ? 'true' : undefined,
+      num_speakers: number(A, 'speakers', 1, 32),
+      no_verbatim: A.clean ? 'true' : undefined,
+      tag_audio_events: A['no-events'] ? 'false' : undefined,
+      keyterms: typeof A.keyterms === 'string' ? A.keyterms.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      timestamps_granularity: 'word',
+    };
+    const body = upload(fields, url ? {} : { file: A.file });
+    // The plain text goes to --out, the full answer (words, timings, speakers) beside it as .json.
+    await paid('stt', '/v1/speech-to-text', body, { ...A, ext: '.txt' }, (secs / 60) * RATE.sttPerMin, async (res, file) => {
+      const j = await res.json();
+      writeFileSync(file, `${j.text ?? (j.transcripts || []).map((t) => t.text).join('\n')}\n`);
+      writeFileSync(`${file}.json`, JSON.stringify(j, null, 1));
+      return true;
+    });
+  },
+
+  async change(A) {
+    need(A, 'change', 'voice', 'file');
+    const secs = seconds(A, A.file);
+    // ElevenLabs refuses more than 5 minutes per request. Say so before anything is sent.
+    if (secs > 300) throw new ElevenError(`The recording is ${Math.round(secs)} s. The voice changer takes at most 300 s per request. Cut it into parts first. Nothing was spent.`);
+    const format = typeof A.format === 'string' ? A.format : 'mp3_44100_128';
+    const fields = {
+      model_id: typeof A.model === 'string' ? A.model : 'eleven_multilingual_sts_v2',
+      remove_background_noise: A.denoise ? 'true' : undefined,
+      voice_settings: A.settings ? json(A.settings, 'settings') : undefined,
+    };
+    const endpoint = `/v1/speech-to-speech/${encodeURIComponent(A.voice)}?output_format=${format}`;
+    await paid('change', endpoint, upload(fields, { audio: A.file }), { ...A, ext: extFor(format) }, (secs / 60) * RATE.stsPerMin, saveBinary);
+  },
+
+  async isolate(A) {
+    need(A, 'isolate', 'file');
+    const secs = seconds(A, A.file);
+    await paid('isolate', '/v1/audio-isolation', upload({}, { audio: A.file }), { ...A, ext: '.mp3' }, (secs / 60) * RATE.isolatePerMin, saveBinary);
+  },
+
+  async dub(A) {
+    need(A, 'dub', 'to');
+    const url = typeof A['source-url'] === 'string' ? A['source-url'] : null;
+    if (!url) need(A, 'dub', 'file');
+    const secs = seconds(A, url ? null : A.file);
+    const fields = {
+      model_id: 'dubbing_v2',
+      ...(url ? { source_url: url } : {}),
+      source_language: typeof A.from === 'string' ? A.from : undefined,
+      keyterms: typeof A.keyterms === 'string' ? A.keyterms.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+    };
+    const body = upload(fields, url ? {} : { file: A.file });
+    const target = { target_language: A.to, ...(A.cloning !== undefined ? { voice_settings: { cloning_strength: number(A, 'cloning', 0, 10) } } : {}) };
+    const key = { ...body.key, ...target };
+    // A dub takes minutes. The project and language ids are saved as soon as they exist, so an
+    // interrupted run picks the same job up again instead of paying for a second one.
+    const request = async (id) => {
+      const pending = join(cacheDir(), `${id}.pending.json`);
+      const state = existsSync(pending) ? JSON.parse(readFileSync(pending, 'utf8')) : {};
+      const save = () => writeFileSync(pending, JSON.stringify(state));
+      if (state.project_id) console.log(`resuming dubbing project ${state.project_id}`);
+      if (!state.project_id) {
+        state.project_id = (await call('POST', '/v1/dubbing/project', body.form())).project_id;
+        save();
+        console.log(`dubbing project ${state.project_id} created`);
+      }
+      const base = `/v1/dubbing/project/${encodeURIComponent(state.project_id)}`;
+      if (!state.language_id) {
+        state.language_id = (await call('POST', `${base}/language`, target)).language_id;
+        save();
+      }
+      let lang;
+      for (let i = 0; ; i += 1) {
+        lang = await call('GET', `${base}/language/${encodeURIComponent(state.language_id)}`);
+        if (lang.status === 'completed') break;
+        if (lang.status === 'failed') throw new ElevenError(`ElevenLabs could not make the ${A.to} dub (project ${state.project_id}). It may still have been charged: check with  node scripts/eleven.mjs account`);
+        if (i % 6 === 0) console.log(`dub ${A.to}: ${lang.status}...`);
+        await wait(10000);
+      }
+      // The download link is signed and expires in about an hour, so fetch it straight away.
+      const audio = await fetch(lang.outputs.lossless_audio);
+      if (!audio.ok) throw new ElevenError(`The dub is done but the download failed (HTTP ${audio.status}). Run the same command again: it resumes and fetches a fresh link.`);
+      rmSync(pending, { force: true });
+      return { headers: { get: () => null }, arrayBuffer: () => audio.arrayBuffer() };
+    };
+    await paid('dub', '/v1/dubbing/project', { describe: { ...body.describe, ...target }, key, form: body.form }, { ...A, ext: '.wav', request }, (secs / 60) * RATE.dubPerMin, saveBinary);
   },
 
   ledger() {

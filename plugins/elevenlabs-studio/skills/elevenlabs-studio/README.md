@@ -1,6 +1,6 @@
 # elevenlabs-studio
 
-Make voice-over, sound effects and music with ElevenLabs from the agent, and spend the credits on purpose.
+Make voice-over, sound effects and music, transcribe, change voices, remove noise and dub with ElevenLabs from the agent, and spend the credits on purpose.
 
 ## Just ask
 
@@ -11,6 +11,10 @@ Once the skill is installed, say what you want in your own words:
 > *"make a voice-over for this script, one file per line"*
 > *"I need a 2 second whoosh for the transition"*
 > *"make a 45 second background track that matches these scenes"*
+> *"transcribe this interview and tell me who says what"*
+> *"make this recording sound like the narrator voice"*
+> *"clean the background noise out of this voice note"*
+> *"dub this video into Arabic"*
 > *"how many credits are left, and what did we spend this week?"*
 
 The agent runs the commands, tells you what each step will cost before it spends anything, and hands you the files.
@@ -43,7 +47,7 @@ sh scripts/setup-deps.sh            # show the install command, ask, then run it
 .\scripts\setup-deps.ps1            # Windows
 ```
 
-**An ElevenLabs account and API key.** Create the key at https://elevenlabs.io/app/settings/api-keys with **Text to Speech**, **Sound Effects**, **Music**, **Voices (read)** and **User (read)** switched on. User read lets the tool read your credit balance, and it will not spend credits it cannot count. If there is a History row, set it to Read too, so voice-over costs are measured exactly. A credit quota on the key is a good extra limit.
+**An ElevenLabs account and API key.** Create the key at https://elevenlabs.io/app/settings/api-keys with **Text to Speech**, **Sound Effects**, **Music**, **Voices (read)** and **User (read)** switched on. For transcription, voice changing, noise removal and dubbing, also switch on **Speech to Text**, **Speech to Speech**, **Audio Isolation** and **Dubbing**. User read lets the tool read your credit balance, and it will not spend credits it cannot count. If there is a History row, set it to Read too, so voice-over costs are measured exactly. A credit quota on the key is a good extra limit.
 
 ## Setup
 
@@ -72,8 +76,15 @@ node scripts/eleven.mjs sfx --text "soft airy whoosh, left to right" --duration 
 node scripts/eleven.mjs plan --prompt "warm minimal piano, slow build" --ms 45000 --out music/plan.json
 node scripts/eleven.mjs music --plan music/plan.json --out music/bed.mp3 --max 700
 
+node scripts/eleven.mjs stt --file interview.mp3 --diarize --keyterms "Acme,Dana Hart" --out interview.txt
+node scripts/eleven.mjs change --voice JBFqnCBsd6RMkjVDRZzb --file my-take.mp3 --denoise --out narrator.mp3
+node scripts/eleven.mjs isolate --file voice-note.m4a --out clean.mp3
+node scripts/eleven.mjs dub --file promo.mp4 --from en --to ar --out promo-ar.wav --dry
+
 node scripts/eleven.mjs ledger
 ```
+
+Recordings are priced by their length. **ffmpeg** (which includes `ffprobe`) lets the tool read it. Without it, or for a link, pass `--seconds N`.
 
 Every paid command takes `--dry`, `--max N`, `--fresh` (with `--why`), `--tag`, `--why` and `--out`.
 

@@ -13,12 +13,21 @@ Body fields the tool sends: `text`, `model_id`, and when given `voice_settings` 
 
 | Model id | Languages | Use it for | Estimate |
 | :-- | :-- | :-- | :-- |
-| `eleven_v3` | 70+ | Expressive final takes. The default here. No stitching, and can drift pitch | ~0.45 per character (measured) |
-| `eleven_v4` | 90+ | Highest quality, expressive | ~1 per character (published) |
+| `eleven_v4` | 90+ | The default here, and ElevenLabs' own default. Highest quality, audio tags such as `[whispers]` and `[laughs]` | ~0.11 per character (measured once: 6 for 53). The tool estimates 0.15 |
+| `eleven_v3` | 70+ | Previous expressive model. No stitching, and can drift pitch | ~0.45 per character (measured) |
 | `eleven_multilingual_v2` | 29 | Long-form, stable. Supports stitching | ~0.45 per character (measured) |
-| `eleven_flash_v2_5` | 32 | Scratch takes and timing checks | ~0.25 per character (assumed) |
-| `eleven_turbo_v2_5` | 32 | Balanced speed and quality | ~0.25 per character (assumed) |
-| `eleven_flash_v2`, `eleven_turbo_v2` | English only | Fast English scratch takes | ~0.25 per character (assumed) |
+| `eleven_flash_v2_5` | 32 | Scratch takes and timing checks. Lowest latency | ~0.25 per character (assumed) |
+| `eleven_flash_v2` | English only | Fast English scratch takes | ~0.25 per character (assumed) |
+| `eleven_v4_turbo` | 90+ | Real-time v4 over a WebSocket only. This tool does not use it | not measured |
+
+ElevenLabs now lists `eleven_turbo_v2_5` and `eleven_turbo_v2` as superseded by the flash models: same output, lower latency. Use flash.
+
+### eleven_v4 limits
+
+- Voice settings: only `stability` and `similarity_boost`. No `style`, no `speed`. The tool refuses the others before calling.
+- No SSML. Direct the delivery with audio tags in the text instead.
+- Whether it accepts `--prev` and `--next` is not yet tested. If ElevenLabs rejects them, the call fails with "Nothing was charged". Stitch with `eleven_multilingual_v2` then.
+- Pitch drift was seen on `eleven_v3`. Not yet checked on v4, so still check the pitch of a take.
 
 `language_code` (ISO 639-1, such as `en`, `fr`, `ar`) is ignored by models that do not support it, and is not supported on `eleven_multilingual_v2`.
 
@@ -28,7 +37,7 @@ Body fields the tool sends: `text`, `model_id`, and when given `voice_settings` 
 
 ## Measured rates
 
-On a Creator plan, `eleven_v3` and `eleven_multilingual_v2` both cost about 0.45 credits per character: 66 for 151 characters, 51 for 115, and many short lines agree. The flash and turbo figure of 0.25 is half of that, assumed and not yet measured. The ledger's measured column, taken from ElevenLabs' history, is the figure to trust.
+On a Creator plan, `eleven_v4` cost 6 credits for 53 characters, exact from history (2026-10-12, one call). `eleven_v3` and `eleven_multilingual_v2` both cost about 0.45 credits per character: 66 for 151 characters, 51 for 115, and many short lines agree. The flash and turbo figure of 0.25 is half of that, assumed and not yet measured. The ledger's measured column, taken from ElevenLabs' history, is the figure to trust.
 
 ## Voice settings
 

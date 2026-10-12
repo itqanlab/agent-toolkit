@@ -1,0 +1,27 @@
+{
+  "sources": [
+    {
+      "name": "elevenlabs/skills",
+      "repo": "https://github.com/elevenlabs/skills",
+      "commit": "0e371300354872fbb8ee375f04cf518e9a335ca5",
+      "synced": "2026-10-12",
+      "license": "MIT",
+      "map": {
+        "text-to-speech": "skills/elevenlabs-studio/references/tts.md",
+        "sound-effects": "skills/elevenlabs-studio/references/sound-effects.md",
+        "music": "skills/elevenlabs-studio/references/music.md",
+        "speech-to-text": "skills/elevenlabs-studio/references/speech-to-text.md",
+        "voice-changer": "skills/elevenlabs-studio/references/voice-changer.md",
+        "voice-isolator": "skills/elevenlabs-studio/references/voice-isolator.md",
+        "dubbing": "skills/elevenlabs-studio/references/dubbing.md"
+      },
+      "not_adopted": {
+        "speech-engine": "real-time voice agent runtime, not a file-in file-out task",
+        "setup-api-key": "replaced by our guided setup, which keeps the key out of the chat",
+        "agents": "conversational agents platform, out of scope for now",
+        "evals": "their own test scenarios for their skills",
+        ".agents": "their packaging for other agents; ours comes from our catalog"
+      }
+    }
+  ]
+}

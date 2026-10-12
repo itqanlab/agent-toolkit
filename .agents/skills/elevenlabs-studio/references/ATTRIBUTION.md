@@ -1,6 +1,6 @@
 # Attribution
 
-Parts of `tts.md`, `music.md` and `sound-effects.md` (the model, voice setting, parameter and output format tables, and some API descriptions) are adapted from the ElevenLabs agent skills at https://github.com/elevenlabs/skills, used under the MIT License below. The credit estimates, the working order and the cost notes are our own.
+Parts of `tts.md`, `music.md`, `sound-effects.md`, `speech-to-text.md`, `voice-changer.md`, `voice-isolator.md` and `dubbing.md` (the model, voice setting, parameter and output format tables, endpoints, limits, and some API descriptions) are adapted from the ElevenLabs agent skills at https://github.com/elevenlabs/skills, used under the MIT License below. The commit last synced is recorded in `upstream.json` at the plugin root. The credit estimates, the measurements, the working order and the cost notes are our own.
 
 ```
 MIT License
