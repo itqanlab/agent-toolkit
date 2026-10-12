@@ -1,0 +1,16 @@
+{
+  "description": "plane-fleet usage pacer: holds new fleet-role subagents when the Claude budget is ahead of pace or past the hard stop.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/usage-pacer.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

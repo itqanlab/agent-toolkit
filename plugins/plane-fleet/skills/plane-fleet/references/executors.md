@@ -1,0 +1,267 @@
+# Executors — who runs each fleet role
+
+The fleet has **roles** (engineer, tester, scan, ticket writer, PM) and **executors** (the
+program that runs a role: a Claude subagent, the Codex CLI, opencode on Ollama Cloud). Any role
+can in principle run on any executor. The PM picks one per spawn.
+
+The role skills don't change. An engineer is an engineer whether Claude or Codex runs it: same
+skill, same standing brief, same slot rules, same report line. Only the program underneath
+differs.
+
+- Registry (machine-readable): `references/executors.json`
+- Selection, budget, log, scoreboard, config: `scripts/lanes/fleetctl.py` (through `run-lane.sh pick|budget|log|stats|apply|seed|config`)
+- User-level state: `{state_home}` = `PLANE_FLEET_HOME`, default `{state_home}/` (outcomes log, decisions, user override, budget override, back-off state, per-project config overrides)
+- Runner for non-Claude executors: `scripts/lanes/run-lane.sh`
+- What a non-Claude session must know: `references/non-claude-adapter.md`
+
+## Task kinds
+
+Every spawn is tagged with a role and a **task kind** before the pick. The PM derives the kind
+from triage (paths, keywords, schema words) and the ticket text:
+
+| kind | means |
+|---|---|
+| `api` | server endpoints, services, DTOs, guards; no schema change |
+| `ui` | client components, templates, styling, client data access |
+| `schema` | schema or migration change (never an experiment, never auto-promoted) |
+| `money-concurrency` | money movement, balances, locks, ordering, timing (same) |
+| `copy-i18n` | labels, translations, static text only |
+| `tests-only` | adds or fixes tests, no product code |
+| `infra-deps` | CI, build config, dependencies, tooling |
+| `retest` | a tester re-checking a reworked PR |
+| `rework` | a second engineer attempt after Rework (never an experiment) |
+
+Add kinds under `task_kinds` in the registry when a new shape of work keeps showing up.
+
+## Champion and challengers
+
+`candidates` in the registry holds, per role and per kind (`*` = any kind without its own
+list), a ranked list of `executor:model`. The first is the **champion**; the rest are
+**challengers**. Shipped defaults are Claude only, so the fleet works with nothing else
+installed:
+
+| role / kind | champion | challengers |
+|---|---|---|
+| engineer / `*` | claude `sonnet` | claude `opus` |
+| engineer / `schema`, `money-concurrency`, `rework` | claude `opus` | — |
+| tester / `*` | claude `opus` | — |
+| tester / `copy-i18n` | claude `sonnet` | claude `opus` |
+| scan / `*` | claude `haiku` | — |
+| ticket-writer / `*` | claude `sonnet` | — |
+
+**Opting in to Codex or opencode** is a user-override edit, for example:
+
+```json
+{ "candidates": {
+    "engineer": { "*": [ {"executor":"codex","model":"gpt-5.6-sol"}, {"executor":"claude","model":"sonnet"} ] },
+    "scan":     { "*": [ {"executor":"opencode","model":"kimi-k2.7-code"}, {"executor":"claude","model":"haiku"} ] } } }
+```
+
+Escalation triggers still pin the engineer to claude `opus`: `schema`, `concurrency`,
+`unknown_root_cause`, `rework_once`, `architecture`, `disprove_gate`.
+
+**Experiments.** About 1 pick in 5 (`selection.explore_rate`) goes to a challenger, the one with
+the fewest logged runs for that role and kind. The pick line says `EXPERIMENT`. Never an
+experiment for: an urgent or trunk-red fix (`--urgent`), a kind with `allow_explore: false`, a
+second attempt after Rework (`--attempt 1`), or an escalation. When the engineer is an
+experiment, its tester stays proven (champion, or n ≥ 5 at ≥ 70%) and, where one exists, from
+another model family than the engineer (`--pair-with codex:gpt-5.6-sol --pair-experiment`).
+
+## How the PM picks
+
+```bash
+L=scripts/lanes/run-lane.sh
+$L pick --role engineer --kind api --cwd <repo>                   # champion or experiment
+$L pick --role engineer --kind api --triggers concurrency         # escalation
+$L pick --role tester --kind ui --pair-with codex:gpt-5.6-sol --pair-experiment
+$L models                                                         # every selectable model
+```
+
+`pick` prints JSON with `decision` (`spawn` or `wait`), `executor`, `model`, `sandbox`,
+`experiment`, `reason`, `budget` and a ready `pick_line`. Layers, later wins:
+
+1. the shared registry `executors.json`
+2. the **user override** `{state_home}/executors.json` (promotions write here)
+3. its `projects.<repo-name>` block (project champions write here)
+4. the repo's `.plane/config.json` → `fleet.executors`
+
+Objects merge key by key; lists and plain values replace. **No registry, or the executor is
+missing on this machine** → a Claude subagent with the team-pm §3 model defaults. A broken lane
+never stops the fleet. Any listed model can also be forced by hand with `run-lane.sh <exe>
+--model`; an unlisted one runs with a warning in `result.json`.
+
+## Budget: one pacer for every executor
+
+Same rules for each executor: **hard stop** at `hard_stop_pct` (95), and **pace**: no faster
+than the window elapses plus `pace_allowance_pct` (20). Override per user in
+`{state_home}/budget.json` (same shape as `budget` in the registry).
+
+| executor | meter | window |
+|---|---|---|
+| claude | the file in `budget.executors.claude.status_file`: a statusline relay that writes the harness's `rate_limits.five_hour` block. None set = no meter | 5 h |
+| codex | newest `~/.codex/sessions/YYYY/MM/DD/*.jsonl` `token_count` event `rate_limits` (`primary`/`secondary` `used_percent`, `window_minutes`, `resets_at`) | as reported (weekly on the current plan) |
+| opencode / Ollama Cloud | no usage API: a local lane counter per window, plus a back-off after any 429 or quota error | 5 h |
+
+Each source answers `ok`, `hold` (pace or back-off) or `stop` (hard stop), with `resume_at`. An
+unknown meter is `ok` (no judgement), as before. After a lane, `run-lane` scans its output for
+429 / rate-limit / quota text and records a back-off (`backoff_minutes`, 30) for that executor.
+
+Switch files in `{state_home}`: `pacer-off` (no gate) and `pace-off` (hard stop only), for all
+executors, or `pacer-off-<executor>` / `pace-off-<executor>` for one. `legacy_switch_dir` on an
+executor's budget block adds one more folder to look in.
+
+Gates:
+- **Claude spawns:** the `usage-pacer.py` PreToolUse hook on `Agent`, now calling the same
+  `fleetctl` check.
+- **Codex/opencode lanes:** `run-lane.sh` checks before launching. Held → `result.json` status
+  `deferred`, exit 75, `resumeAt`. The PM starts a background `sleep` until then and re-picks.
+  It never hands back to the owner.
+- **Routing:** `pick` only chooses executors whose budget is `ok`. When the champion is held,
+  portable work (engineer, scan) moves to the next candidate with budget; pinned work (testers,
+  escalations) returns `decision: wait` with `resume_at`.
+
+One line for preflight and status updates: `run-lane.sh budget` →
+`Claude 58% (5h) · Codex 9% (wk) · Ollama ok (2 lanes)`.
+
+## Running a lane
+
+Claude executor: the `Agent` tool, exactly as team-pm §3 shows. Nothing changes.
+
+Codex or opencode: write the per-spawn brief to a file, then start the lane with **Bash
+`run_in_background: true`** so you are told when it exits:
+
+```bash
+scripts/lanes/run-lane.sh codex --model gpt-5.6-sol \
+  --role engineer --ticket PROJ-134 --cwd /path/to/repo \
+  --brief /tmp/PROJ-134-engineer/brief.md --out /tmp/PROJ-134-engineer/lane
+```
+
+The runner builds the real prompt: the adapter note, "read and follow <role SKILL.md>", the
+standing-brief line (for engineer and tester), then your brief. It feeds it on stdin, enforces
+the timeout (role default, or `--timeout <sec>`), and writes `<out>/result.json`:
+
+| field | meaning |
+|---|---|
+| `status` | `completed` · `failed` · `timeout` · `aborted` · `unavailable` |
+| `exitCode` | 0 completed, 124 timeout, 127 binary missing, 130 aborted, else the executor's |
+| `lastMessage` | the session's final message, which is its report line |
+| `touchedFiles` | `git status --porcelain` in `--cwd` |
+| `worktreesAdded`, `branchesAdded` | new worktrees and branches whose name has the ticket id |
+| `durationMs`, `usage`, `threadId`/`sessionId`, `executorVersion`, `logPath`, `stderrPath` | for the run log and debugging |
+
+`--dry-run` prints the command and writes the prompt without running anything. The runner
+never commits and never prints secrets. Credentials an executor's own config references as env vars (`env_names`, e.g. `OLLAMA_API_KEY`)
+come from the environment, or from the `env_file` your user override names, and go into the
+child's environment only.
+
+### Sandbox
+
+| `--sandbox` | Codex | opencode |
+|---|---|---|
+| `full` | profile `fleet-engineer-full` + `--dangerously-bypass-approvals-and-sandbox` | `build` agent + `--auto` |
+| `restricted` | profile `fleet-engineer` (workspace write, network on, caches, pnpm store, /tmp) | — |
+| `read-only` | `-s read-only` | `plan` agent, no `--auto` |
+
+**Why engineers and testers run `full` on Codex.** Tested 2026-10-09 on codex-cli 0.161.0. The
+restricted profile passed network, `gh api user`, `git ls-remote` (keychain), a local Postgres,
+the npm registry, `pnpm install --frozen-lockfile` and an nx typecheck. It failed every git
+write: `Unable to create .../.git/worktrees/<wt>/HEAD.lock: Operation not permitted`. Codex
+keeps every `.git` path read-only in workspace-write, even when the profile grants it `write`.
+There is no documented way to lift that. Engineers and testers must commit, so they get full
+access. The restricted profile stays for a future role that edits but never commits.
+
+Profiles live in `~/.codex/fleet-engineer.config.toml` and `~/.codex/fleet-engineer-full.config.toml`.
+Codex 0.161 loads `-p <name>` from `$CODEX_HOME/<name>.config.toml`. A `[profiles.<name>]`
+table in config.toml is not how this version does it.
+
+opencode has no OS sandbox. `plan` is a permission policy: it refuses edits but still ran a
+read-only `ls` in the smoke test. Only give opencode read-only roles until that changes.
+
+### Lane-specific settings the runner applies
+
+- Codex: MCP calls need approval and `exec` runs with approval `never`, so every plane call
+  failed until the runner passed `mcp_servers.plane.default_tools_approval_mode="approve"`.
+  `mcp_overrides` can point the lane's `plane` server at the same server build Claude uses, so
+  both see the same tools (only non-secret fields such as `command`; argv is visible in `ps`).
+  `disable_mcp` switches off MCP servers a lane never needs.
+- opencode: a headless run auto-rejects reads outside the working dir, and one rejection ends
+  the run. The runner allows the fleet folder (`{fleet_root}/**`, and nothing else outside)
+  through `OPENCODE_CONFIG_CONTENT`.
+- Both: `NX_DAEMON=false` in the child environment.
+
+## Outcomes log, scoreboard, promotion
+
+**One log for all projects:** `{state_home}/executor-outcomes.jsonl`, append-only, every row
+tagged `project` (the repo name). Older per-project run logs can be folded in with
+`log.legacy_glob` in the user override and `run-lane.sh seed` (idempotent). They stay read live,
+so rows still written there are not lost.
+
+```bash
+$L log add --ticket PROJ-134 --role engineer --kind api --executor codex --model gpt-5.6-sol \
+   --outcome pr_opened --reason "champion" duration_ms=1234000 tokens=230000 rework_count=0
+$L log add ... --experiment                                   # an experiment pick
+$L log backfill --ticket PROJ-134 --role engineer --set verify_first_pass=true ci_first_pass=true
+$L log backfill --ticket PROJ-134 --role tester --set reverted=false bug_filed='"PROJ-171"'
+```
+
+Row fields: `ts, project, ticket, role, task_kind, executor, model, experiment, reason,
+duration_ms, tokens` (Claude), or the lane's `usage` / a quota note (others),
+`claude_meter_delta_pct` when known, `outcome` (`pr_opened`, `blocked`, `verify_pass`,
+`verify_fail`, `done`, `lane_failed`, `deferred`), `verify_first_pass, rework_count,
+ci_first_pass`, and later `reverted`, `bug_filed`. Back-fills are separate rows and apply to the
+latest matching spawn.
+
+**What a row is scored on.** Engineer: `verify_first_pass`, or else the first tester verdict
+after it on the same ticket. Old rows put the engineer's flag on the tester row. Tester: the
+verdict held (not `reverted`, no `bug_filed`), only once those are back-filled. Until then
+testers show `—`.
+
+**Scoreboard:** `$L stats [--role R] [--kind K] [--project P]` gives, per (role, kind,
+executor:model), n, first-pass rate ("not enough data" under 5), rework rate, mean minutes and
+mean cost. Cost is in relative units (`cost_weights`, per million tokens) and is only for
+comparing candidates. Scoring is global; `--project` filters.
+
+**Promotion and demotion:** `$L apply` (`--dry-run` to preview), at every PM preflight:
+- a challenger with n ≥ 5, first-pass ≥ the champion's and lower mean cost becomes champion
+- a champion below 70% over its last 5 scored runs swaps with the next candidate
+- a project gets its own champion only when its own runs (≥ 5 for both) disagree with the
+  global order; that goes under `projects.<repo>` in the user override
+- kinds with `auto_promote: false` (`schema`, `money-concurrency`) are never changed, only
+  written as `PROPOSED` for the owner
+
+Each change is a line in `{state_home}/executor-decisions.md` (date, role/kind, old →
+new, the numbers), and the new order goes into the user override. The owner vetoes by editing
+either file. The PM says every line in its report.
+
+## Limits
+
+- **Meters differ in quality.** Claude's is live. Codex's is only as fresh as the last Codex
+  session that logged it. Ollama has no meter at all, only a lane count and back-off after a 429.
+  A lane can still hit a quota mid-ticket; `run-lane` records the back-off and marks it
+  `rateLimited`, and the PM treats it as a lane failure.
+- **No Agent or Skill tools in a lane.** A lane reads skill files and follows them itself. It
+  cannot spawn helpers.
+- **Claude Code hooks do not run in a lane.** The Plane-API blocker and the usage pacer are
+  Claude hooks. The adapter repeats their rules, but nothing enforces them in Codex or opencode.
+  Git hooks (husky) do run.
+- **Cost of context.** A Codex smoke lane used ~650k input tokens, mostly cached, for a 1-minute
+  task. Expect real engineer lanes to be large.
+- **A lane holds a slot** like any session, and tears it down like any session.
+
+## Adding a role
+
+1. Write its skill (or decide it has none: then the brief is the whole task, like `scan`).
+2. Add it under `roles` in `executors.json`: skill path, whether it gets the standing brief,
+   what it writes, its default sandbox and timeout.
+3. Add a `role_defaults` row (executor, model, fallback) and, if needed, an `escalation` entry.
+4. Say in team-pm when the PM spawns it.
+
+## Adding an executor
+
+1. Install it and add it under `executors` in `executors.json`: `kind`, binary, models, how
+   it maps `full` / `read-only` / `restricted`.
+2. Teach `run-lane.mjs` its argv, how to pass the prompt (stdin is best), and how to get the
+   final message out of its output. Keep the `result.json` shape.
+3. Check `non-claude-adapter.md` still holds for it (MCP access to plane, file reads outside
+   the working dir, hooks).
+4. Smoke it read-only first, then on a throwaway worktree, before giving it a role default.

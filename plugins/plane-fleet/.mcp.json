@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "plane": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/itqanlab/plane-mcp-server@2fecc65285cfdecfa9dbe9bb0cee06e9a3a90036",
+        "plane-mcp-server",
+        "stdio"
+      ],
+      "env": {
+        "PLANE_API_KEY": "${PLANE_API_KEY}",
+        "PLANE_WORKSPACE_SLUG": "${PLANE_WORKSPACE_SLUG}",
+        "PLANE_BASE_URL": "${PLANE_BASE_URL:-https://api.plane.so}"
+      }
+    }
+  }
+}

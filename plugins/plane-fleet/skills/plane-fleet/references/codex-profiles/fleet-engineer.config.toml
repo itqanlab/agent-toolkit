@@ -1,0 +1,24 @@
+# Codex profile for a fleet lane that may edit files but never commits ("restricted").
+# Copy to $CODEX_HOME/fleet-engineer.config.toml and replace the <...> paths.
+# Selected by run-lane with `codex exec -p fleet-engineer`.
+# Tested on codex-cli 0.161.0: network, gh, git ls-remote, a local Postgres, the npm registry,
+# pnpm install and an nx typecheck all work under it. Every .git write is blocked, even with a
+# "write" rule below, so engineer and tester lanes use fleet-engineer-full instead.
+approval_policy = "never"
+default_permissions = "fleet-engineer"
+
+[permissions.fleet-engineer]
+description = "Fleet lane: workspace write, network on, package caches, /tmp"
+extends = ":workspace"
+
+[permissions.fleet-engineer.filesystem]
+"/tmp" = "write"
+"/private/tmp" = "write"
+"<HOME>/.cache" = "write"
+"<HOME>/.npm" = "write"
+"<HOME>/Library/Caches" = "write"      # macOS only
+"<PNPM_STORE_DIR>" = "write"            # `pnpm store path`, if pnpm is used
+
+[permissions.fleet-engineer.network]
+enabled = true
+mode = "full"

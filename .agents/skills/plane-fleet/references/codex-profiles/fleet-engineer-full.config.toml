@@ -1,0 +1,8 @@
+# Codex profile for engineer and tester lanes ("full").
+# Copy to $CODEX_HOME/fleet-engineer-full.config.toml.
+# Why full access: workspace-write keeps every .git path read-only, including a worktree's
+# resolved gitdir, so a sandboxed lane cannot commit. run-lane also passes
+# --dangerously-bypass-approvals-and-sandbox in this mode. Use it only on a machine you trust
+# the lane on, as you would a human engineer.
+approval_policy = "never"
+default_permissions = ":danger-full-access"
