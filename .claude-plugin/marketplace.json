@@ -121,6 +121,54 @@
       ]
     },
     {
+      "name": "audio-narrate",
+      "source": "./plugins/audio-narrate",
+      "description": "Turn text into natural English or Arabic narration for free: one file, or one file per scene for a video. Online neural voices by default, an offline engine when there is no internet, and a pronunciation list for words the voice gets wrong. No key and no account.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/audio-narrate",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "media",
+      "displayName": "Audio Narrate",
+      "keywords": [
+        "text-to-speech",
+        "narration",
+        "voiceover",
+        "arabic",
+        "edge-tts",
+        "piper",
+        "offline"
+      ]
+    },
+    {
+      "name": "audio-transcribe",
+      "source": "./plugins/audio-transcribe",
+      "description": "Turn speech in any audio or video into text, on this machine, free. Arabic and English, local files and links, plain text or subtitles. Whisper runs locally: no API key, nothing leaves the machine.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/audio-transcribe",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "media",
+      "displayName": "Audio Transcribe",
+      "keywords": [
+        "transcription",
+        "speech-to-text",
+        "whisper",
+        "subtitles",
+        "arabic",
+        "audio",
+        "local"
+      ]
+    },
+    {
       "name": "elevenlabs-studio",
       "source": "./plugins/elevenlabs-studio",
       "description": "Voice-over, sound effects, music, transcription, voice changing, noise removal and dubbing with ElevenLabs, from the agent, spending the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
@@ -174,15 +222,63 @@
       ]
     },
     {
-      "name": "watch-video",
-      "source": "./plugins/watch-video",
-      "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
-      "version": "2.1.0",
+      "name": "image-prompt",
+      "source": "./plugins/image-prompt",
+      "description": "Write image prompts in the project's brand, sized for each platform, ready for any image generator. Reads the project's own brand file, logs every prompt so none is written twice, suggests a Higgsfield model and ratio, and never spends credits.",
+      "version": "1.0.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
       },
-      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/watch-video",
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/image-prompt",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "media",
+      "displayName": "Image Prompt",
+      "keywords": [
+        "image",
+        "prompt",
+        "brand",
+        "instagram",
+        "social",
+        "product-photo",
+        "higgsfield"
+      ]
+    },
+    {
+      "name": "video-prompt",
+      "source": "./plugins/video-prompt",
+      "description": "Write video prompts in the project's brand, sized and timed for each platform, ready for any video generator. Reads the project's own brand file, spells out the motion, logs every prompt so none is written twice, suggests a Higgsfield model, and never spends credits.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/video-prompt",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "media",
+      "displayName": "Video Prompt",
+      "keywords": [
+        "video",
+        "prompt",
+        "brand",
+        "reels",
+        "tiktok",
+        "social",
+        "higgsfield"
+      ]
+    },
+    {
+      "name": "video-watch",
+      "source": "./plugins/video-watch",
+      "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
+      "version": "3.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/video-watch",
       "repository": "https://github.com/itqanlab/agent-toolkit",
       "license": "MIT",
       "category": "media",
@@ -225,7 +321,7 @@
       "name": "toolkit-updates",
       "source": "./plugins/toolkit-updates",
       "description": "Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. Read-only, and works with every agent that reads skills.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"

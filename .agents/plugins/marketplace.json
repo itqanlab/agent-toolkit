@@ -65,6 +65,30 @@
       "category": "Developer Tools"
     },
     {
+      "name": "audio-narrate",
+      "source": {
+        "source": "local",
+        "path": "./plugins/audio-narrate"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
+      "name": "audio-transcribe",
+      "source": {
+        "source": "local",
+        "path": "./plugins/audio-transcribe"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
       "name": "elevenlabs-studio",
       "source": {
         "source": "local",
@@ -89,10 +113,34 @@
       "category": "Creativity"
     },
     {
-      "name": "watch-video",
+      "name": "image-prompt",
       "source": {
         "source": "local",
-        "path": "./plugins/watch-video"
+        "path": "./plugins/image-prompt"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
+      "name": "video-prompt",
+      "source": {
+        "source": "local",
+        "path": "./plugins/video-prompt"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    },
+    {
+      "name": "video-watch",
+      "source": {
+        "source": "local",
+        "path": "./plugins/video-watch"
       },
       "policy": {
         "installation": "AVAILABLE",
