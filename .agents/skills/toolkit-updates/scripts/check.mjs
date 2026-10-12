@@ -150,6 +150,10 @@ try {
   process.exit(2);
 }
 const byName = new Map(feed.items.map((i) => [i.name, i]));
+// A renamed tool keeps its old name on disk until it is reinstalled. The feed lists old -> new,
+// so an old copy is reported as an update to the new name instead of being skipped.
+const renamed = new Map((feed.renamed || []).filter((r) => byName.has(r.to)).map((r) => [r.from, r]));
+const itemFor = (name) => byName.get(name) || byName.get(renamed.get(name)?.to);
 
 /* ------------------------------------------------------ what is installed */
 
@@ -157,7 +161,7 @@ const byName = new Map(feed.items.map((i) => [i.name, i]));
 const copies = new Map();
 for (const dir of candidates) {
   const head = readHeader(dir);
-  if (!head || !byName.has(head.name)) continue;
+  if (!head || !itemFor(head.name)) continue;
   if (head['metadata.author'] !== PUBLISHER) continue; // same name, different publisher
   let real = dir;
   try { real = realpathSync(dir); } catch { /* keep dir */ }
@@ -211,6 +215,11 @@ const KIND_LABEL = {
 function howToUpdate(entry, item) {
   const repo = repoOf(item) || 'the source repository';
   const kind = locationKind(entry);
+  if (entry.name !== item.name) {
+    // The old folder and the new one would both load, so the old one has to go first.
+    return `${entry.name} is now called ${item.name}. Remove the old copy at ${entry.at.join(', ')}, then install ${item.name}: `
+      + howToUpdate({ ...entry, name: item.name }, item);
+  }
   const clone = `In a clone of ${repo} (git clone it if you have none): git pull`;
   switch (kind) {
     case 'claude-plugin': {
@@ -231,18 +240,20 @@ function howToUpdate(entry, item) {
 const results = [...copies.values()]
   .sort((a, b) => a.name.localeCompare(b.name))
   .map((entry) => {
-    const item = byName.get(entry.name);
+    const item = itemFor(entry.name);
     const diff = cmp(item.version, entry.version);
-    const status = diff > 0 ? 'update' : diff < 0 ? 'ahead' : 'current';
+    const moved = item.name !== entry.name;
+    const status = moved || diff > 0 ? 'update' : diff < 0 ? 'ahead' : 'current';
     const releases = status === 'update'
       ? item.releases.filter((r) => cmp(r.version, entry.version) > 0).sort((a, b) => cmp(a.version, b.version))
       : [];
     return {
       name: entry.name,
+      ...(moved ? { renamedTo: item.name } : {}),
       installed: entry.version,
       latest: item.version,
       status,
-      breaking: releases.some((r) => r.breaking),
+      breaking: moved || releases.some((r) => r.breaking),
       locations: entry.at,
       kind: locationKind(entry),
       howToUpdate: status === 'update' ? howToUpdate(entry, item) : null,
@@ -250,7 +261,7 @@ const results = [...copies.values()]
     };
   });
 
-const installedNames = new Set(results.map((r) => r.name));
+const installedNames = new Set(results.map((r) => r.renamedTo || r.name));
 const available = feed.items.filter((i) => !installedNames.has(i.name)).map((i) => i.name);
 const pending = results.filter((r) => r.status === 'update');
 
@@ -277,7 +288,7 @@ for (const r of results) {
   const where = `[${KIND_LABEL[r.kind] || r.kind}]`;
   if (r.status === 'current') { console.log(`${r.name}  ${r.installed}  up to date  ${where}`); continue; }
   if (r.status === 'ahead') { console.log(`${r.name}  ${r.installed}  newer than the feed (${r.latest}). A development copy, most likely.  ${where}`); continue; }
-  console.log(`${r.name}  ${r.installed} -> ${r.latest}  UPDATE AVAILABLE${r.breaking ? '  (breaking change, you must act)' : ''}  ${where}`);
+  console.log(`${r.name}${r.renamedTo ? ` (now ${r.renamedTo})` : ''}  ${r.installed} -> ${r.latest}  UPDATE AVAILABLE${r.breaking ? '  (breaking change, you must act)' : ''}  ${where}`);
   for (const l of r.locations) console.log(`  installed at ${tilde(l)}`);
   console.log('  What changed:');
   for (const rel of r.releases) {

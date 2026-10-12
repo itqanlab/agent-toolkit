@@ -7,7 +7,7 @@ Tells you which of your toolkit skills have a newer version, and exactly what ch
 You do not need to run anything. Once the skill is installed, say what you want in your own words:
 
 > *"are my toolkit skills up to date?"*
-> *"what changed in watch-video?"*
+> *"what changed in video-watch?"*
 > *"is there anything new in the toolkit?"*
 > *"update my skills"*
 
@@ -20,15 +20,15 @@ Toolkit updates (feed updated 2026-09-20)
 
 cloudflare-ops  1.1.0  up to date
 
-watch-video  1.0.0 -> 1.2.0  UPDATE AVAILABLE
-  installed at ~/.agents/skills/watch-video
+video-watch  1.0.0 -> 1.2.0  UPDATE AVAILABLE
+  installed at ~/.agents/skills/video-watch
   What changed:
     1.1.0  2026-08-11
       Added: A setup wizard that checks for ffmpeg and yt-dlp and installs them.
       Fixed: Playlists and audio-only sources are handled.
     1.2.0  2026-09-20
       Added: This changelog, so you can see what changed in each version.
-  To update: In a clone of https://github.com/itqanlab/agent-toolkit: git pull, then: ./scripts/install.sh --force watch-video
+  To update: In a clone of https://github.com/itqanlab/agent-toolkit: git pull, then: ./scripts/install.sh --force video-watch
 
 2 copies found (2 skills), 1 can be updated.
 ```

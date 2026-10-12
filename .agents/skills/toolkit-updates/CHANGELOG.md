@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/toolkit-updates/CHANGELOG.md
 
 What changed in `toolkit-updates`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.2.0] - 2026-10-13
+
+### Added
+
+- A tool installed under an old name is now reported as an update to its new name, with what to remove and what to install. Before, it was skipped without a word.
+
 ## [2.1.0] - 2026-09-21
 
 ### Added
