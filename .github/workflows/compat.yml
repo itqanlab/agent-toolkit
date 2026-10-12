@@ -47,6 +47,10 @@ jobs:
 
       - name: Validator
         shell: bash
+        # The upstream Python validator opens files with the system encoding, which is cp1252 on
+        # Windows and fails on UTF-8 text. UTF-8 mode makes it read them as they are.
+        env:
+          PYTHONUTF8: '1'
         run: bash scripts/validate.sh
 
       - name: Install Codex
@@ -74,7 +78,9 @@ jobs:
         run: |
           export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
           bash scripts/install.sh | tee "$RUNNER_TEMP/installer.txt"
-          [ "$(ls "$HOME/.agents/skills" | wc -l)" -eq 7 ]
+          # Every skill folder in the repo, so adding a skill never needs this line changed.
+          expected="$(ls -d plugins/*/skills/*/ | wc -l)"
+          [ "$(ls "$HOME/.agents/skills" | wc -l)" -eq "$expected" ]
           # The Codex settings it prints must give a workspace-write session with the network on.
           export CODEX_HOME="$RUNNER_TEMP/codex-settings"; mkdir -p "$CODEX_HOME" "$RUNNER_TEMP/settings-cwd"
           sed -n '/^  sandbox_mode = /,/^  writable_roots = /p' "$RUNNER_TEMP/installer.txt" | sed 's/^  //' > "$CODEX_HOME/config.toml"
@@ -93,7 +99,8 @@ jobs:
           $out = & .\scripts\install.ps1 -Target $target *>&1 | Out-String
           Write-Host $out
           $count = (Get-ChildItem $target -Directory).Count
-          if ($count -ne 7) { throw "installed $count skills, expected 7" }
+          $expected = (Get-ChildItem plugins\*\skills\* -Directory).Count
+          if ($count -ne $expected) { throw "installed $count skills, expected $expected" }
           if (-not (Test-Path (Join-Path $target 'watch-video\CHANGELOG.md'))) { throw 'CHANGELOG.md did not travel with the skill' }
           # Codex is on the path here, so the installer prints its sandbox settings. The path in
           # them must be a valid TOML string, so it uses forward slashes.
