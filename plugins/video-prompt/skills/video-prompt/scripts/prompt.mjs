@@ -5,7 +5,7 @@
 // ready to copy) and prompt.json (the prompt plus size, ratio, length, don't list and a
 // suggested Higgsfield model), and with --paste a short PASTE.md for a web tool.
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findBrand, readBrand, styleBlock, similar, log, hash, parseArgs, ratioOf, nearestRatio, home } from '../lib/brand.mjs';
@@ -223,7 +223,9 @@ const COMMANDS = {
   },
 };
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath first: started through a symlinked install, argv[1] is the link and import.meta.url
+// the real file, and without it the script would exit having done nothing.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   const A = parseArgs(process.argv.slice(2));
   const cmd = A._[0] || (A.subject ? 'write' : 'help');

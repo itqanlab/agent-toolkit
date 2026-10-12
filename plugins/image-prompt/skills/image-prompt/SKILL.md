@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer. Run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Works offline. Writes only to .prompts/ in the folder it runs from, or to --out."
 metadata:
   author: itqanlab
-  version: 1.0.0
+  version: 1.0.1
   category: media
   short: "Brand-aware image prompts, sized for each platform"
   starter: "write a prompt for an Instagram portrait post of this product"

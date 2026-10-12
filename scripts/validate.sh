@@ -102,6 +102,11 @@ for skill_dir in "$REPO_ROOT"/plugins/*/skills/*/; do
   if grep -qnE '(^|[^a-zA-Z0-9_])(/Users/|/home/[a-z]|~/\.claude|~/\.agents)' "$skill_md"; then
     err "SKILL.md contains an absolute or home-relative path; use paths relative to the skill root"
   fi
+  # Comparing import.meta.url with argv[1] as given fails through a symlinked install: the script
+  # exits having done nothing. argv[1] has to go through realpathSync first.
+  if grep -rlE 'import\.meta\.url *=== *pathToFileURL\(process\.argv\[1\]\)' "$skill_dir" >/dev/null 2>&1; then
+    err "a script decides it was run directly with pathToFileURL(process.argv[1]); use pathToFileURL(realpathSync(process.argv[1])) so a symlinked install works"
+  fi
   if grep -qniE '\bclaude code\b|\bcursor\b|\bopencode\b|\bgemini cli\b|\bcopilot\b' "$skill_md"; then
     warn "SKILL.md names a specific agent; the body is read verbatim by all agents, so keep vendor references in README.md"
   fi

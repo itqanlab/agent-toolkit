@@ -1,6 +1,6 @@
 {
   "name": "image-prompt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Write image prompts in the project's brand, sized for each platform, ready for any image generator. Reads the project's own brand file, logs every prompt so none is written twice, suggests a Higgsfield model and ratio, and never spends credits.",
   "author": {
     "name": "Itqan Lab",

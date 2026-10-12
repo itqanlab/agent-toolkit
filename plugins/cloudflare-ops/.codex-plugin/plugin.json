@@ -1,6 +1,6 @@
 {
   "name": "cloudflare-ops",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Connect a Cloudflare account in two minutes, then manage DNS, subdomains, Pages and R2 from the agent. Three checkboxes instead of 392 permissions, and the token is never typed into the chat.",
   "author": {
     "name": "Itqan Lab",

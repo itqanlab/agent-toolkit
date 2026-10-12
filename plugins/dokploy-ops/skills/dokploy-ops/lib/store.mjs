@@ -9,7 +9,7 @@
 // `readSecrets()` and use the value in-process; humans and agents only ever see
 // whether a value is set, never what it is.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, renameSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, renameSync, statSync, realpathSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -292,7 +292,9 @@ const COMMANDS = {
 
 // pathToFileURL, not string concatenation — a Windows path like C:\... is not a
 // valid URL and would silently never match.
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath first: started through a symlinked install, argv[1] is the link and import.meta.url
+// the real file, and without it the script would exit having done nothing.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   const [command, ...args] = process.argv.slice(2);
   const handler = COMMANDS[command];

@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/toolkit-credentials/CHANGELOG.md
 
 What changed in `toolkit-credentials`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.1.0 were rebuilt from the git history.
 
+## [2.1.1] - 2026-10-13
+
+### Fixed
+
+- Running scripts/store.mjs through a symlinked install now works. Before, it exited without doing anything.
+
 ## [2.1.0] - 2026-09-21
 
 ### Added

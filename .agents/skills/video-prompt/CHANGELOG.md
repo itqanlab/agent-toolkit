@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/video-prompt/CHANGELOG.md
 
 What changed in `video-prompt`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.0.1] - 2026-10-13
+
+### Fixed
+
+- Running scripts/prompt.mjs through a symlinked install now works. Before, it exited without writing anything.
+
 ## [1.0.0] - 2026-10-13
 
 ### Added

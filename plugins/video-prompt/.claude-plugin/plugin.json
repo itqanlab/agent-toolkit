@@ -1,7 +1,7 @@
 {
   "name": "video-prompt",
   "displayName": "Video Prompt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Write video prompts in the project's brand, sized and timed for each platform, ready for any video generator. Reads the project's own brand file, spells out the motion, logs every prompt so none is written twice, suggests a Higgsfield model, and never spends credits.",
   "author": {
     "name": "Itqan Lab",
