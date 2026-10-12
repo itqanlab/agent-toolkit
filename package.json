@@ -13,7 +13,8 @@
     "catalog": "node scripts/build-catalog.mjs",
     "catalog:check": "node scripts/build-catalog.mjs --check",
     "validate": "bash scripts/validate.sh && claude plugin validate .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "upstream": "node scripts/upstream.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
