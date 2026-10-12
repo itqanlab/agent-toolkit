@@ -46,7 +46,26 @@ const fail = (skill, msg) => errors.push(`${skill}: ${msg}`);
 // in it is named <plugin>-<part>, so a name says where it comes from and cannot clash with a
 // skill from another publisher. The plugin is the unit people install, so it has one version
 // and one CHANGELOG.md, kept in the main skill.
+// Every plugin name follows one rule, from catalog/naming.json: <service>-<role> for a tool tied
+// to one outside service, <scope>-<action> for one of our own. A new role or scope is added there
+// on purpose, never by naming a tool something new.
+const naming = JSON.parse(read(join(ROOT, 'catalog', 'naming.json')));
+const nameOk = (n) => {
+  const [first, ...rest] = n.split('-');
+  const last = n.split('-').pop();
+  return (rest.length > 0 && Object.hasOwn(naming.roles, last)) || (rest.length > 0 && Object.hasOwn(naming.scopes, first));
+};
+const renamedList = JSON.parse(read(join(ROOT, 'catalog', 'renamed.json'))).renamed;
+const pluginNames = new Set(readPlugins(ROOT).map((p) => p.name));
+for (const r of renamedList) {
+  if (pluginNames.has(r.from)) fail(r.from, `catalog/renamed.json says it was renamed to ${r.to}, but plugins/${r.from}/ still exists`);
+  if (!pluginNames.has(r.to)) fail(r.to, `catalog/renamed.json renames ${r.from} to it, but plugins/${r.to}/ does not exist`);
+}
+
 for (const pl of readPlugins(ROOT)) {
+  if (!nameOk(pl.name)) {
+    fail(pl.name, `the name breaks the naming rule: ${naming.rule} Roles: ${Object.keys(naming.roles).join(', ')}. Scopes: ${Object.keys(naming.scopes).join(', ')}. See catalog/naming.json`);
+  }
   if (!pl.manifest) fail(pl.name, 'no .claude-plugin/plugin.json');
   else if (!pl.skills.some((s) => s.name === pl.name)) {
     fail(pl.name, `no main skill: skills/${pl.name}/ must exist. Found ${pl.skills.map((s) => s.name).join(', ') || 'none'}`);

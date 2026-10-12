@@ -35,6 +35,8 @@ const SITE = {
 /* ---------------------------------------------------------------- read repo */
 
 const read = (p) => readFileSync(p, 'utf8');
+// Old name -> new name for every renamed tool. Kept so old links and old installs still find it.
+const RENAMED = JSON.parse(read(join(ROOT, 'catalog', 'renamed.json'))).renamed;
 const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -551,6 +553,7 @@ function updatesFeed() {
       + 'If yours is lower, read every entry in "releases" newer than yours and tell the user what changed before you update. '
       + 'A release with "breaking": true needs the user to act.',
     items: skills.map(feedItem),
+    renamed: RENAMED,
   };
 }
 
@@ -947,6 +950,18 @@ for (const s of skills) {
   }
   write(`s/${s.name}/CHANGELOG.md`, s.changelogRaw);
   write(`s/${s.name}/changelog.json`, `${JSON.stringify(feedItem(s), null, 2)}\n`);
+}
+
+// The old page redirects, and the changelog an installed old copy checks is served from the new
+// tool, so its Breaking entry, with the new install command, reaches that copy.
+for (const r of RENAMED) {
+  const to = skills.find((x) => x.name === r.to);
+  if (!to) continue;
+  write(`s/${r.from}/index.html`, `<!doctype html><meta charset="utf-8"><title>Moved to ${r.to}</title>`
+    + `<link rel="canonical" href="${SITE.url}/s/${r.to}/"><meta http-equiv="refresh" content="0; url=/s/${r.to}/">`
+    + `<p><code>${r.from}</code> is now <a href="/s/${r.to}/">${r.to}</a>.</p>\n`);
+  write(`s/${r.from}/CHANGELOG.md`, to.changelogRaw);
+  write(`s/${r.from}/changelog.json`, `${JSON.stringify(feedItem(to), null, 2)}\n`);
 }
 
 write('updates/index.html', page({

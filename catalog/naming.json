@@ -1,0 +1,14 @@
+{
+  "rule": "A tool tied to one outside service is <service>-<role>. A tool of our own is <scope>-<action>. Extra skills in a plugin are <plugin>-<part>.",
+  "roles": {
+    "ops": "runs an account or its resources: servers, DNS, deploys, domains",
+    "studio": "makes media with a paid service, behind a credit guard",
+    "fleet": "runs a team of agent roles against a service"
+  },
+  "scopes": {
+    "audio": "speech and sound",
+    "video": "moving pictures",
+    "image": "still pictures",
+    "toolkit": "the toolkit's own plumbing"
+  }
+}

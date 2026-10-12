@@ -1,0 +1,5 @@
+{
+  "renamed": [
+    { "from": "watch-video", "to": "video-watch", "version": "3.0.0", "date": "2026-10-13" }
+  ]
+}

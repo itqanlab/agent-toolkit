@@ -16,7 +16,7 @@ One deliberate exception: **the name of a directory this toolkit owns on disk.**
 
 **No private config contracts.** A skill requiring `{PROJECT_BRAND}` or `~/.claude/<org>-brand/identity.md` to exist is not agnostic. Either it works with no config, or it documents an explicit config file the host project supplies and degrades gracefully when that is absent.
 
-**No required secrets** unless the skill's entire purpose is that service. `watch-video` needs no key; a Shopify skill obviously needs a Shopify connection, which is fine when documented and when it fails with a clear message.
+**No required secrets** unless the skill's entire purpose is that service. `video-watch` needs no key; a Shopify skill obviously needs a Shopify connection, which is fine when documented and when it fails with a clear message.
 
 **Fail loudly and usefully.** Every external binary gets a `command -v` check with an install hint for at least macOS and Debian/Ubuntu.
 
@@ -33,6 +33,20 @@ Per the spec, `name` and `description` are required; `license`, `compatibility`,
 - `compatibility` — use it when the skill needs system packages or network access. Most skills do not need it.
 
 Keep the body under 500 lines and roughly under 5000 tokens; push detail into `references/`, which agents load only on demand.
+
+## Naming
+
+Every tool follows one rule, so a name says who owns the work and what it does.
+
+| Kind of tool | Pattern | Examples |
+| :-- | :-- | :-- |
+| Tied to one outside service | `<service>-<role>` | `cloudflare-ops`, `elevenlabs-studio`, `plane-fleet` |
+| Our own, not tied to a service | `<scope>-<action>` | `video-watch`, `audio-transcribe`, `image-prompt`, `toolkit-updates` |
+| Extra skill inside a plugin | `<plugin>-<part>` | `higgsfield-studio-soul-id` |
+
+Roles: `ops` runs an account or its resources, `studio` makes media with a paid service behind a credit guard, `fleet` runs a team of agent roles against a service. Scopes: `audio`, `video`, `image`, `toolkit`. The lists live in `catalog/naming.json`, and the catalog check refuses any other name. A new role or scope is added there on purpose, with a one-line meaning.
+
+Renaming a published tool breaks its install name. When it has to happen: bump the major version, write a `Breaking` changelog entry with the new install commands, and add the old and new names to `catalog/renamed.json`. The site then keeps a redirect at the old page and serves the new changelog at the old changelog address. The update feed carries the list, so `toolkit-updates` tells anyone with the old copy what to install.
 
 ## Adding a skill
 
