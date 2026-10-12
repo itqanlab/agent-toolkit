@@ -1,0 +1,44 @@
+{
+  "name": "audio-transcribe",
+  "version": "1.0.0",
+  "description": "Turn speech in any audio or video into text, on this machine, free. Arabic and English, local files and links, plain text or subtitles. Whisper runs locally: no API key, nothing leaves the machine.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/audio-transcribe",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "transcription",
+    "speech-to-text",
+    "whisper",
+    "subtitles",
+    "arabic",
+    "audio",
+    "local"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Audio Transcribe",
+    "shortDescription": "Transcribe any recording, locally and free",
+    "longDescription": "Turn speech in any audio or video into text, on this machine, free. Arabic and English, local files and links, plain text or subtitles. Whisper runs locally: no API key, nothing leaves the machine.",
+    "developerName": "Itqan Lab",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/audio-transcribe/",
+    "defaultPrompt": [
+      "Transcribe this",
+      "What does this voice note say",
+      "Read this recording"
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
+  }
+}

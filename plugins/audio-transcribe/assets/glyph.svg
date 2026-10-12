@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- audio-transcribe. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <!-- A sound wave on the left turns into lines of text on the right. -->
+  <path class="main tint" d="M96 136 H416 Q436 136 436 156 V356 Q436 376 416 376 H96 Q76 376 76 356 V156 Q76 136 96 136 Z"/>
+  <path class="acc" d="M116 256 V256 M140 226 V286 M164 196 V316 M188 236 V276 M212 216 V296"/>
+  <path class="line" d="M260 206 H396 M260 256 H380 M260 306 H348"/>
+  <circle class="dot-acc" cx="236" cy="256" r="6"/>
+</svg>

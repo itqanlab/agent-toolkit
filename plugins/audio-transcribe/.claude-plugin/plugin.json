@@ -1,0 +1,22 @@
+{
+  "name": "audio-transcribe",
+  "displayName": "Audio Transcribe",
+  "version": "1.0.0",
+  "description": "Turn speech in any audio or video into text, on this machine, free. Arabic and English, local files and links, plain text or subtitles. Whisper runs locally: no API key, nothing leaves the machine.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/audio-transcribe",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "transcription",
+    "speech-to-text",
+    "whisper",
+    "subtitles",
+    "arabic",
+    "audio",
+    "local"
+  ]
+}
