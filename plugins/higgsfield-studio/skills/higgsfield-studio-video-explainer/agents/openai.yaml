@@ -1,0 +1,7 @@
+interface:
+  display_name: "Higgsfield Video Explainer"
+  short_description: "Narrated explainer videos, priced block by block"
+  default_prompt: "Use $higgsfield-studio-video-explainer to make a 30-second explainer about how our app works."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- higgsfield-studio. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g transform="translate(-10 18)">
+    <path class="main tint" d="M132 160 H348 A24 24 0 0 1 372 184 V340 A24 24 0 0 1 348 364 H132 A24 24 0 0 1 108 340 V184 A24 24 0 0 1 132 160 Z"/>
+    <path class="line" d="M108 316 L178 252 L236 304 L280 264 L372 336"/>
+    <circle class="ring" cx="292" cy="212" r="20"/>
+    <path class="acc" d="M396 92 Q402 124 432 130 Q402 136 396 168 Q390 136 360 130 Q390 124 396 92 Z"/>
+    <circle class="dot-acc" cx="432" cy="190" r="6"/>
+  </g>
+</svg>

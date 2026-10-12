@@ -1,0 +1,7 @@
+interface:
+  display_name: "Higgsfield Soul ID"
+  short_description: "Train a face once, reuse it in Higgsfield"
+  default_prompt: "Use $higgsfield-studio-soul-id to train a Soul from these photos of me."
+  icon_small: "./assets/icon-small.png"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#09090B"

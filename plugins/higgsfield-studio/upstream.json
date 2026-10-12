@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "name": "higgsfield-ai/skills",
+      "repo": "https://github.com/higgsfield-ai/skills",
+      "commit": "f83af0bc1d937c8119099a11f8ebbf5e6fb99819",
+      "version": "0.13.0",
+      "synced": "2026-10-12",
+      "license": "MIT",
+      "map": {
+        "higgsfield-generate": "skills/higgsfield-studio",
+        "higgsfield-soul-id": "skills/higgsfield-studio-soul-id",
+        "higgsfield-product-photoshoot": "skills/higgsfield-studio-product-photoshoot",
+        "higgsfield-marketplace-cards": "skills/higgsfield-studio-marketplace-cards",
+        "higgsfield-brandkit": "skills/higgsfield-studio-brandkit",
+        "higgsfield-youtube-thumbnail": "skills/higgsfield-studio-youtube-thumbnail",
+        "higgsfield-video-explainer": "skills/higgsfield-studio-video-explainer",
+        "higgsfield-websites": "skills/higgsfield-studio-websites"
+      }
+    }
+  ]
+}

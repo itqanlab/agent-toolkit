@@ -99,10 +99,32 @@
       ]
     },
     {
+      "name": "plane-fleet",
+      "source": "./plugins/plane-fleet",
+      "description": "Run a Plane board with a team of agent roles: a PM that claims tickets and lands approved PRs, parallel engineers each in its own worktree and environment slot, blind testers that check every PR in the browser and add tests, and a ticket writer. Roles can also run on other coding CLIs, picked per spawn by task kind and remaining budget.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/plane-fleet",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "devops",
+      "keywords": [
+        "plane",
+        "project-management",
+        "multi-agent",
+        "pull-requests",
+        "qa",
+        "devops"
+      ]
+    },
+    {
       "name": "elevenlabs-studio",
       "source": "./plugins/elevenlabs-studio",
-      "description": "Make voice-over, sound effects and music with ElevenLabs from the agent, and spend the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
-      "version": "1.0.0",
+      "description": "Voice-over, sound effects, music, transcription, voice changing, noise removal and dubbing with ElevenLabs, from the agent, spending the credits on purpose. Every paid call is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. The key is never typed into the chat.",
+      "version": "1.1.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
@@ -119,6 +141,35 @@
         "sound-effects",
         "music",
         "audio",
+        "credits",
+        "speech-to-text",
+        "transcription",
+        "voice-changer",
+        "voice-isolator",
+        "dubbing"
+      ]
+    },
+    {
+      "name": "higgsfield-studio",
+      "source": "./plugins/higgsfield-studio",
+      "description": "Make images, video, audio, 3D, ads, product shoots, thumbnails, explainers and websites with Higgsfield from the agent, and spend the credits on purpose. Every paid job is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. Built on Higgsfield's official skills.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Itqan Lab",
+        "url": "https://github.com/itqanlab"
+      },
+      "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/higgsfield-studio",
+      "repository": "https://github.com/itqanlab/agent-toolkit",
+      "license": "MIT",
+      "category": "media",
+      "displayName": "Higgsfield Studio",
+      "keywords": [
+        "higgsfield",
+        "image-generation",
+        "video-generation",
+        "ads",
+        "product-photography",
+        "thumbnails",
         "credits"
       ]
     },

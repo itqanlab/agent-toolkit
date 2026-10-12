@@ -1,0 +1,44 @@
+{
+  "name": "higgsfield-studio",
+  "version": "1.0.0",
+  "description": "Make images, video, audio, 3D, ads, product shoots, thumbnails, explainers and websites with Higgsfield from the agent, and spend the credits on purpose. Every paid job is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. Built on Higgsfield's official skills.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/higgsfield-studio",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "higgsfield",
+    "image-generation",
+    "video-generation",
+    "ads",
+    "product-photography",
+    "thumbnails",
+    "credits"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Higgsfield Studio",
+    "shortDescription": "Higgsfield images, video and ads, on a budget",
+    "longDescription": "Make images, video, audio, 3D, ads, product shoots, thumbnails, explainers and websites with Higgsfield from the agent, and spend the credits on purpose. Every paid job is priced first, never paid for twice, measured after and written to a ledger, and a reserve stops a runaway loop. Built on Higgsfield's official skills.",
+    "developerName": "Itqan Lab",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/higgsfield-studio/",
+    "defaultPrompt": [
+      "Generate an image with higgsfield",
+      "Make a video from this photo",
+      "Animate this image"
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
+  }
+}
