@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- image-prompt. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <path class="main tint" d="M112 136 H400 Q416 136 416 152 V328 Q416 344 400 344 H112 Q96 344 96 328 V152 Q96 136 112 136 Z"/>
+  <path class="line" d="M120 316 L200 236 L256 292 L300 248 L392 316"/>
+  <circle class="ring" cx="330" cy="196" r="22"/>
+  <path class="acc" d="M136 392 H312 M336 372 V412"/>
+</svg>

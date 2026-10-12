@@ -1,0 +1,44 @@
+{
+  "name": "image-prompt",
+  "version": "1.0.0",
+  "description": "Write image prompts in the project's brand, sized for each platform, ready for any image generator. Reads the project's own brand file, logs every prompt so none is written twice, suggests a Higgsfield model and ratio, and never spends credits.",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/image-prompt",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "image",
+    "prompt",
+    "brand",
+    "instagram",
+    "social",
+    "product-photo",
+    "higgsfield"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Image Prompt",
+    "shortDescription": "Brand-aware image prompts, sized for each platform",
+    "longDescription": "Write image prompts in the project's brand, sized for each platform, ready for any image generator. Reads the project's own brand file, logs every prompt so none is written twice, suggests a Higgsfield model and ratio, and never spends credits.",
+    "developerName": "Itqan Lab",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/image-prompt/",
+    "defaultPrompt": [
+      "Write an image prompt",
+      "Prompt for an Instagram post image",
+      "Make a prompt for a product photo"
+    ],
+    "brandColor": "#09090B",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png"
+  }
+}
