@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires Node 18 or newer. Run scripts/setup-deps.sh (or scripts/setup-deps.ps1 on Windows) to check for it and install it if missing. Needs network access to the ElevenLabs API and an ElevenLabs account. Generating audio spends that account's credits."
 metadata:
   author: itqanlab
-  version: 1.1.0
+  version: 1.2.0
   category: media
   short: "Voice-over, sound effects and music, on a budget"
   starter: "make a voice-over for this script without wasting credits"
@@ -60,6 +60,8 @@ node scripts/eleven.mjs account                      plan, credits used and left
 node scripts/eleven.mjs voices [--q calm] [--library] [--lang en] [--previews DIR]
 node scripts/eleven.mjs plan --prompt "..." --ms 45000 --out plan.json [--model music_v1]
 node scripts/eleven.mjs ledger                       what has been spent, by kind and by tag
+node scripts/eleven.mjs check --file take.mp3 --text "the line" [--lang ar] [--dialect eg] [--pitch 100-160]
+                                                     pitch in range, every word heard. Exit 5 = redo
 ```
 
 Paid:
@@ -83,7 +85,8 @@ Every paid command also takes `--dry` (print the estimate and the request, call 
 - `tts --timestamps` also writes `<out>.json`: the timing of every character, which is what a picture is cut to.
 - `eleven_v4` is the default, as it is ElevenLabs' own. It takes only `stability` and `similarity_boost` in `--settings`; the tool refuses the rest. Direct the delivery with audio tags in the text, such as `[whispers]`.
 - `--prev` and `--next` pass the neighbouring lines, so separate takes sound like one read. `eleven_v3` does not support them, so the tool refuses them on that model. On `eleven_v4` they are not yet tested. Stitch with `eleven_multilingual_v2`.
-- `eleven_v3` can drift a voice away from its speaker: a male library voice came back female (median pitch 216 Hz, against 106 Hz for the same voice on `eleven_multilingual_v2`). Not yet checked on v4. Check the pitch of each take, and use `eleven_multilingual_v2` for a voice that drifts.
+- `eleven_v3` can drift a voice away from its speaker: a male library voice came back female (median pitch 216 Hz, against 106 Hz for the same voice on `eleven_multilingual_v2`). Not yet checked on v4. Check each take with `check`, and use `eleven_multilingual_v2` for a voice that drifts.
+- `check` is free and local. It reads the median pitch with ffmpeg, and hears the words with a local transcriber when one is installed beside this skill (`audio-transcribe`) or named in `TRANSCRIBE_CMD`. Otherwise pass `--transcript FILE`. Arabic is compared without diacritics; `--dialect eg` also accepts the Egyptian qaf, said as a glottal stop. Set `--pitch` from the voice's first good take, then hold every later take to it.
 - `stt` writes plain text to `--out` and every word with its timing and speaker to `<out>.json`. A free local transcriber costs nothing; prefer it when one is installed and no speaker labels or key terms are needed.
 - `change` takes at most 5 minutes per request, and refuses longer input before sending it.
 - `dub` waits until the dub is done, which takes minutes. Its output is the dubbed audio track as WAV, not a new video. If it is interrupted, run the same command again: it resumes the same job and does not pay twice.
@@ -108,7 +111,7 @@ Never buy something you could have heard for free first.
 1. **Choose the voice by ear, for free.** `voices --library --q "..." --lang en --previews <dir>`, then listen. Never generate a test sentence to choose a voice.
 2. **Fit the script on paper.** Natural narration runs at about 2.6 words per second. If a line cannot fit its window, rewrite it before anything is spoken.
 3. **Scratch take with flash** (`--model eleven_flash_v2_5`, half price) and `--timestamps`. It answers one question: does it fit? The timing comes back as data.
-4. **Final take, one line at a time.** Use `eleven_multilingual_v2` with `--prev` and `--next` when the lines must sound like one read, or `eleven_v3` without stitching when its range is worth it. Check each take's pitch. Redo a line, never the whole script.
+4. **Final take, one line at a time.** Use `eleven_multilingual_v2` with `--prev` and `--next` when the lines must sound like one read, or `eleven_v3` without stitching when its range is worth it. Run `check` on each take. Redo a line, never the whole script.
 5. **Music: plan first.** Get a plan free from `plan`, or write one. Edit the sections until each one matches a scene, then render once with `music_v1`.
 6. **Recordings: clean once, at the right step.** Pass `--denoise` to `change` instead of paying for a separate `isolate`. Transcribe locally for free when no speaker labels are needed.
 7. **Dubbing: one minute first.** A dub is the most expensive call here. Dub a short cut first, listen, then the whole thing.

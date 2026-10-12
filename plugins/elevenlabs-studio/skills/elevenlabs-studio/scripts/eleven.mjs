@@ -22,11 +22,11 @@
 // The API key is read from the shared credential store and used in-process. It is
 // never printed, never passed on a command line, and never written to the ledger.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, copyFileSync, rmSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, resolve, basename } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { readSecrets, providerPath } from '../lib/store.mjs';
 
 const API = 'https://api.elevenlabs.io';
@@ -377,6 +377,90 @@ async function paid(kind, endpoint, body, opts, estimate, onResponse) {
 
 const saveBinary = async (res, file) => { writeFileSync(file, Buffer.from(await res.arrayBuffer())); };
 
+// ---------------------------------------------------------------- checking a take
+
+/**
+ * Median pitch of the voiced parts, in Hz. Autocorrelation over 80 ms frames of 16 kHz mono,
+ * frames under a loudness floor skipped. Rough, but enough to catch a voice that drifted to
+ * another register, which is what happened to a male voice on eleven_v3 (216 Hz against 106).
+ */
+function medianPitch(file) {
+  let raw;
+  try {
+    raw = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'], { maxBuffer: 1 << 28 });
+  } catch { return null; }
+  const x = new Float32Array(raw.buffer, raw.byteOffset, Math.floor(raw.length / 4));
+  const rate = 16000;
+  const frame = 1280;
+  const lo = Math.floor(rate / 400);
+  const hi = Math.floor(rate / 70);
+  const found = [];
+  for (let i = 0; i + frame <= x.length; i += frame / 2) {
+    let mean = 0;
+    for (let j = 0; j < frame; j += 1) mean += x[i + j];
+    mean /= frame;
+    let energy = 0;
+    for (let j = 0; j < frame; j += 1) energy += (x[i + j] - mean) ** 2;
+    if (Math.sqrt(energy / frame) < 0.02) continue;
+    let best = 0;
+    let lag = 0;
+    for (let k = lo; k <= hi; k += 1) {
+      let ac = 0;
+      for (let j = 0; j + k < frame; j += 1) ac += (x[i + j] - mean) * (x[i + j + k] - mean);
+      if (ac > best) { best = ac; lag = k; }
+    }
+    if (lag && best > 0.3 * energy) found.push(rate / lag);
+  }
+  if (!found.length) return null;
+  found.sort((a, b) => a - b);
+  return Math.round(found[Math.floor(found.length / 2)]);
+}
+
+/**
+ * Words for comparison. Arabic loses its diacritics and tatweel, and alef forms, alef maqsura and
+ * taa marbuta are folded. With the Egyptian dialect, qaf folds with hamza too: Egyptian speech
+ * says it as a glottal stop, Whisper then writes «المأس» for «المقاس», and without this the check
+ * would fail the voice for speaking the dialect it was chosen for.
+ */
+function words(text, egyptian) {
+  let t = text.replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
+  // The folded qaf can leave two alefs where the speech had one (المقاس -> المااس), so collapse them.
+  if (egyptian) t = t.replace(/[قءئؤ]/g, 'ا').replace(/ا+/g, 'ا');
+  return t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+}
+
+/** Letter-level similarity of two word lists, so a moved word break is not counted as a miss. */
+function similarity(a, b) {
+  const x = a.join('');
+  const y = b.join('');
+  if (!x.length && !y.length) return 1;
+  let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= y.length; j += 1) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[y.length] / Math.max(x.length, y.length);
+}
+
+/**
+ * A free local transcriber, when one is installed beside this skill (the toolkit's
+ * audio-transcribe) or named by TRANSCRIBE_CMD. Returns the text, or null.
+ */
+function hear(file, lang) {
+  // Both the path the script was started from and its real path: an install by symlink resolves
+  // to the source folder, where the transcriber is not a neighbour.
+  const skillDirs = [process.argv[1], fileURLToPath(import.meta.url)].filter(Boolean).map((f) => dirname(dirname(resolve(f))));
+  const candidates = [process.env.TRANSCRIBE_CMD, ...skillDirs.map((d) => join(dirname(d), 'audio-transcribe', 'scripts', 'transcribe.sh'))].filter(Boolean);
+  const script = candidates.find((c) => existsSync(c));
+  if (!script) return null;
+  try {
+    const out = execFileSync('bash', [script, file, '--lang', lang], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 600000 });
+    const text = out.trim().split('\n').filter((l) => l !== '__TRANSCRIBE_FAILED__').join(' ').trim();
+    return text || null;
+  } catch { return null; }
+}
+
 // ---------------------------------------------------------------- arguments
 
 function parseArgs(argv) {
@@ -437,6 +521,11 @@ Paid:
                                             waits until done; rerun to resume if interrupted
 
 Uploads are priced from their length: ffprobe reads it, or pass --seconds N.
+
+Free check of a finished take:
+  check --file take.mp3 --text "the script line" [--lang ar] [--dialect eg] [--pitch 115-180]
+        [--transcript heard.txt | --heard "..."]
+                                            pitch in range, and every word heard. Exit 5 = redo
 
 Every paid command also takes:
   --dry        print the estimate and the request, call nothing
@@ -675,6 +764,39 @@ const COMMANDS = {
     await paid('dub', '/v1/dubbing/project', { describe: { ...body.describe, ...target }, key, form: body.form }, { ...A, ext: '.wav', request }, (secs / 60) * RATE.dubPerMin, saveBinary);
   },
 
+  // Free and local: is this take the right voice, and does it say every word of the script?
+  check(A) {
+    need(A, 'check', 'file', 'text');
+    if (!existsSync(A.file)) throw new ElevenError(`no such file: ${A.file}`);
+    const lang = typeof A.lang === 'string' ? A.lang : 'en';
+    const egyptian = A.dialect === 'eg' || A.dialect === 'egyptian';
+    const range = typeof A.pitch === 'string' ? A.pitch.split('-').map(Number) : null;
+    const pitch = medianPitch(A.file);
+    const pitchOk = !range || !pitch || (pitch >= range[0] && pitch <= range[1]);
+    console.log(`pitch ${pitch ?? 'unreadable'} Hz${range ? (pitchOk ? ` (in ${range[0]}-${range[1]})` : `  OUT OF RANGE ${range[0]}-${range[1]}`) : ''}`);
+
+    const heard = typeof A.heard === 'string' ? A.heard
+      : typeof A.transcript === 'string' ? readFileSync(A.transcript, 'utf8') : hear(A.file, lang);
+    if (heard === null) {
+      console.log('words: not checked. No local transcriber was found. Install audio-transcribe beside this skill, set TRANSCRIBE_CMD, or pass --transcript FILE.');
+      if (!pitchOk) process.exitCode = 5;
+      return;
+    }
+    const want = words(A.text, egyptian);
+    const got = words(heard, egyptian);
+    const have = new Set(got);
+    const missing = want.filter((w) => !have.has(w));
+    const byWord = want.length ? (want.length - missing.length) / want.length : 0;
+    const byLetter = similarity(want, got);
+    const score = Math.max(byWord, byLetter);
+    console.log(`words ${Math.round(byWord * 100)}%   letters ${Math.round(byLetter * 100)}%`);
+    console.log(`heard: ${heard.replace(/\s+/g, ' ').trim()}`);
+    if (missing.length) console.log(`not heard: ${missing.join(' ')}   (the transcriber misspells too: listen before redoing)`);
+    const ok = pitchOk && score >= 0.85;
+    console.log(ok ? 'take ok' : 'take failed: listen, then redo this line alone');
+    if (!ok) process.exitCode = 5;
+  },
+
   ledger() {
     if (!existsSync(ledgerPath())) { console.log(`nothing spent yet (no ledger at ${ledgerPath()})`); return; }
     const rows = readFileSync(ledgerPath(), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
@@ -704,7 +826,9 @@ const COMMANDS = {
 };
 
 // pathToFileURL, not string concatenation: a Windows path like C:\... is not a valid URL.
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath first: started through a symlinked install, argv[1] is the link and import.meta.url
+// the real file, and without it the script would exit having done nothing.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   const A = parseArgs(process.argv.slice(2));
   const cmd = A._[0] || 'help';

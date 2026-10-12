@@ -4,6 +4,16 @@ Latest: https://agent-toolkit.itqanlab.com/s/elevenlabs-studio/CHANGELOG.md
 
 What changed in `elevenlabs-studio`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.2.0] - 2026-10-13
+
+### Added
+
+- A free check of a finished take: the median pitch against an expected range, and every word of the script heard back by a local transcriber. Exit code 5 means redo the line. Arabic is compared without diacritics, and --dialect eg also accepts Egyptian qaf spoken as a glottal stop.
+
+### Fixed
+
+- Running scripts/eleven.mjs through a symlinked install now works. Before, it exited without doing anything.
+
 ## [1.1.0] - 2026-10-12
 
 ### Added
