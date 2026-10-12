@@ -28,10 +28,10 @@ Emoji first so `git log --oneline` scans visually; the rest is Conventional Comm
 | 🔧 | `chore` | Tooling, hooks, housekeeping |
 | ⏪ | `revert` | Reverting a previous commit |
 
-Rules: lowercase type, kebab-case scope, no capitalised subject, no trailing full stop, header ≤ 100 chars. Scope is usually the skill name (`watch-video`) or the area (`install`, `compat`, `hooks`).
+Rules: lowercase type, kebab-case scope, no capitalised subject, no trailing full stop, header ≤ 100 chars. Scope is usually the skill name (`video-watch`) or the area (`install`, `compat`, `hooks`).
 
 ```
-✨ feat(watch-video): add --lang flag for non-English captions
+✨ feat(video-watch): add --lang flag for non-English captions
 🐛 fix(install): keep .claude-plugin when target is ~/.claude/skills
 📝 docs(compat): record verified discovery paths for eight agents
 ```

@@ -1,17 +1,17 @@
 ---
-name: watch-video
-description: "Watch / analyze a video or audio source the agent cannot natively play. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', 'transcribe this video', '/watch-video'. A URL from YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, LinkedIn or 1750+ other sites, or a local file. Downloads it, pulls captions (or transcribes locally when there are none), and extracts frames so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed."
+name: video-watch
+description: "Watch / analyze a video or audio source the agent cannot natively play. Triggers: 'watch this video', 'analyze this short/reel/clip', 'what happens in this video', 'reverse-engineer this video', 'read the frames of', 'transcribe this video', '/video-watch'. A URL from YouTube, TikTok, Instagram, X, Facebook, Vimeo, Reddit, Twitch, LinkedIn or 1750+ other sites, or a local file. Downloads it, pulls captions (or transcribes locally when there are none), and extracts frames so the agent can Read the transcript + frames and describe pacing, hooks, on-screen text, format, or answer questions about the content. No API key needed."
 license: MIT
 compatibility: Runs on macOS and Linux — both scripts are bash. On Windows use WSL or Git Bash; there is no native PowerShell path. Requires ffmpeg, and yt-dlp for URL sources; run scripts/setup.sh to check for either (--check) or install them (--yes). An optional local whisper engine (free, offline) adds transcripts for sources with no captions. Needs network access for remote videos.
 metadata:
   author: itqanlab
-  version: "2.1.0"
+  version: "3.0.0"
   category: media
   short: "Let your agent watch and transcribe any video"
   starter: "tell me why the hook of this video works"
 ---
 
-# watch-video
+# video-watch
 
 Let the agent "watch" a video by turning it into a transcript plus frames it can Read.
 

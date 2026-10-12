@@ -4,6 +4,8 @@ Every skill in this repo is a conformant [Agent Skills](https://agentskills.io/s
 
 That is what makes one directory work everywhere. The table below is the verified discovery behaviour of each supported agent.
 
+The test records below name tools as they were called at the time. `watch-video` was renamed `video-watch` in 3.0.0 (2026-10-13).
+
 ## Verified discovery paths
 
 Checked against each vendor's own documentation on 2026-08-11. Paths are quoted from those docs; see Sources.

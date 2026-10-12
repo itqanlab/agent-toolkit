@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — check for what watch-video needs, and offer to install what is missing.
+# setup.sh — check for what video-watch needs, and offer to install what is missing.
 #
 #   ffmpeg   required. Extracts frames and reads media metadata.
 #   yt-dlp   required for URLs. Downloads the video and its captions.
@@ -86,7 +86,7 @@ WHISPER="$(whisper_cmd)"
 
 row() { printf '  %-9s %-8s %s\n' "$1" "$2" "$3"; }
 
-echo "watch-video — dependency check"
+echo "video-watch — dependency check"
 echo "  platform  $OS_NAME${PM:+ · $PM}"
 echo
 row ffmpeg  "$([ $FFMPEG_OK -eq 1 ] && echo ok || echo MISSING)" "$([ $FFMPEG_OK -eq 1 ] && ffmpeg -version 2>/dev/null | head -1 | cut -c1-46 || echo 'required — frames and metadata')"
@@ -100,7 +100,7 @@ MISSING=()
 [ $WANT_WHISPER -eq 1 ] && [ -z "$WHISPER" ] && MISSING+=("whisper")
 
 if [ ${#MISSING[@]} -eq 0 ]; then
-  echo "Everything watch-video needs is installed."
+  echo "Everything video-watch needs is installed."
   [ -z "$WHISPER" ] && echo "Tip: --with-whisper adds transcripts for videos that ship no captions."
   [ -z "$WHISPER" ] && echo "     Free and fully local — no API key, no account, nothing sent anywhere."
   exit 0

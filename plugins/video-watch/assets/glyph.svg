@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- watch-video. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <!-- video-watch. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
   <g transform="translate(0 30)">
     <path class="main tint" d="M96 256 Q256 118 416 256 Q256 394 96 256 Z"/>
     <circle class="ring" cx="256" cy="256" r="58"/>

@@ -1,12 +1,12 @@
 {
-  "name": "watch-video",
-  "version": "2.1.0",
+  "name": "video-watch",
+  "version": "3.0.0",
   "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
   "author": {
     "name": "Itqan Lab",
     "url": "https://github.com/itqanlab"
   },
-  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/watch-video",
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/video-watch",
   "repository": "https://github.com/itqanlab/agent-toolkit",
   "license": "MIT",
   "keywords": [
@@ -32,7 +32,7 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://agent-toolkit.itqanlab.com/s/watch-video/",
+    "websiteURL": "https://agent-toolkit.itqanlab.com/s/video-watch/",
     "defaultPrompt": [
       "Watch this video",
       "Analyze this short/reel/clip",

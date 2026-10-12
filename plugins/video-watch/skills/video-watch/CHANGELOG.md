@@ -1,8 +1,14 @@
 # Changelog
 
-Latest: https://agent-toolkit.itqanlab.com/s/watch-video/CHANGELOG.md
+Latest: https://agent-toolkit.itqanlab.com/s/video-watch/CHANGELOG.md
 
-What changed in `watch-video`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.2.0 were rebuilt from the git history.
+What changed in `video-watch` (called `watch-video` before 3.0.0), newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.2.0 were rebuilt from the git history.
+
+## [3.0.0] - 2026-10-13
+
+### Breaking
+
+- Renamed from `watch-video` to `video-watch`, to follow the toolkit's naming rule: our own tools are named medium first, then action. Remove the old copy, then install `video-watch`: `/plugin install video-watch@itqan` in Claude Code, `codex plugin add video-watch@itqan` in Codex, or `./scripts/install.sh video-watch` for any other agent. Nothing else changed.
 
 ## [2.1.0] - 2026-09-21
 

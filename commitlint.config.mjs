@@ -1,6 +1,6 @@
 // Commit format: <emoji> <type>(<scope>): <subject>
 //
-//   ✨ feat(watch-video): add --lang flag for non-English captions
+//   ✨ feat(video-watch): add --lang flag for non-English captions
 //   🐛 fix(install): keep .claude-plugin when target is ~/.claude/skills
 //   📝 docs(compat): record verified discovery paths for eight agents
 //

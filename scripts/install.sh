@@ -222,7 +222,7 @@ for label in "${detected_labels[@]}"; do
     echo "  writable_roots = [\"$store\"]"
     echo
     echo "Skip this if your config already sets sandbox_mode to danger-full-access."
-    echo "Skills that only run local tools, such as watch-video on a local file, do not"
+    echo "Skills that only run local tools, such as video-watch on a local file, do not"
     echo "need it."
     echo
   fi

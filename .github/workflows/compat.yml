@@ -101,7 +101,7 @@ jobs:
           $count = (Get-ChildItem $target -Directory).Count
           $expected = (Get-ChildItem plugins\*\skills\* -Directory).Count
           if ($count -ne $expected) { throw "installed $count skills, expected $expected" }
-          if (-not (Test-Path (Join-Path $target 'watch-video\CHANGELOG.md'))) { throw 'CHANGELOG.md did not travel with the skill' }
+          if (-not (Test-Path (Join-Path $target 'video-watch\CHANGELOG.md'))) { throw 'CHANGELOG.md did not travel with the skill' }
           # Codex is on the path here, so the installer prints its sandbox settings. The path in
           # them must be a valid TOML string, so it uses forward slashes.
           if ($out -notmatch 'writable_roots = \["[A-Za-z]:/') { throw 'the Codex settings do not carry a forward-slash Windows path' }

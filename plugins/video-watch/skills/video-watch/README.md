@@ -1,4 +1,4 @@
-# watch-video
+# video-watch
 
 An agent cannot play a video. This gives it the next best thing: a transcript plus an ordered strip of frames it can actually read.
 
@@ -10,10 +10,10 @@ No API key. Nothing leaves your machine except the download itself.
 
 ```
 /plugin marketplace add itqanlab/agent-toolkit
-/plugin install watch-video@itqan
+/plugin install video-watch@itqan
 ```
 
-Or for any conformant agent, from the toolkit root: `./scripts/install.sh watch-video`
+Or for any conformant agent, from the toolkit root: `./scripts/install.sh video-watch`
 
 ## Setup
 

@@ -38,7 +38,7 @@ Users then run:
 
 ```
 /plugin marketplace add itqanlab/agent-toolkit
-/plugin install watch-video@itqan
+/plugin install video-watch@itqan
 ```
 
 Notes that matter:
@@ -55,7 +55,7 @@ Notes that matter:
 
 ```
 codex plugin marketplace add itqanlab/agent-toolkit
-codex plugin add watch-video@itqan
+codex plugin add video-watch@itqan
 ```
 
 A plain `add` from GitHub works. It needs no `--ref` and no `--sparse`, because every plugin sits at a fixed path on `main`. To update, run `codex plugin marketplace upgrade itqan` and then `codex plugin add <name>@itqan` again. Codex replaces the installed version and starts using it in a new session.

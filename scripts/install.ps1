@@ -14,7 +14,7 @@
 .EXAMPLE
   .\scripts\install.ps1
   .\scripts\install.ps1 -Detect
-  .\scripts\install.ps1 watch-video -Link -Force
+  .\scripts\install.ps1 video-watch -Link -Force
   .\scripts\install.ps1 -Claude
   .\scripts\install.ps1 -Project
 #>
@@ -187,7 +187,7 @@ if ($detected | Where-Object { $_.Label -eq 'Codex' }) {
   Write-Host ''
   Write-Host '"elevated" is the mode that really blocks the network when you do not allow it.'
   Write-Host 'Skip all this if your config already sets sandbox_mode to danger-full-access.'
-  Write-Host 'Skills that only run local tools, such as watch-video on a local file, do not'
+  Write-Host 'Skills that only run local tools, such as video-watch on a local file, do not'
   Write-Host 'need it.'
   Write-Host ''
 }
