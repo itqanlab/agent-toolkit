@@ -29,6 +29,22 @@ decisions) comes in the brief itself.
   first (hooks silently don't run until you do).
 - Temp and cache dirs are yours alone: use your slot's, or `/tmp/<TICKET>-<role>` if you have no
   slot. Never use, clean or delete a directory another session was given.
+- **Leave nothing running.** Memory is the fleet's tightest resource: one headless Chromium
+  costs about 500 MB, one API server 200-300 MB, and seven slots pushed a 32 GB Mac into
+  17 GB of swap (2026-10-14). So:
+  - Launch ONE browser per session and reuse it (new contexts or pages, not new browsers).
+    Close every context when you are done with it, and the browser in a `finally`, so a
+    failed script cannot leak it.
+  - Launch Chromium with `--renderer-process-limit=2 --disable-gpu --disable-dev-shm-usage`
+    and with trace, video and HAR off unless a check needs them. A screenshot only when you
+    will look at it; delete it once you have.
+  - Point the browser's user-data-dir (or `cwd`) inside your slot's scratch dir, so a leftover
+    can be traced to its slot.
+  - Never start an Nx daemon (`NX_DAEMON=false` in every shell you run nx from).
+  - Teardown is not done until these all print nothing: `lsof -iTCP:<api> -sTCP:LISTEN`,
+    `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "hlmna-slot-<slot>"`, and
+    `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
+    anything else you find instead of killing it.
 - Run `git config core.bare` before and after any test run. It must print `false`. If it prints
   `true`, run `git config core.bare false` and say so in your report.
 - Report what you could NOT demonstrate as plainly as what you could.

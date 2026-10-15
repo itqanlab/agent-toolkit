@@ -894,6 +894,21 @@ registry or a project override names a lane, start it with `run-lane.sh --role t
 - The tester stopped because the ticket text changed after the build → scope is your call.
   Decide, comment the decision on the ticket, then either re-test or send to Rework.
 
+**Sweep and memory gate, before every spawn and after every report.** Run
+`scripts/fleet-sweep.sh --repo <repo> --live <slots in use, e.g. A,C,F>`. It lists what dead
+or finished sessions left running (servers on slot ports of slots not in use, processes in
+removed worktrees or other slots' scratch dirs, Nx daemons, headless Chromium older than 3
+hours or tied to a free slot), lists other projects' servers under "not ours" (never touched;
+tell the owner once), and prints the gate: swap % and free disk.
+- Leftovers → rerun with `--kill`, and say in one line what was stopped.
+- Gate CLOSED (exit 2: free memory under 25% or under 6 GB free disk; swap is shown but not gated, macOS keeps it allocated) → spawn nothing new, not even
+  a tester; let running sessions finish and re-check after each report. Lower the slot count
+  you fill (start at 4 on a 32 GB machine) until the gate stays open with every slot busy.
+- A lane that died (timeout, ENOSPC) leaves its processes behind: sweep right after you
+  clean its worktree. (2026-10-14: an Nx daemon from a dead Codex lane ran 3 hours, and a
+  Playwright Chromium from another ran 4 hours; seven slots put 17 GB in swap, and swap on
+  the system disk was half of why that disk hit 100%.)
+
 **Slot rules that make parallel hold** (each learned from a real collision):
 
 - Never assign the shared row. One slot, one live session. Reuse only after reported teardown.

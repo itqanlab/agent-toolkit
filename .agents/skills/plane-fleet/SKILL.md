@@ -76,6 +76,7 @@ scripts/lanes/run-lane.sh stats --role engineer
 - `scripts/board-drift.sh` — find tickets whose board state disagrees with git and GitHub
 - `scripts/repo-scan.sh` — the repo half of the PM's pre-pick triage
 - `scripts/git-tidy.sh` — clear merged local branches and stale worktrees
+- `scripts/fleet-sweep.sh` — find and stop what finished sessions left running (servers, Chromium, Nx daemons) and check the memory and disk gate before a spawn
 
 ## Updates
 
