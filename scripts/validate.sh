@@ -234,6 +234,10 @@ if command -v uvx >/dev/null 2>&1; then
     want "$(basename "$skill_dir")" && dirs+=("${skill_dir%/}")
   done
   # One process for every skill. See scripts/lib/skills-ref-all.py for why.
+  # Inside a git hook, git exports GIT_DIR and GIT_INDEX_FILE. From a linked worktree they point
+  # at the worktree's own git dir, and uv's own clone of the validator then fails with
+  # "Git operation failed". Run uvx without them.
+  env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX \
   uvx --quiet --from "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" \
       python "$REPO_ROOT/scripts/lib/skills-ref-all.py" "${dirs[@]}" \
     || errors=$((errors+1))
