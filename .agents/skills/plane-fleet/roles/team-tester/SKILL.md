@@ -182,6 +182,13 @@ and the pass count in your APPROVED comment. A PR that changes shared UI (`fleet
 the shell, a shared table, dialog or form control) touches too much to pick specs by hand. Add
 the e2e label (`ci.e2e_label`) **before** `gh pr ready` so its CI runs the whole suite.
 
+**Do not run the full server or browser suite yourself** (owner, 2026-10-15). The PM's group
+PR runs both in CI, with the e2e label set before the PR is marked ready, and that run is the
+full check. Run your PR's own specs, the specs for the screens and endpoints the diff touches,
+and the specs whose assertions hit text or keys the diff changed (grep for them). A full local
+run costs 15 to 20 minutes on one worker, and in the 2026-10-14 run testers ran it once or
+twice per ticket while the group PR ran it again: one of the main reasons sessions took 3 hours.
+
 **Browser (e2e) specs: keep adding them, and write them so the suite can be sharded.** The owner's
 decision (2026-10-01) is to keep growing e2e coverage and fix the speed with sharding, which only
 works if specs don't depend on each other. So an e2e spec you add:

@@ -77,7 +77,24 @@ The cap stays: at most 2 new tickets per session, and the PM triages every one.
   spec runs under the full multi-worker suite before merge. One-worker local passes are not
   enough.
 
-## 4. PM bookkeeping
+## 4. Review rounds by priority (owner, 2026-10-15)
+
+How many times a ticket may go back depends on what it is, not on how many defects a reviewer
+can still find. A heuristic tool always has one more edge case.
+
+| Ticket | Rework rounds | After that |
+|---|---|---|
+| urgent or high, or anything touching money, stock, permissions, security or live data | as many as it takes | n/a |
+| medium product work | 2, then the PM decides: ship with a follow-up ticket, or keep going | follow-up ticket for what is left |
+| low priority tooling, docs, guards, catalogs, test-only | **1** | the rest becomes a non-blocking note, an "advisory" label on the tool, or one follow-up ticket |
+
+- The PM records that call as a `PM SCOPE DECISION:` comment, so the next tester judges the
+  narrower scope.
+- A helper script inside a docs or catalog ticket is advisory unless the ticket says it is a
+  CI gate. Measured 2026-10-14: HLMNA-672 (low, docs) took 7 sessions and about 1.2M tokens,
+  mostly review rounds on its scanner, while the catalog itself was right after round 2.
+
+## 5. PM bookkeeping
 
 - In every resume note and final report, give **filed vs closed** for the run, counted from
   the board in the same turn.

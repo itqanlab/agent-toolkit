@@ -962,6 +962,20 @@ its latest commit, trunk green (§1), and no schema ticket ahead of it still unm
 5. **Write each ticket → `Merged` right after its own merge**, comment naming the merge commit.
 6. Merge up to `fleet.merge_train_size`, then let the deploy settle (§6) before the next train.
 
+**Draft-only fleets: one group PR, and it is the full check** (owner, 2026-10-13 and
+2026-10-15). When engineers open drafts and testers leave them draft, the PM builds
+`release/group-<date>-<n>` from about 10 approved branches, runs the pre-push gate and a Codex
+review (`codex review "<instructions naming the base>"`; `--base` cannot be combined with a
+prompt), and opens ONE PR into the trunk. That PR is where the whole server and browser suites
+run, so testers no longer run them per ticket (team-tester). To make sure they really run:
+- open the group PR **as a draft**, add the e2e label, and only then `gh pr ready`. A label
+  passed to `gh pr create --label` is applied after the opened event, so CI never sees it
+  (2026-10-14: the full browser suite was skipped on group 1, and 3 reds surfaced on develop).
+- check the run's scope step printed the label as present (`HAS_LABEL: true` on this repo)
+  and that the browser job reads SUCCESS, not SKIPPED, before merging.
+- a red group PR: match the failing spec to its PR (`gh pr view --json files`), drop that
+  branch from the group, rebuild, and send its ticket to Rework.
+
 **Merge in groups of about 5 when the browser suite only runs on trunk.** Many repos keep PR
 CI short (affected lint, typecheck, unit and API tests) and run the browser e2e suite only on
 the trunk push after a merge, unless the PR carries the full-e2e label (`ci.e2e_label` in
