@@ -9,7 +9,9 @@
 //               [--timeout <sec>] [--effort <level>] [--dry-run]
 //               [--ignore-budget]
 //   run-lane.sh models [codex|opencode]
-//   run-lane.sh pick|budget|log|stats|apply|seed ...   -> fleetctl.py (selection, pacer, log)
+//   run-lane.sh pick|budget|log|stats|report|apply|seed ...   -> fleetctl.py (selection, pacer, log, report)
+//   After a lane: run-lane.sh log add --from-result <out>/result.json --outcome O [--kind K] takes
+//   ticket, role, executor, model, durationMs and usage from result.json.
 //
 // Exit codes: 0 completed · 2 usage error (no result.json) · 75 deferred (no budget; see
 // resumeAt) · 124 timeout · 127 executor missing · 130 aborted · otherwise the executor's
@@ -373,7 +375,7 @@ async function run(opts) {
 const opts = parseArgs(process.argv.slice(2));
 const cmd = opts.positional[0];
 if (!cmd) usage("missing executor or subcommand");
-if (["pick", "budget", "log", "stats", "apply", "seed", "config"].includes(cmd)) {
+if (["pick", "budget", "log", "stats", "report", "selftest", "apply", "seed", "config"].includes(cmd)) {
   usage(`"${cmd}" is handled by fleetctl.py: call it through run-lane.sh`);
 } else if (cmd === "models") {
   const { registry } = loadRegistry(opts.cwd || process.cwd());

@@ -7,9 +7,12 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py pick    --role R [--kind K] [--triggers a,b] [--urgent] [--attempt N]
                       [--pair-with exe:model [--pair-experiment]] [--cwd DIR] [--seed N]
   fleetctl.py budget  [status|line|check EXE|backoff EXE [--minutes M] [--reason TEXT]|lane-start EXE] [--json]
-  fleetctl.py log     add --ticket T --role R --executor E --model M --outcome O [--kind K] [k=v ...]
+  fleetctl.py log     add --ticket T --role R --executor E --model M --outcome O [--kind K]
+                      [--set k=v ...] [k=v ...] [--from-result <lane>/result.json]
   fleetctl.py log     backfill --ticket T --role R --set k=v [k=v ...]
   fleetctl.py stats   [--role R] [--kind K] [--project P] [--json]
+  fleetctl.py report  --project P --since ISO [--until ISO]   Done, approvals, tokens, hours (see report -h)
+  fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
   fleetctl.py config  [--get a.b.c] [--cwd DIR]   .plane/config.json + the per-user project override
@@ -388,6 +391,7 @@ def load_rows(reg):
         merged.append(live.pop(k) if k and k in live else r)
     merged += live.values()
     merged.sort(key=lambda r: r.get("ts") or "")
+    merged = fold_usage_rows(merged)
     for b in sorted(backfills, key=lambda r: r.get("ts") or ""):
         for r in reversed(merged):
             if (r.get("ticket"), r.get("role")) == (b.get("ticket"), b.get("role")) and \
@@ -396,6 +400,30 @@ def load_rows(reg):
                 break
     derive_quality(merged)
     return merged
+
+
+def fold_usage_rows(rows):
+    """Back-filled usage rows ("usage_only": true) carry tokens/duration for a session whose own
+    spawn row was logged without them. With "for_ts" naming that spawn row (same project, ticket,
+    role, ts) the numbers go onto it and the usage row disappears, so a session is counted once.
+    Without a match the usage row stays as a session of its own."""
+    index = {}
+    for r in rows:
+        if not r.get("usage_only"):
+            index.setdefault((r.get("project"), r.get("ticket"), r.get("role"), r.get("ts")), r)
+    out = []
+    for r in rows:
+        if r.get("usage_only") and r.get("for_ts"):
+            target = index.get((r.get("project"), r.get("ticket"), r.get("role"), r.get("for_ts")))
+            if target is not None:
+                for k, v in r.items():
+                    if k in NUMERIC_KEYS or k in ("lane_status", "result_path"):
+                        if target.get(k) is None:
+                            target[k] = v
+                target["backfilled"] = True
+                continue
+        out.append(r)
+    return out
 
 
 def derive_quality(rows):
@@ -430,17 +458,71 @@ def append_row(reg, row):
         f.write(json.dumps(row, separators=(",", ":")) + "\n")
 
 
+NUMERIC_KEYS = ("duration_ms", "tokens", "input_tokens", "output_tokens", "cached_input_tokens",
+                "reasoning_output_tokens", "rework_count", "claude_meter_delta_pct", "tool_uses")
+
+
+def coerce(key, v):
+    """key=value text -> number for the numeric keys (1,234 and 1_234 allowed), true/false/null
+    -> bool/None, JSON objects and quoted strings as JSON, anything else stays a string."""
+    s = v.strip()
+    if key in NUMERIC_KEYS:
+        n = s.replace(",", "").replace("_", "")
+        try:
+            return int(n)
+        except ValueError:
+            try:
+                return float(n)
+            except ValueError:
+                raise SystemExit(f"fleetctl: {key} must be a number, got {v!r}")
+    if s.lower() in ("true", "false"):
+        return s.lower() == "true"
+    if s.lower() in ("null", "none"):
+        return None
+    try:
+        return json.loads(s)
+    except Exception:
+        return v
+
+
 def parse_kv(items):
     out = {}
     for it in items or []:
         if "=" not in it:
             raise SystemExit(f"fleetctl: expected key=value, got {it!r}")
         k, v = it.split("=", 1)
-        try:
-            out[k] = json.loads(v)
-        except Exception:
-            out[k] = v
+        out[k.strip()] = coerce(k.strip(), v)
     return out
+
+
+def usage_fields(usage):
+    """A codex/opencode usage block -> flat numeric fields; tokens = input + output."""
+    out = {}
+    if not isinstance(usage, dict):
+        return out
+    for k in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens"):
+        if isinstance(usage.get(k), (int, float)):
+            out[k] = usage[k]
+    if "input_tokens" in out or "output_tokens" in out:
+        out["tokens"] = out.get("input_tokens", 0) + out.get("output_tokens", 0)
+    return out
+
+
+def lane_result_fields(path):
+    """A lane's result.json -> (identity, fields). identity: ticket/role/executor/model, used
+    where the command line leaves them out. fields: duration_ms, the token counts, lane_status."""
+    try:
+        res = json.load(open(X(path)))
+    except Exception as e:
+        raise SystemExit(f"fleetctl: cannot read {path}: {e}")
+    ident = {k: res.get(k) for k in ("ticket", "role", "executor", "model") if res.get(k)}
+    fields = {"result_path": os.path.abspath(X(path))}
+    if isinstance(res.get("durationMs"), (int, float)):
+        fields["duration_ms"] = res["durationMs"]
+    fields.update(usage_fields(res.get("usage")))
+    if res.get("status") and res["status"] != "completed":
+        fields["lane_status"] = res["status"]
+    return ident, fields, res
 
 
 def now_iso():
@@ -453,8 +535,10 @@ def cost_units(reg, r):
     key = f"{r.get('executor')}:{r.get('model')}"
     weight = w.get(key, w.get(r.get("executor") or "", None))
     tok = r.get("tokens")
-    if isinstance(tok, dict):  # codex usage block
+    if isinstance(tok, dict):  # codex usage block (older rows)
         tok = (tok.get("input_tokens", 0) - tok.get("cached_input_tokens", 0)) + tok.get("output_tokens", 0)
+    elif isinstance(r.get("input_tokens"), (int, float)):  # flat lane usage: cache reads are not billed alike
+        tok = (r["input_tokens"] - (r.get("cached_input_tokens") or 0)) + (r.get("output_tokens") or 0)
     if weight is None or not isinstance(tok, (int, float)):
         return None
     return tok / 1e6 * weight
@@ -475,7 +559,9 @@ def summarize(reg, rows):
 def scoreboard(reg, rows, role=None, kind=None, project=None):
     groups = {}
     for r in rows:
-        if r.get("type", "spawn") != "spawn" or r.get("outcome") in ("deferred",):
+        if r.get("type", "spawn") != "spawn" or r.get("outcome") in ("deferred",) or r.get("usage_only"):
+            continue
+        if r.get("role") == "pm" and r.get("outcome") == "done":  # ticket-state marker, not a session
             continue
         if role and r.get("role") != role:
             continue
@@ -737,6 +823,195 @@ def seed(reg):
     return added, by_project
 
 
+# ---------------------------------------------------------------- report
+REPORT_HELP = """Window report for one project: what shipped and what it cost.
+
+  Done          tickets with a row outcome=done. The PM writes it when a ticket reaches Done:
+                  run-lane.sh log add --ticket X --role pm --executor claude --model <pm model> \\
+                      --outcome done --set client_visible=true|false
+                client_visible=true: the client can see the change (UI, copy, a report they read).
+                false: tests, infra, refactors, internal tooling. These pm rows are markers, not
+                sessions, so they are left out of the session and token totals.
+  Approved      tickets with a tester row outcome=verify_pass.
+  Sessions      every other spawn row, by role/executor/model: count, tokens, hours (duration_ms).
+                Claude tokens are `tokens`. Codex shows output_tokens and input_tokens apart:
+                input is mostly cache reads (cached_input_tokens), so it is not comparable.
+  Per ticket    all session tokens in the window divided by Done (or Approved) tickets, Claude and
+                Codex separately. Work on tickets not yet Done is in the numerator too.
+  First pass    the first tester verdict per ticket in the window: verify_pass vs verify_fail.
+  Rework        rework rounds per ticket = tester verify_fail verdicts in the window (top 5).
+"""
+
+
+def parse_ts(s):
+    if not s:
+        return None
+    try:
+        d = datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if d.tzinfo is None:
+        d = d.astimezone()
+    return d
+
+
+def tok_parts(r):
+    """(total, input, cached, output) for a row; None where unknown."""
+    tok = r.get("tokens")
+    if isinstance(tok, dict):
+        f = usage_fields(tok)
+        return f.get("tokens"), f.get("input_tokens"), f.get("cached_input_tokens"), f.get("output_tokens")
+    return (tok if isinstance(tok, (int, float)) else None, r.get("input_tokens"),
+            r.get("cached_input_tokens"), r.get("output_tokens"))
+
+
+def report(reg, project, since, until=None):
+    t0, t1 = parse_ts(since), parse_ts(until) if until else None
+    if t0 is None:
+        raise SystemExit(f"fleetctl: --since {since!r} is not an ISO time")
+    rows = []
+    for r in load_rows(reg):
+        if r.get("type", "spawn") != "spawn" or (project and r.get("project") != project):
+            continue
+        t = parse_ts(r.get("ts"))
+        if t is None or t < t0 or (t1 and t >= t1):
+            continue
+        rows.append(r)
+    rows.sort(key=lambda r: r.get("ts") or "")
+    is_marker = lambda r: r.get("role") == "pm" and r.get("outcome") == "done"
+    done = {}
+    for r in rows:
+        if r.get("outcome") == "done":
+            done[r.get("ticket")] = r  # latest done row per ticket wins
+    approved = sorted({r.get("ticket") for r in rows if r.get("role") in ("tester", "verifier-legacy")
+                       and r.get("outcome") == "verify_pass"})
+    sessions = [r for r in rows if not is_marker(r) and r.get("outcome") != "deferred"]
+    L = []
+    w = f"{since}" + (f" to {until}" if until else " to now")
+    L.append(f"Fleet report · {project or 'all projects'} · {w}")
+    L.append("")
+    L.append(f"Done: {len(done)}  " + ", ".join(sorted(t for t in done if t)))
+    L.append(f"Approved: {len(approved)}  " + ", ".join(t for t in approved if t))
+    L.append("")
+    # sessions by role/executor/model
+    groups = {}
+    for r in sessions:
+        groups.setdefault((r.get("role") or "?", r.get("executor") or "claude", r.get("model") or "?"), []).append(r)
+    L.append(f"{'role':<12}{'executor:model':<24}{'n':>4}{'w/tok':>6}{'tokens':>12}{'input':>13}{'output':>11}{'hours':>7}")
+    tot = {"claude": [0, 0.0], "codex_in": 0, "codex_cached": 0, "codex_out": 0, "codex_h": 0.0, "other": 0}
+    for key in sorted(groups):
+        rs = groups[key]
+        role, exe, model = key
+        total = inp = out = cached = 0
+        ntok = 0
+        hours = sum(r["duration_ms"] for r in rs if isinstance(r.get("duration_ms"), (int, float))) / 3.6e6
+        for r in rs:
+            t, i, c, o = tok_parts(r)
+            if t is None and i is None and o is None:
+                continue
+            ntok += 1
+            total += t or 0; inp += i or 0; out += o or 0; cached += c or 0
+        if exe == "claude":
+            tot["claude"][0] += total; tot["claude"][1] += hours
+            cols = f"{total:>12,}{'':>13}{'':>11}"
+        elif exe == "codex":
+            tot["codex_in"] += inp; tot["codex_out"] += out; tot["codex_cached"] += cached; tot["codex_h"] += hours
+            cols = f"{'':>12}{inp:>13,}{out:>11,}"
+        else:
+            tot["other"] += total
+            cols = f"{total:>12,}{inp or '':>13}{out or '':>11}"
+        L.append(f"{role:<12}{exe + ':' + model:<24}{len(rs):>4}{ntok:>6}{cols}{hours:>7.1f}")
+    L.append(f"{'total':<12}{'':<24}{len(sessions):>4}{'':>6}{tot['claude'][0]:>12,}{tot['codex_in']:>13,}{tot['codex_out']:>11,}"
+             f"{tot['claude'][1] + tot['codex_h']:>7.1f}")
+    missing = sum(1 for r in sessions if tok_parts(r)[0] is None and tok_parts(r)[3] is None)
+    if missing:
+        L.append(f"  {missing} of {len(sessions)} sessions have no token numbers (w/tok counts the ones that do).")
+    if tot["codex_in"]:
+        L.append(f"  Codex input is mostly cache reads: {tot['codex_cached']:,} of {tot['codex_in']:,} "
+                 f"({tot['codex_cached'] / tot['codex_in'] * 100:.0f}%) cached.")
+    L.append("")
+    per = lambda n, d: f"{n / d:,.0f}" if d else "—"
+    nd, na = len(done), len(approved)
+    L.append(f"Tokens per Done ticket ({nd}):     Claude {per(tot['claude'][0], nd)} · Codex output {per(tot['codex_out'], nd)}, input {per(tot['codex_in'], nd)}")
+    L.append(f"Tokens per approved ticket ({na}): Claude {per(tot['claude'][0], na)} · Codex output {per(tot['codex_out'], na)}, input {per(tot['codex_in'], na)}")
+    # first-pass approval
+    first = {}
+    fails = {}
+    for r in rows:
+        if r.get("role") in ("tester", "verifier-legacy") and r.get("outcome") in ("verify_pass", "verify_fail"):
+            first.setdefault(r.get("ticket"), r.get("outcome"))
+            if r.get("outcome") == "verify_fail":
+                fails[r.get("ticket")] = fails.get(r.get("ticket"), 0) + 1
+    if first:
+        p = sum(1 for v in first.values() if v == "verify_pass")
+        L.append(f"First-pass approval: {p}/{len(first)} = {p / len(first) * 100:.0f}% (first tester verdict per ticket)")
+    else:
+        L.append("First-pass approval: — (no tester verdicts)")
+    top = sorted(fails.items(), key=lambda kv: (-kv[1], kv[0] or ""))[:5]
+    L.append("Rework rounds (top 5): " + (", ".join(f"{t} {n}" for t, n in top) if top else "none"))
+    if done:
+        vis = [t for t, r in done.items() if r.get("client_visible") is True]
+        known = [t for t, r in done.items() if isinstance(r.get("client_visible"), bool)]
+        L.append(f"Client-visible Done: {len(vis)}/{len(done)} = {len(vis) / len(done) * 100:.0f}%"
+                 + (f" ({len(done) - len(known)} Done rows without client_visible)" if len(known) < len(done) else ""))
+    else:
+        L.append("Client-visible Done: — (no Done rows)")
+    return "\n".join(L)
+
+
+# ---------------------------------------------------------------- selftest
+def selftest():
+    """log add with --set, bare k=v and --from-result writes typed values that read back."""
+    import tempfile
+    global STATE_HOME
+    d = tempfile.mkdtemp(prefix="fleetctl-selftest-")
+    old_home, old_env = STATE_HOME, os.environ.get("PLANE_FLEET_HOME")
+    STATE_HOME = d
+    os.environ["PLANE_FLEET_HOME"] = d
+    ok = True
+    def check(name, got, want):
+        nonlocal ok
+        good = got == want and type(got) is type(want)
+        ok &= good
+        print(f"{'ok  ' if good else 'FAIL'} {name}: {got!r}" + ("" if good else f" (want {want!r})"))
+    try:
+        base = ["log", "add", "--project", "st", "--ticket", "ST-1", "--role", "engineer", "--executor", "claude",
+                "--model", "opus", "--outcome", "pr_opened"]
+        main(base + ["--set", "duration_ms=1,234", "tokens=5678", "client_visible=true", "note=hello world"], quiet=True)
+        main(base[:5] + ["ST-2"] + base[6:] + ["--reason", "a=b", "duration_ms=10", "tokens=20"], quiet=True)
+        res = os.path.join(d, "result.json")
+        json.dump({"executor": "codex", "model": "gpt-x", "role": "tester", "ticket": "ST-3", "status": "completed",
+                   "durationMs": 90000, "usage": {"input_tokens": 1000, "cached_input_tokens": 900, "output_tokens": 50}},
+                  open(res, "w"))
+        main(["log", "add", "--project", "st", "--outcome", "verify_pass", "--from-result", res], quiet=True)
+        reg = load_registry(None, "st")
+        reg.setdefault("log", {})["path"] = os.path.join(d, "executor-outcomes.jsonl")
+        rows = {r["ticket"]: r for r in load_rows(reg)}
+        r1, r2, r3 = rows.get("ST-1", {}), rows.get("ST-2", {}), rows.get("ST-3", {})
+        check("--set duration_ms", r1.get("duration_ms"), 1234)
+        check("--set tokens", r1.get("tokens"), 5678)
+        check("--set client_visible", r1.get("client_visible"), True)
+        check("--set string", r1.get("note"), "hello world")
+        check("bare duration_ms", r2.get("duration_ms"), 10)
+        check("bare tokens", r2.get("tokens"), 20)
+        check("--reason kept", r2.get("reason"), "a=b")
+        check("row shape", sorted(k for k in r2 if k != "quality")[:6], ["duration_ms", "executor", "experiment", "model", "outcome", "project"])
+        check("from-result executor", r3.get("executor"), "codex")
+        check("from-result role", r3.get("role"), "tester")
+        check("from-result duration_ms", r3.get("duration_ms"), 90000)
+        check("from-result output_tokens", r3.get("output_tokens"), 50)
+        check("from-result input_tokens", r3.get("input_tokens"), 1000)
+        check("from-result tokens", r3.get("tokens"), 1050)
+    finally:
+        STATE_HOME = old_home
+        if old_env is None:
+            os.environ.pop("PLANE_FLEET_HOME", None)
+        else:
+            os.environ["PLANE_FLEET_HOME"] = old_env
+    print("selftest passed" if ok else "selftest FAILED")
+    return 0 if ok else 1
+
+
 # ---------------------------------------------------------------- project config
 def project_config(cwd):
     """<repo>/.plane/config.json, deep-merged with {state_home}/projects/<repo>.json (the user's
@@ -752,7 +1027,7 @@ def project_config(cwd):
 
 
 # ---------------------------------------------------------------- cli
-def main(argv=None):
+def main(argv=None, quiet=False):
     ap = argparse.ArgumentParser(prog="fleetctl")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pick"); p.add_argument("--role", required=True); p.add_argument("--kind")
@@ -765,13 +1040,25 @@ def main(argv=None):
     lg = sub.add_parser("log"); lg.add_argument("action", choices=["add", "backfill"])
     for f in ("ticket", "role", "executor", "model", "outcome", "kind", "project", "cwd", "reason"):
         lg.add_argument(f"--{f}")
-    lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=[]); lg.add_argument("extra", nargs="*")
+    lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
+    lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
+    rp = sub.add_parser("report", description=REPORT_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+    rp.add_argument("--project"); rp.add_argument("--since", required=True); rp.add_argument("--until"); rp.add_argument("--cwd")
+    sub.add_parser("selftest")
     s = sub.add_parser("stats"); s.add_argument("--role"); s.add_argument("--kind"); s.add_argument("--project")
     s.add_argument("--json", action="store_true"); s.add_argument("--cwd")
     a = sub.add_parser("apply"); a.add_argument("--dry-run", action="store_true"); a.add_argument("--cwd")
     sd = sub.add_parser("seed"); sd.add_argument("--cwd")
     cf = sub.add_parser("config"); cf.add_argument("--get"); cf.add_argument("--cwd")
-    args = ap.parse_args(argv)
+    args, rest = ap.parse_known_args(argv)
+    # Bare key=value words (log add ... duration_ms=1 tokens=2) land here wherever they sit on the
+    # line; argparse would otherwise drop them or refuse them after an option.
+    args.extra = [x for x in rest if "=" in x and not x.startswith("-")]
+    bad = [x for x in rest if x not in args.extra]
+    if bad or (args.extra and args.cmd != "log"):
+        ap.error(f"unrecognized arguments: {' '.join(bad or args.extra)}")
+    if args.cmd == "selftest":
+        return selftest()
     reg = load_registry(getattr(args, "cwd", None) or os.getcwd(), getattr(args, "project", None))
 
     if args.cmd == "pick":
@@ -795,7 +1082,16 @@ def main(argv=None):
             ap.error(f"unknown budget action {args.action}")
     elif args.cmd == "log":
         fields = parse_kv(args.extra)
+        fields.update(parse_kv(args.set))
         if args.action == "add":
+            ident = {}
+            if args.from_result:
+                ident, rfields, _ = lane_result_fields(args.from_result)
+                for k, v in rfields.items():
+                    fields.setdefault(k, v)  # numbers typed on the line win over the file
+            for f in ("ticket", "role", "executor", "model"):
+                if not getattr(args, f) and ident.get(f):
+                    setattr(args, f, ident[f])
             for f in ("ticket", "role", "executor", "model", "outcome"):
                 if not getattr(args, f) and f not in fields:
                     ap.error(f"log add needs --{f}")
@@ -807,14 +1103,19 @@ def main(argv=None):
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
             append_row(reg, row)
-            print(f"logged {row['project']} {row['ticket']} {row['role']} {row['executor']}:{row['model']} {row['outcome']}")
+            if not quiet:
+                extra = " ".join(f"{k}={v}" for k, v in fields.items() if k != "result_path")
+                print(f"logged {row['project']} {row['ticket']} {row['role']} {row['executor']}:{row['model']} {row['outcome']}"
+                      + (f" {extra}" if extra else ""))
         else:
-            sets = parse_kv(args.set)
+            sets = fields
             if not (args.ticket and args.role and sets):
                 ap.error("log backfill needs --ticket, --role and --set k=v")
             append_row(reg, {"type": "backfill", "ts": now_iso(), "project": args.project or reg.get("_project"),
                              "ticket": args.ticket, "role": args.role, "fields": sets})
             print(f"backfilled {args.ticket} {args.role}: {', '.join(sets)}")
+    elif args.cmd == "report":
+        print(report(reg, args.project or reg.get("_project"), args.since, args.until))
     elif args.cmd == "stats":
         board = scoreboard(reg, load_rows(reg), args.role, args.kind, args.project)
         if args.json:

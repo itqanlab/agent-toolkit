@@ -714,20 +714,26 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    clean up anything in `worktreesAdded`/`branchesAdded` that has nothing pushed), then re-queue
    the ticket **once on the role's Claude fallback**. A second lane failure on the same executor
    that day → stop using it for that role this run and say so.
-6. **Log every spawn** at its end: `$L log add --ticket … --role … --kind … --executor …
-   --model … --outcome … [--experiment] --reason "…" duration_ms=… tokens=…` (one log for all
-   projects, `~/.config/plane-fleet/executor-outcomes.jsonl`). **Back-fill** as the ticket
-   moves: `$L log backfill --ticket … --role engineer --set verify_first_pass=… ci_first_pass=…`,
-   and `reverted` / `bug_filed` when they happen.
+6. **Log every spawn** at its end. Claude: `$L log add --ticket … --role … --kind … --executor
+   claude --model … --outcome … [--experiment] --reason "…" --set duration_ms=… tokens=…` with the
+   numbers from the Agent result. Lane: `$L log add --from-result <out>/result.json --kind …
+   --outcome … --reason "…"` (ticket, role, executor, model, duration and tokens come from the
+   file). One log for all projects, `~/.config/plane-fleet/executor-outcomes.jsonl`.
+   **Back-fill** as the ticket moves: `$L log backfill --ticket … --role engineer --set
+   verify_first_pass=… ci_first_pass=…`, and `reverted` / `bug_filed` when they happen. When a
+   ticket reaches **Done**: `$L log add --ticket … --role pm --executor claude --model <yours>
+   --outcome done --set client_visible=true|false` (true = the client can see the change).
 7. The usage pacer hook gates Claude spawns; `run-lane` gates lanes with the same rules
    (§0.6). A rate-limit in a lane records a back-off and is a lane failure.
 
 ### Record every spawn so the defaults can be checked later
 
 Since 2026-10-09 every spawn goes to the one user-level log with `run-lane.sh log add` (§3
-Executors, step 6), and `run-lane.sh stats` computes the rates below. The old per-project file,
-(`legacy_glob` in the executors registry), was folded in and is still read; its row shape,
-for reference:
+Executors, step 6), `run-lane.sh stats` computes the rates below, and `run-lane.sh report
+--project <repo> --since <iso>` gives a run's totals: Done and approved tickets, sessions and
+tokens by role/executor/model, tokens per Done ticket, first-pass approval, rework rounds and
+the client-visible share. The old per-project file (`legacy_glob` in the executors registry)
+was folded in and is still read; its row shape, for reference:
 
 ```
 {"ts":"<iso8601>","ticket":"PROJ-132","role":"worker","executor":"claude","model":"sonnet",
@@ -736,10 +742,12 @@ for reference:
 ```
 
 `executor` is `claude` / `codex` / `opencode`; `model` is the exact id (`gpt-5.6-sol`,
-`kimi-k2.7-code`). For a lane, take `duration_ms` from `result.json` `durationMs`, `tokens`
-from its `usage` when present, and add `"lane_status"` when it did not complete. Rows written
-before 2026-10-09 have no `executor`: read them as `claude`. Compute the pass rates below per
-**(role, executor, model)**, and change an executor default only on the same evidence rules.
+`kimi-k2.7-code`). For a Claude spawn pass `duration_ms` and `tokens` with `--set` (values are
+stored as numbers). For a lane pass `--from-result <out>/result.json`: it takes `durationMs`
+and the `usage` block (`input_tokens`, `cached_input_tokens`, `output_tokens`) and adds
+`lane_status` when the lane did not complete. Rows written before 2026-10-09 have no
+`executor`: read them as `claude`. Compute the pass rates below per **(role, executor,
+model)**, and change an executor default only on the same evidence rules.
 
 `outcome` is one of `pr_opened` / `blocked` / `verify_pass` / `verify_fail` / `done`. Fill
 `verify_first_pass` on the ticket's worker row once its verify verdict is known — that is the

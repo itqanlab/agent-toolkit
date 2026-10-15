@@ -9,7 +9,7 @@ skill, same standing brief, same slot rules, same report line. Only the program 
 differs.
 
 - Registry (machine-readable): `references/executors.json`
-- Selection, budget, log, scoreboard, config: `scripts/lanes/fleetctl.py` (through `run-lane.sh pick|budget|log|stats|apply|seed|config`)
+- Selection, budget, log, scoreboard, config: `scripts/lanes/fleetctl.py` (through `run-lane.sh pick|budget|log|stats|report|apply|seed|config|selftest`)
 - User-level state: `{state_home}` = `PLANE_FLEET_HOME`, default `{state_home}/` (outcomes log, decisions, user override, budget override, back-off state, per-project config overrides)
 - Runner for non-Claude executors: `scripts/lanes/run-lane.sh`
 - What a non-Claude session must know: `references/non-claude-adapter.md`
@@ -197,19 +197,43 @@ tagged `project` (the repo name). Older per-project run logs can be folded in wi
 so rows still written there are not lost.
 
 ```bash
-$L log add --ticket PROJ-134 --role engineer --kind api --executor codex --model gpt-5.6-sol \
-   --outcome pr_opened --reason "champion" duration_ms=1234000 tokens=230000 rework_count=0
+# a Claude spawn: numbers from the Agent result, as --set (or bare k=v words, same thing)
+$L log add --ticket PROJ-134 --role engineer --kind api --executor claude --model sonnet \
+   --outcome pr_opened --reason "champion" --set duration_ms=1234000 tokens=230000 rework_count=0
+# a lane: ticket, role, executor, model, duration and tokens come from its result.json
+$L log add --from-result /tmp/PROJ-134-engineer/lane/result.json --kind api --outcome pr_opened --reason "PR 212"
 $L log add ... --experiment                                   # an experiment pick
+# the PM, when a ticket reaches Done (a marker row, not a session)
+$L log add --ticket PROJ-134 --role pm --executor claude --model opus --outcome done --set client_visible=true
 $L log backfill --ticket PROJ-134 --role engineer --set verify_first_pass=true ci_first_pass=true
 $L log backfill --ticket PROJ-134 --role tester --set reverted=false bug_filed='"PROJ-171"'
+$L selftest                                                   # log add round trip in a temp log
 ```
 
+`--set` values are typed: `duration_ms`, `tokens`, `input_tokens`, `output_tokens`,
+`cached_input_tokens` (and `reasoning_output_tokens`, `rework_count`) are stored as numbers
+(`1,234` is fine), `true`/`false` as booleans, anything else as a string. Numbers typed on the
+line win over `--from-result`. Before 2026-10-15 `log add` dropped `--set` values and refused
+bare `k=v` words after an option, so older spawn rows have no tokens or duration.
+
 Row fields: `ts, project, ticket, role, task_kind, executor, model, experiment, reason,
-duration_ms, tokens` (Claude), or the lane's `usage` / a quota note (others),
-`claude_meter_delta_pct` when known, `outcome` (`pr_opened`, `blocked`, `verify_pass`,
-`verify_fail`, `done`, `lane_failed`, `deferred`), `verify_first_pass, rework_count,
-ci_first_pass`, and later `reverted`, `bug_filed`. Back-fills are separate rows and apply to the
-latest matching spawn.
+duration_ms, tokens` (Claude: the session total), or for a lane `input_tokens,
+cached_input_tokens, output_tokens, reasoning_output_tokens`, `tokens` = input + output,
+`result_path` and `lane_status` when it did not complete. Then `claude_meter_delta_pct` when
+known, `outcome` (`pr_opened`, `blocked`, `verify_pass`, `verify_fail`, `done`, `lane_failed`,
+`deferred`), `verify_first_pass, rework_count, ci_first_pass`, and later `reverted`,
+`bug_filed`. `log add` needs `--executor` on every row, the PM's own Done rows included (use the PM's executor and model). A Done row (`--role pm --outcome done`) carries `client_visible`: `true` when the
+client can see the change (UI, copy, a report they read), `false` for tests, infra, refactors
+and internal tooling. Back-fills are separate rows and apply to the latest matching spawn. A
+row with `"usage_only": true` and `for_ts` adds tokens/duration to the spawn row with that ts
+(used to back-fill a run logged without numbers); without a match it counts as its own session.
+
+**Report:** `$L report --project <repo> --since <iso> [--until <iso>]` prints, for that window:
+tickets Done (`outcome=done` rows) and approved (`verify_pass`), sessions by
+role/executor/model with tokens and hours, tokens per Done and per approved ticket (Claude
+total; Codex output and input apart, input being ~99% cache reads), first-pass approval (the
+first tester verdict per ticket), rework rounds per ticket (tester `verify_fail` count, top 5)
+and the share of Done tickets with `client_visible=true`. `$L report -h` defines each line.
 
 **What a row is scored on.** Engineer: `verify_first_pass`, or else the first tester verdict
 after it on the same ticket. Old rows put the engineer's flag on the tester row. Tester: the
