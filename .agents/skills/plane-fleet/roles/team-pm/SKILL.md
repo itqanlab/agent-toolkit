@@ -962,6 +962,12 @@ its latest commit, trunk green (§1), and no schema ticket ahead of it still unm
    gh pr merge <n> --merge --delete-branch
    git checkout <trunk> && git fetch origin && git reset --hard origin/<trunk>
    ```
+   **A branch another open PR is based on is never deleted at merge.** Check first:
+   `gh pr list --state open --base <head branch of n>`. If anything is listed, merge `<n>`
+   without `--delete-branch`, move each listed PR to the trunk with
+   `gh pr edit <m> --base <trunk>`, and delete the branch only after that. GitHub closes a PR
+   whose base branch is deleted, and a closed PR cannot be retargeted, only re-filed as a new
+   PR (2026-10-17: a stacked PR closed this way and had to be re-filed).
    For each next PR: `gh pr update-branch <n>`, then **wait for its CI to go green again** before
    merging. This is the one place anyone waits for CI, and it is you.
 3. **Conflicts:** a mechanical rebase is yours. Anything that changes behaviour is not — send the

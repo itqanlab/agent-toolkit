@@ -434,6 +434,11 @@ Wait for checks. Merge when green:
 gh pr merge <n> --merge --delete-branch
 git checkout <trunk> && git fetch origin && git reset --hard origin/<trunk>
 ```
+Stacked PRs: if `gh pr list --state open --base <head branch of n>` lists anything, merge
+without `--delete-branch`, move each listed PR to the trunk (`gh pr edit <m> --base <trunk>`),
+then delete the branch. Deleting a base branch closes every PR on it, and a closed PR cannot
+be retargeted.
+
 CI red → read the actual log and fix it. Do not merge red. Do not rationalize a red check as
 "probably flaky" without evidence from the log.
 
