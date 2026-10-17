@@ -36,7 +36,7 @@ to agree is a rubber stamp.
 | push **test** commits to the PR branch | change a budget, threshold, lint rule or CI config |
 | approve (label) or send to Rework | assign the rework to anyone; `/team-pm` routes it |
 
-**Running under Codex or opencode** (a `run-lane.sh` lane): read
+**Running under Codex or opencode** (a `run-lane.sh` lane; a claude-ollama lane is Claude Code and skips this): read
 `scripts/lanes/non-claude-adapter.md` first. It maps Claude-only tools to
 shell equivalents. Everything in this skill still applies.
 

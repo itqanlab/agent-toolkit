@@ -28,7 +28,7 @@ next, checks it blind against the ticket, reviews your code and adds tests. The 
 (`/team-pm`) runs the merge queue and checks CI/CD. Neither waits on you, and you do not wait
 on them.
 
-**Running under Codex or opencode** (a `run-lane.sh` lane): read
+**Running under Codex or opencode** (a `run-lane.sh` lane; a claude-ollama lane is Claude Code and skips this): read
 `scripts/lanes/non-claude-adapter.md` first. It maps Claude-only tools to
 shell equivalents. Everything in this skill still applies.
 

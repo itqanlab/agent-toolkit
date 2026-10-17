@@ -701,7 +701,7 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    then pick again. No registry, or the executor's binary is missing → Claude, as above.
 3. **Announce** its `pick_line`: `PROJ-134 → engineer/api · codex:gpt-5.6-sol · EXPERIMENT ·
    … · slot A` (and the trigger, if one fired).
-   **Spawn:** Claude via `Agent` exactly as above. Codex/opencode: write the brief (same
+   **Spawn:** Claude via `Agent` exactly as above. Any lane executor (codex, opencode, claude-ollama): write the brief (same
    content as a Claude brief: standing-brief line, ticket, slot and its values, owned files,
    shared registries) to `/tmp/<TICKET>-<role>/brief.md`, then **Bash `run_in_background: true`**:
    ```
@@ -743,7 +743,7 @@ was folded in and is still read; its row shape, for reference:
  "outcome":"pr_opened","verify_first_pass":null,"rework_count":0}
 ```
 
-`executor` is `claude` / `codex` / `opencode`; `model` is the exact id (`gpt-5.6-sol`,
+`executor` is `claude` / `codex` / `opencode` / `claude-ollama`; `model` is the exact id (`gpt-5.6-sol`,
 `kimi-k2.7-code`). For a Claude spawn pass `duration_ms` and `tokens` with `--set` (values are
 stored as numbers). For a lane pass `--from-result <out>/result.json`: it takes `durationMs`
 and the `usage` block (`input_tokens`, `cached_input_tokens`, `output_tokens`) and adds

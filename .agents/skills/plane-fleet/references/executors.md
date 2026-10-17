@@ -1,7 +1,8 @@
 # Executors — who runs each fleet role
 
 The fleet has **roles** (engineer, tester, scan, ticket writer, PM) and **executors** (the
-program that runs a role: a Claude subagent, the Codex CLI, opencode on Ollama Cloud). Any role
+program that runs a role: a Claude subagent, the Codex CLI, opencode on Ollama Cloud, Claude Code
+on Ollama Cloud). Any role
 can in principle run on any executor. The PM picks one per spawn.
 
 The role skills don't change. An engineer is an engineer whether Claude or Codex runs it: same
@@ -100,7 +101,7 @@ than the window elapses plus `pace_allowance_pct` (20). Override per user in
 |---|---|---|
 | claude | the file in `budget.executors.claude.status_file`: a statusline relay that writes the harness's `rate_limits.five_hour` block. None set = no meter | 5 h |
 | codex | newest `~/.codex/sessions/YYYY/MM/DD/*.jsonl` `token_count` event `rate_limits` (`primary`/`secondary` `used_percent`, `window_minutes`, `resets_at`) | as reported (weekly on the current plan) |
-| opencode / Ollama Cloud | no usage API: a local lane counter per window, plus a back-off after any 429 or quota error | 5 h |
+| opencode, claude-ollama / Ollama Cloud | no usage API: a local lane counter per window, plus a back-off after any 429 or quota error. Both draw on one plan, so `state_as: opencode` makes them share the counter and the back-off | 5 h |
 
 Each source answers `ok`, `hold` (pace or back-off) or `stop` (hard stop), with `resume_at`. An
 unknown meter is `ok` (no judgement), as before. After a lane, `run-lane` scans its output for
@@ -113,7 +114,7 @@ executor's budget block adds one more folder to look in.
 Gates:
 - **Claude spawns:** the `usage-pacer.py` PreToolUse hook on `Agent`, now calling the same
   `fleetctl` check.
-- **Codex/opencode lanes:** `run-lane.sh` checks before launching. Held → `result.json` status
+- **Codex, opencode and claude-ollama lanes:** `run-lane.sh` checks before launching. Held → `result.json` status
   `deferred`, exit 75, `resumeAt`. The PM starts a background `sleep` until then and re-picks.
   It never hands back to the owner.
 - **Routing:** `pick` only chooses executors whose budget is `ok`. When the champion is held,
@@ -121,13 +122,13 @@ Gates:
   escalations) returns `decision: wait` with `resume_at`.
 
 One line for preflight and status updates: `run-lane.sh budget` →
-`Claude 58% (5h) · Codex 9% (wk) · Ollama ok (2 lanes)`.
+`Claude 58% (5h) · Codex 9% (wk) · Ollama ok (2 lanes) · Claude Code/Ollama ok (2 lanes)`.
 
 ## Running a lane
 
 Claude executor: the `Agent` tool, exactly as team-pm §3 shows. Nothing changes.
 
-Codex or opencode: write the per-spawn brief to a file, then start the lane with **Bash
+Codex, opencode or claude-ollama: write the per-spawn brief to a file, then start the lane with **Bash
 `run_in_background: true`** so you are told when it exits:
 
 ```bash
@@ -136,7 +137,7 @@ scripts/lanes/run-lane.sh codex --model gpt-5.6-sol \
   --brief /tmp/PROJ-134-engineer/brief.md --out /tmp/PROJ-134-engineer/lane
 ```
 
-The runner builds the real prompt: the adapter note, "read and follow <role SKILL.md>", the
+The runner builds the real prompt: the adapter note (not for claude-ollama, which is Claude Code), "read and follow <role SKILL.md>", the
 standing-brief line (for engineer and tester), then your brief. It feeds it on stdin, enforces
 the timeout (role default, or `--timeout <sec>`), and writes `<out>/result.json`:
 
@@ -156,11 +157,11 @@ child's environment only.
 
 ### Sandbox
 
-| `--sandbox` | Codex | opencode |
-|---|---|---|
-| `full` | profile `fleet-engineer-full` + `--dangerously-bypass-approvals-and-sandbox` | `build` agent + `--auto` |
-| `restricted` | profile `fleet-engineer` (workspace write, network on, caches, pnpm store, /tmp) | — |
-| `read-only` | `-s read-only` | `plan` agent, no `--auto` |
+| `--sandbox` | Codex | opencode | claude-ollama |
+|---|---|---|---|
+| `full` | profile `fleet-engineer-full` + `--dangerously-bypass-approvals-and-sandbox` | `build` agent + `--auto` | `--dangerously-skip-permissions` |
+| `restricted` | profile `fleet-engineer` (workspace write, network on, caches, pnpm store, /tmp) | — | — |
+| `read-only` | `-s read-only` | `plan` agent, no `--auto` | allow Read, Grep, Glob, Bash, `mcp__plane__*`; deny Edit, Write, NotebookEdit |
 
 **Why engineers and testers run `full` on Codex.** Tested 2026-10-09 on codex-cli 0.161.0. The
 restricted profile passed network, `gh api user`, `git ls-remote` (keychain), a local Postgres,
@@ -187,7 +188,17 @@ read-only `ls` in the smoke test. Only give opencode read-only roles until that 
 - opencode: a headless run auto-rejects reads outside the working dir, and one rejection ends
   the run. The runner allows the fleet folder (`{fleet_root}/**`, and nothing else outside)
   through `OPENCODE_CONFIG_CONTENT`.
-- Both: `NX_DAEMON=false` in the child environment.
+- claude-ollama: runs `claude -p` with the child's env pointed at the provider
+  (`ANTHROPIC_BASE_URL` = `base_url`, `ANTHROPIC_AUTH_TOKEN` = the `auth_env` key,
+  `ANTHROPIC_API_KEY` removed). Every model alias (opus, sonnet, haiku, the small fast model,
+  subagents) is set to the lane's model, so no call falls through to Anthropic and the Claude
+  quota is untouched. MCP is `--strict-mcp-config` with only `mcp_servers` (plane), copied from
+  `~/.claude.json` into a 0600 `mcp.json` in the out dir and deleted when the lane ends.
+  `--add-dir` gives it the fleet folder. Read-only is a tool list, not plan mode: tested
+  2026-10-16, plan mode blocks MCP calls even with an allow rule. `--effort` passes through.
+  Smoke tested 2026-10-16 on kimi-k2.7-code and glm-5.3: Bash, Plane reads, a denied Write in
+  read-only, and an edit + test run + commit in full mode. No commit trailer is added.
+- All: `NX_DAEMON=false` in the child environment.
 
 ## Outcomes log, scoreboard, promotion
 
@@ -263,11 +274,17 @@ either file. The PM says every line in its report.
   session that logged it. Ollama has no meter at all, only a lane count and back-off after a 429.
   A lane can still hit a quota mid-ticket; `run-lane` records the back-off and marks it
   `rateLimited`, and the PM treats it as a lane failure.
-- **No Agent or Skill tools in a lane.** A lane reads skill files and follows them itself. It
-  cannot spawn helpers.
-- **Claude Code hooks do not run in a lane.** The Plane-API blocker and the usage pacer are
-  Claude hooks. The adapter repeats their rules, but nothing enforces them in Codex or opencode.
-  Git hooks (husky) do run.
+- **No Agent or Skill tools in a Codex or opencode lane.** It reads skill files and follows
+  them itself, and cannot spawn helpers. A claude-ollama lane has both, and its subagents run on
+  the lane's model.
+- **Claude Code hooks do not run in a Codex or opencode lane.** The Plane-API blocker and the
+  usage pacer are Claude hooks. The adapter repeats their rules, but nothing enforces them there.
+  A claude-ollama lane runs them all, which also means the usage pacer can hold its `Agent`
+  calls on the Claude meter even though those subagents run on Ollama. Git hooks (husky) run
+  everywhere.
+- **claude-ollama is not proven.** No candidates list names it by default. It gets real work
+  only as a challenger in a user override, and earns champion through the scoreboard like any
+  other executor.
 - **Cost of context.** A Codex smoke lane used ~650k input tokens, mostly cached, for a 1-minute
   task. Expect real engineer lanes to be large.
 - **A lane holds a slot** like any session, and tears it down like any session.
