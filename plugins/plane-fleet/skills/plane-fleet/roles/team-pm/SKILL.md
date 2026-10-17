@@ -874,8 +874,23 @@ fresh session briefed with exactly what already exists.
 
 ## 4) Spawn a tester the moment a PR opens — no CI wait
 
-The moment **any** engineer reports "In Review · PR #n", that PR is testable. If any slot is
-free, spawn `/team-tester` on it right away:
+The moment **any** engineer reports "In Review · PR #n" **with a clean review** (below), that
+PR is testable. If any slot is free, spawn `/team-tester` on it right away:
+
+**Review gate before the tester.** The engineer runs `codex review` on its own diff before
+pushing (team-engineer §4.3b) and reports it in the handoff. Before you spawn a tester, read
+that one line of the handoff:
+- no review line, or the last pass has an open P1 → back to the same engineer lane (resume it
+  or start a new one with the finding). No tester yet.
+- a P2 marked "not applicable" with a reason you disagree with → post a `PM SCOPE DECISION:`
+  saying it must be fixed, and send it back.
+- otherwise, spawn the tester. If you doubt the report, run
+  `codex review --base origin/<trunk>` on the pushed branch yourself. It takes about 5 minutes
+  and needs no slot.
+
+The group review (§5) still runs. It should only find what comes from combining branches.
+When it finds a per-PR defect, log it as a review escape (`log add --reason "review escape: …"`):
+a run of escapes means the per-PR review isn't working.
 
 ```
 Agent(description: "tester PROJ-134", model: "opus", run_in_background: true,

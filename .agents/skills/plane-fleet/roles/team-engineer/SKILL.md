@@ -311,6 +311,27 @@ What belongs where:
 3. **Tear down the slot** — stop both servers, drop your slot DB, free the ports. A slot you
    leave running blocks the next session assigned to it.
 
+   **3b. Independent code review, before you push.** Commit, then run a fresh review of your
+   whole diff against the trunk:
+   ```bash
+   codex review --base origin/<trunk> > /tmp/<TICKET>-review.md 2>&1
+   ```
+   It runs in a new process with none of your reasoning, so it is not you marking your own
+   work. Start it in the background as soon as you commit, next to your narrow tests, so it
+   costs little wall time.
+   - **Every P1: fix it, commit, and run the review again.** Repeat until no P1 is left.
+   - **Every P2: fix it, or write one line on why it does not apply.** A P2 fix does not need
+     another review pass.
+   - P3 and style notes: your call.
+   - A finding that is real but outside the ticket goes through §5 (file it, don't work it).
+   - The review being unavailable (CLI missing, auth error) is a blocker to report (§7), not a
+     step to skip.
+
+   Why: on 2026-10-15/16 two Sentry tickets each passed engineer and tester, then the group
+   review found 5 privacy defects, then 2 more, then a race. That was three full
+   engineer + tester rounds, about 50 minutes each, for defects a 5 to 10 minute review on the
+   engineer's own diff would have caught in the first run.
+
 4. Push (the hook runs the full gate here; a failure means fix and push again) and open the PR:
    ```bash
    git push -u origin <branch>
@@ -390,6 +411,10 @@ rather than reconstructable later.
    - PR link
    - what you checked and how: the local gate, and your browser walk (criteria walked, as which
      role, screenshots) — and anything you could not reach
+   - **review result (§4.3b):** how many passes, every P1 and P2 with what you did about it
+     (fixed in `<sha>` / not applicable because …), and the last pass's verdict. The PM does
+     not start a tester without this line, and a last pass with an open P1 sends the ticket
+     straight back to you.
    - areas/files touched, so `/team-pm` can judge overlap with sibling in-flight tickets
    - a **migration flag** if this PR touches a schema file, restated even if you already
      flagged it at §1.4
@@ -404,7 +429,7 @@ rather than reconstructable later.
    that.
 3. **Report exactly one line** back to whoever spawned you. That line is your entire final
    message, with no summary before or after it:
-   `PROJ-134 → In Review · PR #212 · gate green · browser: 3/3 criteria walked as sales · slot A torn down`
+   `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, 0 P1 open · browser: 3/3 criteria walked as sales · slot A torn down`
    The payload lives in the Plane comment. Do not paste the diff, the investigation, or a
    status essay into the reply.
 4. **Stop.** Do not wait for CI. Do not merge. Do not deploy. Do not pick another ticket.
