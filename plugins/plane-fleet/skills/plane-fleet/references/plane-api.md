@@ -6,7 +6,7 @@
 > A capability the MCP lacks becomes an issue on the MCP server's tracker (`plane.mcp_issues`
 > in config), not a workaround.
 
-## Current state (2026-10-02): the plugin's Plane MCP server, Plane Community 1.4.2
+## Current state (2026-10-17): the plugin's Plane MCP server, Plane Community 1.4.2
 
 The plugin declares a Plane MCP server named `plane` (see the plugin README). Its tools take an
 `action`: `workitem(action="update", ...)`. `P` below is the project id from `.plane/config.json`.
@@ -27,9 +27,10 @@ is wrong. Report it; do not route around it.
 | pre-pick triage | `workitem(action="triage", workitem_identifiers=["A","B"], path_prefixes=["apps","libs"], comments=true)` | up to 25 tickets. Plane facts only: `text_chars`, `keywords`, `paths`, `decision_words`, `vague_scope`, and with comments `decision_comments`, `comments_after_update`. Repo side: `scripts/repo-scan.sh` |
 | states | `state(action="list", project_id=P)` | compact rows |
 | state change | `workitem(action="update", workitem_identifier="PROJ-N", state="In Review")` | state by name. Reply has `state_name` and `description_escaped`. A state-only update sends only the state, so priority is never touched |
+| several changes | `workitem(action="update", workitem_identifier="PROJ-N", state="In Review", assignees=["dev@example.com"], target_date="2026-10-21")` | ONE call. Decide every field before you send it; a second update for a forgotten field is waste. Assignees take a uuid, an email or a display name (PMCP-18); an unknown name is refused with the members listed. The reply echoes every field the call set, as stored (PMCP-17) |
 | comment | `workitem_comment(action="create", workitem_identifier="PROJ-N", comment_html="<p>..</p>")` | reply is `{id, workitem, created_at, comment_chars, comment_escaped}`, not an echo |
 | relations | `workitem_relation(action="create" / "list" / "delete", ...)` | create and list work through the API. Delete goes through a bot web session inside the MCP, since Plane 1.4.2 has no API route for it. Both work on our Plane |
-| search | `workitem(action="search", query=...)` | works |
+| search | `workitem(action="search", query=...)` | whole workspace, no project id needed; rows carry the project identifier and `sequence_id`. Use it OR a `list`, never both for the same lookup |
 | rows | `workitem(action="list")` returns compact rows by default | `fields=all` for every field |
 | rate limit | 429s are retried inside the MCP | our Plane allows 600/minute per key |
 
@@ -71,6 +72,12 @@ read them yet. If you cannot read them, treat the ticket as blocked and skip it.
 
 The same goes for any write: confirm a state change shows the new `state_name`, and confirm a
 field you did not mean to touch was not changed.
+
+**Check the echo before you read again.** `create`, `update`, `manage_assignee` and
+`manage_label` reply with every field the call set, as Plane stored it (PMCP-17). Compare
+those values with what you sent; that is the verification. Read the item again only for
+something the echo cannot show, such as relations or comments. On an MCP older than PMCP-17
+the reply has no `assignees` or dates, so a read-back is still needed there.
 
 ## Rate limits, and why a throttled scan changes the answer
 
