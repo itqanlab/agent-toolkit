@@ -190,8 +190,9 @@ does not run the browser suite (it runs on trunk after the PM merges a group), y
 browser check before merge. In your slot, run the spec files for every screen the diff touches
 (`test.e2e_run` in config, with your slot's ports), plus the specs you wrote. Put the command
 and the pass count in your APPROVED comment. A PR that changes shared UI (`fleet.shared_ui_paths`:
-the shell, a shared table, dialog or form control) touches too much to pick specs by hand. Add
-the e2e label (`ci.e2e_label`) **before** `gh pr ready` so its CI runs the whole suite.
+the shell, a shared table, dialog or form control) touches too much to pick specs by hand. Say so in your APPROVED comment
+("shared UI: needs the full browser suite") so the PM checks it in the group PR's run. Do not mark
+the PR ready to get that run yourself.
 
 **Do not run the full server or browser suite yourself** (owner, 2026-10-15). The PM's group
 PR runs both in CI, with the e2e label set before the PR is marked ready, and that run is the
@@ -224,9 +225,10 @@ You decide **approve** or **rework**. You never decide **who** fixes it. That go
    `gh label create qa-approved --color 0E8A16`).
    `gh pr review <n> --comment --body "<summary>"`. (GitHub forbids approving your own PR, and
    every agent pushes as the owner's account. The label is the approval.)
-   **If the PR is a draft, mark it ready now: `gh pr ready <n>`.** Where draft PRs skip the heavy CI,
-   marking it ready starts the full CI exactly once, with your test commits
-   included. Do this only on APPROVED. A PR sent to Rework stays a draft.
+   **Leave the PR a draft. Never run `gh pr ready`.** Only the PM's group PR is marked ready
+   (team-pm, merge queue). A single PR marked ready runs the full CI, about 40 minutes on the one
+   runner, and then trunk runs it again after the merge. On 2026-10-16 three PRs were marked
+   ready one by one and each one held up the runner twice (owner: CI should not run per PR).
 2. **Attach one client-ready screenshot to the Plane ticket**: the screen the client will look
    at, real-looking data, no dev overlays. The manager uses it for the client message after
    deploy. It does not run the app itself.

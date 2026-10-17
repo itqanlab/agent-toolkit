@@ -338,8 +338,8 @@ What belongs where:
    gh pr create --draft --base <trunk> --title "<type>(<scope>): <what> (<TICKET>)" \
      --body "<what / why / how you checked it: gate + browser walk>"
    ```
-   **Always open it as a DRAFT.** On repos whose CI skips heavy jobs for drafts, a draft runs only the cheap checks, and the full CI runs once when the
-   tester marks it ready on approval. Your local pre-push gate already ran the full suite. A rework
+   **Always open it as a DRAFT.** On repos whose CI skips heavy jobs for drafts, a draft runs only the cheap checks, and the full CI runs once, on the PM's
+   group PR. Nobody marks a single ticket's PR ready (owner, 2026-10-16). Your local pre-push gate already ran the full suite. A rework
    engineer pushes to the same draft PR and leaves it as a draft. If the PR is already ready (a
    rework after approval), leave its state alone.
 

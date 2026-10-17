@@ -441,8 +441,10 @@ Say which one you are in when it happens ("3 PRs waiting for test, giving slot B
 builds and tests locally for 20–30 minutes before it pushes anything, so starting it adds no CI
 load, and by the time it opens a PR a train has usually landed. The cap applies to *open PRs*:
 with 6 or more open PRs from this run (`In Review`, `Testing`, `Approved`, `Rework` with a PR),
-engineers already open every PR as a **draft** (team-engineer, since 2026-09-30), and testers mark
-it ready on APPROVED (team-tester), so the heavy CI runs once per ticket. Never leave slots idle only because the merge
+engineers already open every PR as a **draft** (team-engineer, since 2026-09-30), and every PR stays
+a draft through approval. Only the group PR is marked ready, so the heavy CI runs once per group plus
+once on trunk. **Never `gh pr ready` a single ticket's PR, not even to get its e2e run** (owner,
+2026-10-16: three single PRs marked ready that day each ran the full CI twice). Never leave slots idle only because the merge
 queue is long. (2026-09-30: a "no engineer at ≥4 open PRs" rule left every slot idle for an hour
 while CI drained, and the owner asked why nothing was running.) Measured 2026-09-29/30: 9 open
 PRs put 18+ jobs in the runner queue, so the pushes are what need limiting, not the work.
