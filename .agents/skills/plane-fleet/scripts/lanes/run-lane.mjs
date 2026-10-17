@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// run-lane — run one fleet role on a non-Claude executor (codex or opencode) and write
+// run-lane — run one fleet role on a CLI executor (codex, opencode, or Claude Code on another
+// provider such as claude-ollama) and write
 // <out>/result.json. Launched by the PM with Bash run_in_background, so the PM is
 // notified when it exits. Never commits by itself. Never prints secrets.
 //
 // Usage:
-//   run-lane.sh <codex|opencode> --model <m> --role <role> --ticket <ID> --cwd <dir>
+//   run-lane.sh <codex|opencode|claude-ollama> --model <m> --role <role> --ticket <ID> --cwd <dir>
 //               --brief <file> --out <dir> [--sandbox restricted|full|read-only]
 //               [--timeout <sec>] [--effort <level>] [--dry-run]
 //               [--ignore-budget]
-//   run-lane.sh models [codex|opencode]
+//   run-lane.sh models [codex|opencode|claude-ollama]
 //   run-lane.sh pick|budget|log|stats|report|apply|seed ...   -> fleetctl.py (selection, pacer, log, report)
 //   After a lane: run-lane.sh log add --from-result <out>/result.json --outcome O [--kind K] takes
 //   ticket, role, executor, model, durationMs and usage from result.json.
@@ -20,7 +21,7 @@
 // <repo>/.plane/config.json -> fleet.executors. See executors.md.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream, appendFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -147,7 +148,8 @@ function composePrompt(o, role) {
   parts.push(`# Fleet lane: ${o.role} for ${o.ticket}`);
   parts.push(`Executor: ${o.executor} · model: ${o.model} · sandbox: ${o.sandbox} · working dir: ${o.cwd}`);
   parts.push("");
-  parts.push(`FIRST read ${ADAPTER} and follow it. It explains how to run a skill written for Claude Code from ${o.executor}.`);
+  // A claude-cli lane is Claude Code itself: skills, hooks and CLAUDE.md work natively, no adapter.
+  if (o.kind !== "claude-cli") parts.push(`FIRST read ${ADAPTER} and follow it. It explains how to run a skill written for Claude Code from ${o.executor}.`);
   if (role?.skill) {
     parts.push(`Your role skill: read ${resolve(FLEET_ROOT, expand(role.skill))} in full and follow it exactly, as the ${o.role}. Paths like references/... and scripts/... in it are relative to ${FLEET_ROOT}. Where it says to invoke another skill, read that skill's SKILL.md (fleet roles are under ${FLEET_ROOT}/roles/) and follow it.`);
   }
@@ -193,6 +195,28 @@ function opencodeArgv(o, exe) {
   return ["run", "--format", "json", "--model", model, "--dir", o.cwd, ...agent];
 }
 
+// Claude Code against another provider: the prompt goes on stdin, the provider comes from env.
+function claudeCliArgv(o, exe, mcpPath) {
+  const prof = exe.permission_profiles?.[o.sandbox];
+  if (!prof) usage(`${o.executor} has no permission profile "${o.sandbox}" (have: ${Object.keys(exe.permission_profiles || {}).join(", ")})`);
+  const argv = ["-p", "--output-format", "stream-json", "--verbose", "--model", o.model,
+    "--no-session-persistence", "--add-dir", FLEET_ROOT, ...prof.args, "--strict-mcp-config"];
+  if (mcpPath) argv.push("--mcp-config", mcpPath);
+  if (o.effort) argv.push("--effort", o.effort);
+  return argv;
+}
+// Copy the named MCP servers out of the user's Claude config into a 0600 file for this lane only.
+function writeLaneMcp(exe, out) {
+  const names = exe.mcp_servers || [];
+  if (!names.length) return null;
+  let src = {};
+  try { src = JSON.parse(readFileSync(expand(exe.mcp_source || "~/.claude.json"), "utf8")).mcpServers || {}; } catch {}
+  const servers = Object.fromEntries(names.filter((n) => src[n]).map((n) => [n, src[n]]));
+  const path = join(out, "mcp.json");
+  writeFileSync(path, JSON.stringify({ mcpServers: servers }), { mode: 0o600 });
+  return { path, missing: names.filter((n) => !src[n]) };
+}
+
 // ---------- event parsing (best effort; the raw stream is always kept) ----------
 function makeScanner(onEvent) {
   let buf = "";
@@ -223,7 +247,7 @@ async function run(opts) {
   if (!registry) usage(`registry ${REGISTRY} is missing: spawn the claude fallback instead`);
   const exe = registry.executors?.[executor];
   if (!exe) usage(`unknown executor "${executor}" (have: ${Object.keys(registry.executors || {}).join(", ")})`);
-  if (exe.kind !== executor && !["codex", "opencode"].includes(exe.kind)) usage(`executor kind ${exe.kind} is not runnable here`);
+  if (exe.kind !== executor && !["codex", "opencode", "claude-cli"].includes(exe.kind)) usage(`executor kind ${exe.kind} is not runnable here`);
   const kind = exe.kind;
   const role = registry.roles?.[opts.role];
   if (!role) usage(`unknown role "${opts.role}" (have: ${Object.keys(registry.roles || {}).join(", ")})`);
@@ -243,7 +267,9 @@ async function run(opts) {
   writeFileSync(paths.prompt, composePrompt(o, role));
 
   const bin = exe.binary || kind;
-  const argv = kind === "codex" ? codexArgv(o, exe, paths.final) : opencodeArgv(o, exe);
+  const laneMcp = kind === "claude-cli" ? writeLaneMcp(exe, out) : null;
+  const argv = kind === "codex" ? codexArgv(o, exe, paths.final)
+    : kind === "claude-cli" ? claudeCliArgv(o, exe, laneMcp?.path) : opencodeArgv(o, exe);
   const env = { ...process.env };
   // Credentials the executor's own config references as env vars ({env:NAME}): taken from the
   // environment, else from the file the registry names. Values never reach argv, logs or stdout.
@@ -259,11 +285,25 @@ async function run(opts) {
     const json = expand(JSON.stringify(cfg)).replace(/~\//g, `${HOME}/`);
     env.OPENCODE_CONFIG_CONTENT = json;
   }
+  if (kind === "claude-cli") {
+    // Point this child (and every subagent it spawns) at the provider. Its own key wins over the
+    // claude.ai login; no alias may fall through to an Anthropic model id.
+    if (!exe.base_url || !exe.auth_env) usage(`${executor} needs base_url and auth_env in the registry`);
+    delete env.ANTHROPIC_API_KEY;
+    env.ANTHROPIC_BASE_URL = exe.base_url;
+    env.ANTHROPIC_AUTH_TOKEN = env[exe.auth_env] || "";
+    for (const k of ["ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_SMALL_FAST_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL"]) env[k] = model;
+    env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  }
   // Fleet hygiene for anything the lane runs (standing brief): no shared Nx daemon.
   env.NX_DAEMON = "false";
 
   if (opts["dry-run"]) {
-    process.stdout.write(JSON.stringify({ bin, argv, cwd, sandbox, timeoutSec, prompt: paths.prompt, registry: source, modelWarning }, null, 2) + "\n");
+    process.stdout.write(JSON.stringify({ bin, argv, cwd, sandbox, timeoutSec, prompt: paths.prompt, registry: source, modelWarning,
+      ...(laneMcp ? { mcpServers: (exe.mcp_servers || []).filter((n) => !laneMcp.missing.includes(n)), mcpMissing: laneMcp.missing } : {}),
+      ...(kind === "claude-cli" ? { providerKey: env.ANTHROPIC_AUTH_TOKEN ? "set" : "MISSING" } : {}) }, null, 2) + "\n");
+    if (laneMcp) rmSync(laneMcp.path, { force: true });
     return 0;
   }
 
@@ -279,6 +319,7 @@ async function run(opts) {
     startedAt: startedAt.toISOString(), promptPath: paths.prompt, logPath: paths.events, stderrPath: paths.stderr,
   };
   const finish = (fields) => {
+    if (laneMcp) rmSync(laneMcp.path, { force: true }); // it may hold MCP credentials
     const after = snapshot(cwd);
     const result = {
       ...base, ...fields,
@@ -303,6 +344,10 @@ async function run(opts) {
       return 75;
     }
   }
+  if (kind === "claude-cli" && !env.ANTHROPIC_AUTH_TOKEN) {
+    finish({ status: "unavailable", exitCode: 127, signal: null, lastMessage: "", error: `${exe.auth_env} not found in the environment or env_file` });
+    return 127;
+  }
   if (!version) {
     finish({ status: "unavailable", exitCode: 127, signal: null, lastMessage: "", error: `${bin} not found or --version failed` });
     return 127;
@@ -312,12 +357,22 @@ async function run(opts) {
 
   const child = spawn(bin, argv, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
   const errOut = createWriteStream(paths.stderr);
-  let threadId = null; let sessionId = null; let tokenUsage = null;
+  let threadId = null; let sessionId = null; let tokenUsage = null; let cliResult = null;
   const textParts = new Map(); const order = [];
   const scan = makeScanner((ev) => {
     if (kind === "codex") {
       if (ev.type === "thread.started" && ev.thread_id) threadId = ev.thread_id;
       if (ev.type === "turn.completed" && ev.usage) tokenUsage = ev.usage;
+    } else if (kind === "claude-cli") {
+      if (ev.session_id) sessionId = ev.session_id;
+      if (ev.type === "result") {
+        cliResult = ev;
+        // Same shape as codex: input counts cache reads too, cached_input_tokens says how many.
+        const u = ev.usage || {};
+        const cached = u.cache_read_input_tokens || 0;
+        tokenUsage = { input_tokens: (u.input_tokens || 0) + cached + (u.cache_creation_input_tokens || 0),
+          cached_input_tokens: cached, output_tokens: u.output_tokens || 0, num_turns: ev.num_turns ?? null };
+      }
     } else {
       const sid = ev.sessionID || ev.session_id; if (sid) sessionId = sid;
       if (ev.type === "text" && ev.part?.type === "text") {
@@ -347,6 +402,10 @@ async function run(opts) {
 
   let lastMessage = "";
   if (kind === "codex") { try { lastMessage = readFileSync(paths.final, "utf8").trim(); } catch {} }
+  else if (kind === "claude-cli") {
+    lastMessage = cliResult && !cliResult.is_error && typeof cliResult.result === "string" ? cliResult.result.trim() : "";
+    if (lastMessage) writeFileSync(paths.final, lastMessage + "\n");
+  }
   else { lastMessage = order.map((id) => textParts.get(id)).join("").trim(); if (lastMessage) writeFileSync(paths.final, lastMessage + "\n"); }
 
   // Quota or rate limit hit: record a back-off so the pacer holds this executor for a while.
@@ -355,7 +414,7 @@ async function run(opts) {
   try {
     const tail = (p) => { const t = readFileSync(p, "utf8"); return t.slice(-200000); };
     const errText = existsSync(paths.stderr) ? tail(paths.stderr) : "";
-    const evText = existsSync(paths.events) ? tail(paths.events).split("\n").filter((l) => /"type":"(error|turn\.failed|session\.error)"|"error"/.test(l)).join("\n") : "";
+    const evText = existsSync(paths.events) ? tail(paths.events).split("\n").filter((l) => /"type":"(error|turn\.failed|session\.error)"|"error"|"is_error":true/.test(l)).join("\n") : "";
     rateLimited = RATE_RE.test(errText) || RATE_RE.test(evText);
   } catch {}
   if (rateLimited) fleetctl(["budget", "backoff", executor, "--reason", "rate limited in lane", "--cwd", cwd]);

@@ -128,6 +128,8 @@ def switch_on(reg, exe, name):
 def state_path(reg, exe):
     d = P(reg, "state_dir") or os.path.join(STATE_HOME, "state")
     os.makedirs(d, exist_ok=True)
+    # Executors on one plan (opencode and claude-ollama on Ollama Cloud) share one counter and back-off.
+    exe = budget_cfg(reg, exe).get("state_as") or exe
     return os.path.join(d, f"{exe}.json")
 
 
@@ -278,7 +280,7 @@ def budget_backoff(reg, exe, minutes=None, reason="rate limited", now=None):
     return st["backoff_until"]
 
 
-LABELS = {"claude": "Claude", "codex": "Codex", "opencode": "Ollama"}
+LABELS = {"claude": "Claude", "codex": "Codex", "opencode": "Ollama", "claude-ollama": "Claude Code/Ollama"}
 
 
 def budget_line(reg, checks=None):
@@ -292,7 +294,7 @@ def budget_line(reg, checks=None):
             s = f"{lab} {c['used_pct']:.0f}%" + (f" ({span})" if span else "")
         elif c.get("note") == "pacer off":
             s = f"{lab} pacer off"
-        elif c["executor"] == "opencode":
+        elif c.get("source") == "local-counter":
             s = f"{lab} ok ({c.get('lanes_in_window', 0)} lanes)" if c["state"] == "ok" else lab
         else:
             s = f"{lab} ?"
@@ -596,9 +598,10 @@ def ckey(c):
 
 def family(reg, c):
     fam = reg.get("families", {})
-    if c["executor"] == "opencode":
+    # '<executor>:<prefix>' first, then '*:<prefix>' (open models served by more than one executor).
+    for scope in (c["executor"], "*"):
         for k, v in fam.items():
-            if k.startswith("opencode:") and str(c["model"]).startswith(k.split(":", 1)[1]):
+            if k.startswith(scope + ":") and str(c["model"]).startswith(k.split(":", 1)[1]):
                 return v
     return fam.get(c["executor"], c["executor"])
 
