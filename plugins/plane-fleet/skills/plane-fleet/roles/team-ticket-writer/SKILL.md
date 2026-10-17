@@ -110,6 +110,19 @@ pass to find the same instance.
   exact search command/method to re-run and reconcile against — never silently fall back to
   "find them all" with no starting list.
 
+### Third-party behaviour: read its source, don't assume it
+
+When a ticket depends on how a library, SDK or external API behaves (an error handler, an
+interceptor, a webhook, a retry policy), read the installed code in `node_modules` (or the
+vendor's source) at filing time and cite it the same way you cite repo code, e.g.
+`node_modules/@sentry/angular/.../errorhandler.js:52 unwraps HttpErrorResponse before
+captureException`. If the behaviour can't be settled by reading, file a short `investigation`
+ticket first, and file the build ticket from its findings.
+
+Why: 2026-10-16, HLMNA-815 went through three rework rounds. One of them came from Sentry's
+Angular error handler unwrapping `HttpErrorResponse` before our filter saw it. Ten minutes in
+`node_modules` at filing time would have put that in the ticket.
+
 ---
 
 ## 2) Pick the kind
@@ -174,6 +187,15 @@ this is the literal enumerated list from the "Sweep-scope tickets" rule below �
 count ("N instances, all listed:") and cite each one's <code>file:line</code>, not a
 restatement of "everywhere."</li></ul>
 
+<h2>3b. Must not happen</h2>
+<ul><li>Concrete bad inputs with the exact result that must NOT occur, one per line. Each is a
+test the engineer writes and the tester drives. Example: "a 5xx request carrying an
+<code>x-api-key</code> header reaches Sentry with no value for that header". Not "scrub
+PII".</li>
+<li><b>Real path to drive:</b> name the entry point the tester must use in the running app
+(e.g. "an <code>HttpClient</code> call subscribed with no error callback"), not a function to
+call directly.</li></ul>
+
 <h2>4. Scope</h2>
 <p><b>In:</b> … <b>Out:</b> … (out-of-scope items name the ticket that owns them)</p>
 
@@ -190,6 +212,18 @@ restatement of "everywhere."</li></ul>
 
 §3's enumerated list is **never boilerplate** — it is the single highest-value part of the
 ticket. Do the search now; don't defer it to §0.3, which is a re-check, not first discovery.
+
+**§3b is required whenever the ticket touches security, privacy, money, auth, or an external
+service.** Testers judge against the ticket. A rule that isn't written down is a rule nobody
+checks, and the first place it surfaces is the group review, after a full engineer and tester
+round. On 2026-10-15 all 5 group-review defects on the two Sentry tickets were missing
+must-not lines.
+
+**Red-team the draft before filing (§3b tickets only).** Run one short pass on the draft
+body, for example `codex exec "Read this ticket. List the ways an engineer could satisfy every
+line of it and still ship something broken, insecure or leaking data. Concrete inputs only."`
+with the body piped in. Turn each real answer into a §3b line. Skip answers that are out of
+scope or already covered.
 
 **Scope already locked → say so explicitly instead of writing the 4-step gate.** When you're
 filing a split of a ticket you (or a sibling ticket) already investigated — e.g. "2/2" of a

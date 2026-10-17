@@ -127,6 +127,17 @@ Then:
 5. **Write verdicts as you get them** into one comment you keep updating, so a death mid-run
    leaves something: `PASS <artifact>` / `FAIL <what happened instead>`.
 
+### "Must not happen" lines are criteria, driven through the real path
+
+Each line in the ticket's §3b "Must not happen" is a Phase A criterion. Drive it through the
+entry point the ticket names, in the running app. Calling the function under test directly
+(a filter, a hook, a `beforeSend`) proves only that function, not the path users hit. When an
+outcome lands in an external service (Sentry, a courier, a store), read what that service
+actually stored back from its API and check it there. Don't rely on what the app sent.
+
+Why: 2026-10-16, a tester approved HLMNA-815 by calling `beforeSend` directly. On the real
+path, Angular's error handler had already unwrapped the error, so 4xx responses leaked anyway.
+
 ### "Not applicable" is a finding, never a quiet pass
 
 Before recording any criterion N/A, answer in writing: **did this change CREATE the need for
