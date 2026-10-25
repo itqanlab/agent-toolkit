@@ -23,6 +23,9 @@ import json, os, sys, time, datetime
 HERE = os.path.dirname(os.path.realpath(__file__))
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
 FLEET = ("team-engineer", "team-tester", "team-ticket-writer")
+# Agent types spawned by subagent_type; logged under the role they run so history stays comparable.
+FLEET_AGENTS = {"fleet-engineer": "team-engineer", "fleet-tester": "team-tester",
+                "fleet-planner": "fleet-planner", "fleet-plane": "fleet-plane"}
 LANES_DIRS = [d for d in (
     os.environ.get("FLEETCTL_DIR"),
     os.path.join(HERE, "..", "skills", "plane-fleet", "scripts", "lanes"),
@@ -47,8 +50,10 @@ def main():
         event = json.load(sys.stdin)
     except Exception:
         return 0
-    prompt = json.dumps(event.get("tool_input", {}))
-    role = next((r for r in FLEET if r in prompt), None)
+    tool_input = event.get("tool_input", {})
+    prompt = json.dumps(tool_input)
+    role = FLEET_AGENTS.get(tool_input.get("subagent_type", "")) \
+        or next((r for r in FLEET if r in prompt), None)
     if not role:
         return 0
     now = time.time()

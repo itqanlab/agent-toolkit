@@ -31,6 +31,20 @@ folder, the one that holds this file.
 | write or split tickets, turn notes into tickets | ticket writer | `roles/team-ticket-writer/SKILL.md` |
 | ship the queue alone, one ticket at a time, no team | solo | `roles/solo-ship/SKILL.md` |
 
+## Agents
+
+Four agent types ship in the plugin's `agents/` folder. Each carries only the tools its role
+uses, so a spawn starts at about 23k tokens instead of about 40k for `general-purpose`
+(measured 2026-10-22). On a linked install, link them into your agent's agents folder too
+(`README.md`, Setup).
+
+| Agent | Role | Writes |
+| --- | --- | --- |
+| `fleet-planner` | turns a request or the open board into right-sized tickets, one outcome each | a plan file, never Plane |
+| `fleet-plane` | files the plan, merges siblings, sets relations, reports board health | Plane only |
+| `fleet-engineer` | one ticket to an open PR (`roles/team-engineer`) | code, its own ticket |
+| `fleet-tester` | one PR, blind check then unit and e2e tests (`roles/team-tester`) | tests, its own ticket |
+
 The PM spawns engineers and testers as sub-sessions, one per ticket or PR. If you cannot start
 sub-sessions, run `roles/solo-ship/SKILL.md` instead, or run one engineer or tester role by hand.
 

@@ -603,6 +603,21 @@ worth surfacing, not a reason to stop other work).
 **Claim before spawning**: state → `In Progress`, assigned, for every ticket you're about to
 spawn — in the same message/pass, not staggered, so a crash mid-claim is recoverable.
 
+### New work and board shape: the planner plans, the Plane specialist files
+
+You do not write or reshape tickets yourself. When the user brings new work (a feature, a bug
+list, meeting notes), or the board has many small tickets on the same area:
+
+1. Spawn `fleet-planner` with the request, the repo path and the fleet folder. It returns a
+   plan file: one ticket per outcome, sized by `references/ticket-rules.md` §2 "Shape".
+2. Show the user the plan's ticket list and totals (tickets before and after). Merging or
+   cancelling tickets on a client board needs their yes.
+3. Spawn `fleet-plane` with the plan path and the approved list. It files, merges and links the
+   tickets and reports the ids.
+4. Pick from the result as usual.
+
+Engineers and testers still set their own ticket's state and write their own comments.
+
 ---
 
 ## 3) Spawn engineers — in parallel, each with a slot
@@ -611,16 +626,24 @@ One `/team-engineer` session per claimed ticket, launched **together in a single
 picking more than one:
 
 ```
-Agent(description: "engineer PROJ-134", model: "sonnet", run_in_background: true,
-      prompt: "Read <fleet>/roles/team-engineer/SKILL.md and follow it for PROJ-134. Slot: A. ...")
-Agent(description: "engineer PROJ-140", model: "sonnet", run_in_background: true,
-      prompt: "Read <fleet>/roles/team-engineer/SKILL.md and follow it for PROJ-140. Slot: B. ...")
+Agent(description: "engineer PROJ-134", subagent_type: "fleet-engineer", model: "sonnet",
+      run_in_background: true,
+      prompt: "Fleet folder: <fleet>. Work PROJ-134. Slot: A. ...")
+Agent(description: "engineer PROJ-140", subagent_type: "fleet-engineer", model: "sonnet",
+      run_in_background: true,
+      prompt: "Fleet folder: <fleet>. Work PROJ-140. Slot: B. ...")
 ```
 
 `<fleet>` is the absolute path of the fleet folder you resolved at the start (see the note at
 the top of this file). Sub-sessions don't share your working directory, so every path in a
-brief is absolute. If the role is installed as its own skill, "invoke the team-engineer skill"
-works too.
+brief is absolute.
+
+**Always spawn the fleet agent types** (`fleet-engineer`, `fleet-tester`), not
+`general-purpose`. They carry only the tools the role uses and read the standing brief and
+their role file on their own. Measured 2026-10-22 on one project: 23k tokens at startup against
+40k for `general-purpose`, on every spawn. If the agent types are not installed (an
+"agent type not found" error), fall back to `general-purpose` with
+"Read <fleet>/roles/team-engineer/SKILL.md and follow it" in the prompt, and say so.
 
 **Assign the slot yourself and write it in the brief.** Never let two sessions choose their own
 ports; two independent choices can collide. Track which slot each live session holds. A slot is
@@ -661,6 +684,8 @@ context is sufficient — and one full run produced none of them.
 | worker, mechanical (rebase, re-push) | `sonnet` | **Never `haiku` for an engineer.** 2026-09-30: a Haiku engineer bypassed the pre-push hook with a false "pre-existing error" claim, and branched off a PR branch instead of trunk. The PM had to rebuild it. |
 | read-only scan (triage, counting, log reading) | `haiku` | The only place Haiku goes. It never commits, pushes or writes the board. |
 | ticket writer | `sonnet` | Escalate for a batch needing real design judgement. |
+| planner (`fleet-planner`) | `opus` | Decides what the tickets are. A bad split costs a full ticket cycle per extra ticket. |
+| Plane specialist (`fleet-plane`) | `sonnet` | Files and reshapes tickets from an approved plan; the judgement is already in the plan. |
 
 **Escalate the worker to `opus` when the ticket shows any of these** — check before spawning:
 
@@ -895,8 +920,9 @@ When it finds a per-PR defect, log it as a review escape (`log add --reason "rev
 a run of escapes means the per-PR review isn't working.
 
 ```
-Agent(description: "tester PROJ-134", model: "opus", run_in_background: true,
-      prompt: "Read <fleet>/roles/team-tester/SKILL.md and follow it for PROJ-134, PR #212, branch <b>. Slot: C. ...")
+Agent(description: "tester PROJ-134", subagent_type: "fleet-tester", model: "opus",
+      run_in_background: true,
+      prompt: "Fleet folder: <fleet>. Test PROJ-134, PR #212, branch <b>. Slot: C. ...")
 ```
 
 Pick the tester's executor the same way as an engineer's (§3 Executors). Today's default is

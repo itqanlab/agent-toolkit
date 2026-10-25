@@ -40,7 +40,9 @@ a symlinked install works.
 ## Setup
 
 1. Install the plugin, or link `skills/plane-fleet` (and, if you like, each `roles/<name>`) into
-   your agent's skills folder.
+   your agent's skills folder. On a linked install, also link each file in the plugin's
+   `agents/` folder into `~/.claude/agents/`, so the PM can spawn `fleet-engineer`,
+   `fleet-tester`, `fleet-planner` and `fleet-plane`. New agent types show up in the next session.
 2. Set the three Plane variables in the environment your agent starts from.
 3. In each repo, let the PM or solo role write `.plane/config.json` on first run, or write it
    from `references/config-schema.md`. Keep private values (client contact, server names,
