@@ -324,6 +324,17 @@ async function run(opts) {
     effort: opts.effort || null, timeoutSec, executorVersion: version, registry: source, modelWarning,
     startedAt: startedAt.toISOString(), promptPath: paths.prompt, logPath: paths.events, stderrPath: paths.stderr,
   };
+  // One small file per lane under {state_home}/lanes, so a status view can list live lanes
+  // without knowing every lane's --out. Best effort: a failed write never stops the lane.
+  const laneFile = join(STATE_HOME, "lanes",
+    `${startedAt.getTime()}-${executor}-${opts.role}-${opts.ticket}`.replace(/[^A-Za-z0-9._-]/g, "_") + ".json");
+  const writeLane = (fields) => {
+    try {
+      mkdirSync(dirname(laneFile), { recursive: true });
+      writeFileSync(laneFile, JSON.stringify({ executor, model, effort: opts.effort || null, role: opts.role,
+        ticket: opts.ticket, cwd, out, startedAt: base.startedAt, pid: process.pid, ...fields }) + "\n");
+    } catch {}
+  };
   const finish = (fields) => {
     if (laneMcp) rmSync(laneMcp.path, { force: true }); // it may hold MCP credentials
     const after = snapshot(cwd);
@@ -333,6 +344,7 @@ async function run(opts) {
       touchedFiles: after.status, worktreesAdded: added(before.worktrees, after.worktrees, opts.ticket), branchesAdded: added(before.branches, after.branches, opts.ticket),
     };
     writeFileSync(paths.result, JSON.stringify(result, null, 2) + "\n");
+    writeLane({ status: result.status, finishedAt: result.finishedAt, durationMs: result.durationMs, usage: result.usage || null });
     const summary = `lane ${result.status} · ${executor}/${model} · ${opts.role} ${opts.ticket} · exit ${result.exitCode} · ${Math.round(result.durationMs / 1000)}s · ${paths.result}`;
     process.stdout.write(summary + "\n" + (result.lastMessage ? `--- last message ---\n${result.lastMessage}\n` : ""));
     return result;
@@ -359,6 +371,7 @@ async function run(opts) {
     return 127;
   }
   writeFileSync(paths.started, JSON.stringify({ ...base, pid: process.pid }, null, 2) + "\n");
+  writeLane({ status: "running" });
   fleetctl(["budget", "lane-start", executor, "--cwd", cwd]);
 
   const child = spawn(bin, argv, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
