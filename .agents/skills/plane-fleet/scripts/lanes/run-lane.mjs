@@ -192,7 +192,10 @@ function opencodeArgv(o, exe) {
   const model = o.model.includes("/") ? o.model : `${exe.provider}/${o.model}`;
   const agent = o.sandbox === "read-only" ? exe.agents?.["read-only"]?.args : exe.agents?.write?.args;
   if (!agent) usage(`opencode has no agent args for sandbox "${o.sandbox}"`);
-  return ["run", "--format", "json", "--model", model, "--dir", o.cwd, ...agent];
+  const argv = ["run", "--format", "json", "--model", model, "--dir", o.cwd, ...agent];
+  // opencode calls reasoning effort a "variant"; the names are the provider's own.
+  if (o.effort) argv.push("--variant", o.effort);
+  return argv;
 }
 
 // Claude Code against another provider: the prompt goes on stdin, the provider comes from env.

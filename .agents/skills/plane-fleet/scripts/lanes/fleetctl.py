@@ -517,7 +517,7 @@ def lane_result_fields(path):
         res = json.load(open(X(path)))
     except Exception as e:
         raise SystemExit(f"fleetctl: cannot read {path}: {e}")
-    ident = {k: res.get(k) for k in ("ticket", "role", "executor", "model") if res.get(k)}
+    ident = {k: res.get(k) for k in ("ticket", "role", "executor", "model", "effort") if res.get(k)}
     fields = {"result_path": os.path.abspath(X(path))}
     if isinstance(res.get("durationMs"), (int, float)):
         fields["duration_ms"] = res["durationMs"]
@@ -569,8 +569,8 @@ def scoreboard(reg, rows, role=None, kind=None, project=None):
             continue
         if project and r.get("project") != project:
             continue
-        exe = f"{r.get('executor') or 'claude'}:{r.get('model')}"
-        for k in (r.get("task_kind") or "unknown", "*"):
+        exe = rkey(r)
+        for k in dict.fromkeys((r.get("task_kind") or "unknown", "*")):  # a row logged as "*" counts once
             if kind and k != kind:
                 continue
             groups.setdefault((r.get("role"), k, exe), []).append(r)
@@ -593,7 +593,12 @@ def print_board(reg, board):
 
 # ---------------------------------------------------------------- pick
 def ckey(c):
-    return f"{c['executor']}:{c['model']}"
+    # effort is part of a candidate's identity: the same model at two efforts is two candidates
+    return f"{c['executor']}:{c['model']}" + (f"@{c['effort']}" if c.get("effort") else "")
+
+
+def rkey(r):
+    return ckey({"executor": r.get("executor") or "claude", "model": r.get("model"), "effort": r.get("effort")})
 
 
 def family(reg, c):
@@ -649,7 +654,7 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
     challengers = [c for c in cands[1:] if ok(c)]
     if not no_explore and challengers and rng.random() < float(sel.get("explore_rate", 0.2)):
         rows = load_rows(reg)
-        count = lambda c: sum(1 for r in rows if r.get("role") == role and f"{r.get('executor')}:{r.get('model')}" == ckey(c)
+        count = lambda c: sum(1 for r in rows if r.get("role") == role and rkey(r) == ckey(c)
                               and (list_kind == "*" or r.get("task_kind") == list_kind))
         chosen = min(challengers, key=count)
         out["experiment"] = True
@@ -690,7 +695,7 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
             if alt:
                 chosen = alt
                 out["reason"] += f"; other family than engineer ({pfam})"
-    out.update(decision="spawn", executor=chosen["executor"], model=chosen["model"],
+    out.update(decision="spawn", executor=chosen["executor"], model=chosen["model"], effort=chosen.get("effort"),
                sandbox=chosen.get("sandbox") or (reg.get("roles", {}).get(role) or {}).get("sandbox"),
                fallback=(reg.get("fallback") or {}).get(role))
     out["pick_line"] = f"{role}/{kind} · {ckey(chosen)}" + (" · EXPERIMENT" if out["experiment"] else "") + f" · {out['reason']} · {out['budget']}"
@@ -899,7 +904,8 @@ def report(reg, project, since, until=None):
     # sessions by role/executor/model
     groups = {}
     for r in sessions:
-        groups.setdefault((r.get("role") or "?", r.get("executor") or "claude", r.get("model") or "?"), []).append(r)
+        model = (r.get("model") or "?") + (f"@{r['effort']}" if r.get("effort") else "")
+        groups.setdefault((r.get("role") or "?", r.get("executor") or "claude", model), []).append(r)
     L.append(f"{'role':<12}{'executor:model':<24}{'n':>4}{'w/tok':>6}{'tokens':>12}{'input':>13}{'output':>11}{'hours':>7}")
     tot = {"claude": [0, 0.0], "codex_in": 0, "codex_cached": 0, "codex_out": 0, "codex_h": 0.0, "other": 0}
     for key in sorted(groups):
@@ -983,7 +989,7 @@ def selftest():
         main(base + ["--set", "duration_ms=1,234", "tokens=5678", "client_visible=true", "note=hello world"], quiet=True)
         main(base[:5] + ["ST-2"] + base[6:] + ["--reason", "a=b", "duration_ms=10", "tokens=20"], quiet=True)
         res = os.path.join(d, "result.json")
-        json.dump({"executor": "codex", "model": "gpt-x", "role": "tester", "ticket": "ST-3", "status": "completed",
+        json.dump({"executor": "codex", "model": "gpt-x", "effort": "high", "role": "tester", "ticket": "ST-3", "status": "completed",
                    "durationMs": 90000, "usage": {"input_tokens": 1000, "cached_input_tokens": 900, "output_tokens": 50}},
                   open(res, "w"))
         main(["log", "add", "--project", "st", "--outcome", "verify_pass", "--from-result", res], quiet=True)
@@ -1005,6 +1011,10 @@ def selftest():
         check("from-result output_tokens", r3.get("output_tokens"), 50)
         check("from-result input_tokens", r3.get("input_tokens"), 1000)
         check("from-result tokens", r3.get("tokens"), 1050)
+        check("from-result effort", r3.get("effort"), "high")
+        check("no effort, no key", "effort" in r1, False)
+        board = scoreboard(reg, list(rows.values()), role="tester")
+        check("scoreboard keys effort", ("tester", "*", "codex:gpt-x@high") in board, True)
     finally:
         STATE_HOME = old_home
         if old_env is None:
@@ -1041,7 +1051,7 @@ def main(argv=None, quiet=False):
     b.add_argument("executor", nargs="?"); b.add_argument("--minutes", type=float); b.add_argument("--reason", default="rate limited")
     b.add_argument("--json", action="store_true"); b.add_argument("--cwd")
     lg = sub.add_parser("log"); lg.add_argument("action", choices=["add", "backfill"])
-    for f in ("ticket", "role", "executor", "model", "outcome", "kind", "project", "cwd", "reason"):
+    for f in ("ticket", "role", "executor", "model", "effort", "outcome", "kind", "project", "cwd", "reason"):
         lg.add_argument(f"--{f}")
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
@@ -1092,7 +1102,7 @@ def main(argv=None, quiet=False):
                 ident, rfields, _ = lane_result_fields(args.from_result)
                 for k, v in rfields.items():
                     fields.setdefault(k, v)  # numbers typed on the line win over the file
-            for f in ("ticket", "role", "executor", "model"):
+            for f in ("ticket", "role", "executor", "model", "effort"):
                 if not getattr(args, f) and ident.get(f):
                     setattr(args, f, ident[f])
             for f in ("ticket", "role", "executor", "model", "outcome"):
@@ -1101,6 +1111,7 @@ def main(argv=None, quiet=False):
             row = {"type": "spawn", "ts": now_iso(), "project": args.project or reg.get("_project"),
                    "ticket": args.ticket, "role": args.role, "task_kind": args.kind or "unknown",
                    "executor": args.executor, "model": args.model, "experiment": bool(args.experiment),
+                   **({"effort": args.effort} if args.effort else {}),
                    "reason": args.reason, "outcome": args.outcome}
             row.update(fields)
             if row["outcome"] not in OUTCOMES:

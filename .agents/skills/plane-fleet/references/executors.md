@@ -58,6 +58,18 @@ installed:
     "scan":     { "*": [ {"executor":"opencode","model":"kimi-k2.7-code"}, {"executor":"claude","model":"haiku"} ] } } }
 ```
 
+**Effort is part of a candidate.** A candidate may carry `"effort"`, and then it is its own
+entry everywhere: `codex:gpt-5.6-sol@low` and `codex:gpt-5.6-sol@high` are scored, explored and
+promoted separately. `pick` returns the effort; pass it to the lane with `--effort`, or to a
+Claude spawn as the `Agent` call's `effort`. A candidate without `"effort"` runs at the
+executor's default and keeps the plain `executor:model` key, so older rows still count for it.
+To compare efforts, list the same model twice with different efforts:
+
+```json
+"tests-only": [ {"executor":"codex","model":"gpt-5.6-sol","effort":"medium"},
+                {"executor":"codex","model":"gpt-5.6-sol","effort":"low"} ]
+```
+
 Escalation triggers still pin the engineer to claude `opus`: `schema`, `concurrency`,
 `unknown_root_cause`, `rework_once`, `architecture`, `disprove_gate`.
 
@@ -214,6 +226,7 @@ $L log add --ticket PROJ-134 --role engineer --kind api --executor claude --mode
 # a lane: ticket, role, executor, model, duration and tokens come from its result.json
 $L log add --from-result /tmp/PROJ-134-engineer/lane/result.json --kind api --outcome pr_opened --reason "PR 212"
 $L log add ... --experiment                                   # an experiment pick
+$L log add ... --effort high                                  # a Claude spawn given an effort (lanes: from result.json)
 # the PM, when a ticket reaches Done (a marker row, not a session)
 $L log add --ticket PROJ-134 --role pm --executor claude --model opus --outcome done --set client_visible=true
 $L log backfill --ticket PROJ-134 --role engineer --set verify_first_pass=true ci_first_pass=true

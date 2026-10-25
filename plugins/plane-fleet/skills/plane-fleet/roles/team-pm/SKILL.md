@@ -770,7 +770,8 @@ was folded in and is still read; its row shape, for reference:
 
 `executor` is `claude` / `codex` / `opencode` / `claude-ollama`; `model` is the exact id (`gpt-5.6-sol`,
 `kimi-k2.7-code`). For a Claude spawn pass `duration_ms` and `tokens` with `--set` (values are
-stored as numbers). For a lane pass `--from-result <out>/result.json`: it takes `durationMs`
+stored as numbers), and `--effort <level>` when the `Agent` call set one; `pick` returns the
+candidate's effort, and a spawn logged without it is scored as the default effort. For a lane pass `--from-result <out>/result.json`: it takes `durationMs`
 and the `usage` block (`input_tokens`, `cached_input_tokens`, `output_tokens`) and adds
 `lane_status` when the lane did not complete. Rows written before 2026-10-09 have no
 `executor`: read them as `claude`. Compute the pass rates below per **(role, executor,
