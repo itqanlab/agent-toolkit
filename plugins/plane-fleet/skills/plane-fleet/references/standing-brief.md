@@ -42,7 +42,7 @@ decisions) comes in the brief itself.
     can be traced to its slot.
   - Never start an Nx daemon (`NX_DAEMON=false` in every shell you run nx from).
   - Teardown is not done until these all print nothing: `lsof -iTCP:<api> -sTCP:LISTEN`,
-    `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "hlmna-slot-<slot>"`, and
+    `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "<your slot scratch dir>"`, and
     `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
     anything else you find instead of killing it.
 - Run `git config core.bare` before and after any test run. It must print `false`. If it prints

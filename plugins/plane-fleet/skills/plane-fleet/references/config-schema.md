@@ -97,6 +97,7 @@ by key; lists and plain values replace.
       "B": { "api": 3020, "client": 4220, "db": "app_slot_b", "nx_cache": "$HOME/.cache/plane-fleet/slot-b/nx-cache" }
       // add redis / bucket keys per slot if the app uses them
     },
+    "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []
     },

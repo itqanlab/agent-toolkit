@@ -10,7 +10,7 @@
 #
 # What counts as a leftover:
 #   1. a process listening on the api or client port of a slot that is NOT in --live
-#   2. a process whose working directory is a worktree or /tmp/hlmna-slot-* that no longer
+#   2. a process whose working directory is a worktree or a slot scratch dir that no longer
 #      exists, or a slot scratch dir of a slot not in --live
 #   3. an Nx daemon started from any worktree (slots run NX_DAEMON=false, so any daemon
 #      under .claude/worktrees is a leftover once its owner is gone; a live slot's daemon
@@ -52,6 +52,11 @@ WT="$REPO/.claude/worktrees"
 # merged config (repo .plane/config.json plus the per-user override, which may add slots)
 CFG="$("$(dirname "$0")/lanes/run-lane.sh" config --cwd "$REPO" 2>/dev/null)"
 [ -n "$CFG" ] || CFG="$(cat "$REPO/.plane/config.json")"
+# slot scratch dirs are <prefix><slot>; prefix from fleet.slot_scratch_prefix, else
+# /tmp/<plane identifier, lowercase>-slot-
+SCRATCH="$(jq -r '.fleet.slot_scratch_prefix // empty' <<<"$CFG")"
+[ -n "$SCRATCH" ] || SCRATCH="/tmp/$(jq -r '.plane.identifier // "fleet"' <<<"$CFG" | tr A-Z a-z)-slot-"
+SCRATCH_BASE="$(basename "$SCRATCH")"
 live_has() { case ",$LIVE," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 cwd_of() { lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1; }
 # seconds since start, from etime ([[dd-]hh:]mm:ss); macOS ps has no etimes
@@ -75,11 +80,11 @@ done < <(jq -r '.fleet.slots | to_entries[] | [.key, (.value.api // ""), (.value
 while read -r pid cmd; do
   cwd="$(cwd_of "$pid")"
   case "$cwd" in
-    "$WT"/*|/tmp/hlmna-slot-*|/private/tmp/hlmna-slot-*) ;;
+    "$WT"/*|"$SCRATCH"*|/private"$SCRATCH"*) ;;
     *) continue ;;
   esac
   if [ ! -d "$cwd" ]; then note "$pid" "cwd gone: $cwd"; continue; fi
-  slot="$(printf '%s' "$cwd" | sed -n 's#.*/hlmna-slot-\([a-z]\).*#\1#p' | tr a-z A-Z)"
+  slot="$(printf '%s' "$cwd" | sed -n "s#.*/${SCRATCH_BASE}\([a-z]\).*#\1#p" | tr a-z A-Z)"
   if [ -n "$slot" ] && ! live_has "$slot"; then note "$pid" "in scratch of slot $slot, slot not live"; continue; fi
   case "$cmd" in
     *nx/src/daemon/server/start.js*)
@@ -93,7 +98,7 @@ done < <(ps -axo pid=,command= | grep -E "node|chrome-headless-shell" | grep -v 
 
 # Chromium whose user-data-dir names a slot that is not live (cwd may be elsewhere)
 while read -r pid cmd; do
-  slot="$(printf '%s' "$cmd" | sed -n 's#.*hlmna-slot-\([a-z]\).*#\1#p' | tr a-z A-Z)"
+  slot="$(printf '%s' "$cmd" | sed -n "s#.*${SCRATCH_BASE}\([a-z]\).*#\1#p" | tr a-z A-Z)"
   [ -n "$slot" ] && ! live_has "$slot" && note "$pid" "headless Chromium for slot $slot, slot not live"
 done < <(ps -axo pid=,command= | grep "[c]hrome-headless-shell" | grep -v -- "--type=")
 
@@ -127,7 +132,7 @@ fi
 # other projects' servers, for the owner to decide (never killed)
 echo "not ours (listening, outside this repo):"
 lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1 && ($1 ~ /node|chrome|vite|python/) {print $2}' | sort -u | while read -r pid; do
-  cwd="$(cwd_of "$pid")"; case "$cwd" in "$REPO"*|/tmp/hlmna-*|/private/tmp/hlmna-*) continue ;; esac
+  cwd="$(cwd_of "$pid")"; case "$cwd" in "$REPO"*|"$SCRATCH"*|/private"$SCRATCH"*) continue ;; esac
   printf '  %-7s up %-12s %s\n' "$pid" "$(ps -o etime= -p "$pid" | tr -d ' ')" "$cwd"
 done
 
