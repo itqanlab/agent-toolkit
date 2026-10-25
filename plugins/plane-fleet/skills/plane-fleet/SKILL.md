@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Needs git, the GitHub CLI (gh) signed in, python3 and node 18 or newer, and a Plane MCP server named plane (see README.md). Optional: other coding CLIs for non-default executors. Network access to Plane and GitHub."
 metadata:
   author: itqanlab
-  version: 1.6.0
+  version: 2.0.0
   category: devops
   short: "Run a Plane board with sections of agent roles"
   starter: "fleet run: work the board until the queue is empty"

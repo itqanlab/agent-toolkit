@@ -4,6 +4,27 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.0.0] - 2026-10-25
+
+### Breaking
+
+- The plugin and its skill are renamed `plane-fleet` → `fleet`. Reinstall it under the new name. A linked install relinks `skills/plane-fleet` and each agent card.
+- The fleet is organized in sections: `core/` (PM, planner, board specialist, scanner, solo mode, the `fleet` command, shared references), `engineering/` (engineer, tester, their references and scripts) and `social/` (planned). Every role is a folder with `role.md` and `skills/`, one file per thing it does, read only when that step comes.
+- The role skills `team-pm`, `team-engineer`, `team-tester`, `team-ticket-writer` and `solo-ship` are gone as separate skills. Start the PM with `/plane-fleet run`; the others are role files reached through `fleet` (table in `SKILL.md`). The ticket writer is now the planner's `skills/write-ticket.md`.
+- `scripts/lanes/run-lane.sh` is now the `fleet` command in `core/scripts/`, with `scripts/fleet` as its short path. The old path still forwards to it for this version.
+- Agent cards sit in `agents/<section>/`. `fleet-plane` is renamed `fleet-board`. A plugin install names them `plane-fleet:<section>:<agent>`.
+
+### Added
+
+- `fleet-scanner`, a read-only agent for counting, triage and log reading on behalf of the PM and planner.
+- A README per section.
+
+### Changed
+
+- Agent cards are short pointers; each role's procedure lives in its `role.md`.
+- The engineer's, tester's and PM's long role files are split into skill files by their existing sections, text unchanged. Section numbers (`§3`) stay, and references between files name the file.
+- The state folder keeps its name, `~/.config/plane-fleet` (`PLANE_FLEET_HOME`), so the log, cost cache and overrides carry over. Hooks and `cost` still recognize sessions and log rows from before the rename.
+
 ## [1.6.0] - 2026-10-25
 
 ### Added
@@ -66,7 +87,7 @@ What changed in `plane-fleet`, newest version first. To see if a newer version e
 ### Added
 
 - Four agent types in `agents/`: `fleet-planner` plans right-sized tickets, `fleet-plane` files and reshapes them on Plane, `fleet-engineer` and `fleet-tester` run the existing roles. Each carries only the tools its role uses. Measured on one project: a spawn starts at about 23k tokens, against about 40k for `general-purpose`.
-- Shape rules in `references/ticket-rules.md` §2: one outcome per ticket, end to end; never split by layer while under the ceiling; siblings on the same screen or component ship together.
+- Shape rules in `engineering/references/ticket-rules.md` §2: one outcome per ticket, end to end; never split by layer while under the ceiling; siblings on the same screen or component ship together.
 - opencode lanes can use opencode's free models and the Z.ai coding plan as `provider/model`. Free models cost 0 in the cost units. Model families ignore the provider prefix.
 - `disable_plugins` in the executor registry turns off Codex plugins in a lane. The browser and computer-use plugins bring `cua_repl`, which drives the owner's real Chrome and desktop.
 - Every lane writes a small status file under `{state_home}/lanes/`, so a status view can list live and finished lanes without knowing each lane's `--out`.
@@ -90,10 +111,10 @@ What changed in `plane-fleet`, newest version first. To see if a newer version e
 
 ### Added
 
-- `scripts/fleet-sweep.sh` finds what finished or dead sessions left running (servers on free slots' ports, processes in removed worktrees, Nx daemons, old headless Chromium, wait loops that can never end) and stops it with `--kill`. It also prints a spawn gate on free memory and disk. The PM runs it before every spawn.
+- `engineering/scripts/fleet-sweep.sh` finds what finished or dead sessions left running (servers on free slots' ports, processes in removed worktrees, Nx daemons, old headless Chromium, wait loops that can never end) and stops it with `--kill`. It also prints a spawn gate on free memory and disk. The PM runs it before every spawn.
 - `run-lane.sh report --project <p> --since <iso>`: tokens per Done ticket, first-pass approval, rework rounds and the share of Done work the client can see, for one run.
 - `run-lane.sh log add --from-result <result.json>` takes a lane's tokens and duration from its own file. `selftest` checks the log round trip.
-- Rework rounds by ticket kind in `references/ticket-rules.md`.
+- Rework rounds by ticket kind in `engineering/references/ticket-rules.md`.
 
 ### Changed
 
