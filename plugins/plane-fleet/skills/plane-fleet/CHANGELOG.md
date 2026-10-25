@@ -4,6 +4,26 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.3.0] - 2026-10-25
+
+### Added
+
+- `run-lane.sh cost`: what tickets really cost and how long they took, read from the Claude Code session files of the PM and its agents, the lanes' usage and GitHub merge times. Per merged ticket: cost, agent + PM share, first spawn to merge, hours agents worked; cost by role and by rework rounds; where the money goes (cache reads and writes, cache rewrites after a wait, first-call context, the PM's calls and context). `--ticket` prints one ticket's sessions in order, `--json` gives the data.
+- `cost --backfill [--dry-run]` writes the real usage onto Claude spawn rows, so the scoreboard compares Claude and lanes on the same tokens.
+- A `prices` block in the executor registry: API list prices per model, used only by `cost`. A model without a price shows tokens only.
+- `log add --cause missed|ticket|spec_changed|environment`, required on every `verify_fail`. Of 114 test failures logged before this, none had a cause.
+- `fleet.cost.claude_project_dirs` in the project config, for a repo whose old sessions sit under another folder name.
+
+### Changed
+
+- The PM logs a Claude spawn's `agent_id` and duration, not its `tokens`, names every spawn `<role> <TICKET>`, and runs `cost --backfill` and `cost` in preflight.
+
+### Fixed
+
+- The `tokens` a Claude spawn row carried is the size of the agent's last call, not its spend: measured 2026-10-25, a median engineer session processed 9.8M tokens and a tester 14.3M, 44 and 56 times the logged figure. The docs that built cost claims on it are corrected: the agent types' start is about 17k tokens of context against 72k for `general-purpose` (1.2.0 said 23k against 40k), and the fixed cost of a ticket is now given in measured dollars.
+- `cost` keeps a summary of each session it reads, so a session still counts after Claude Code deletes its file (30 days by default).
+- A repo that moved had its old run-log rows counted twice: the copy under the new Claude projects folder got a new `source_key`. On one project that was 459 of 1,442 rows, so the scoreboard, reports and promotions worked on doubled samples, and `seed` would copy the rows in again. A legacy row's identity no longer includes the folder.
+
 ## [1.2.0] - 2026-10-25
 
 ### Added
