@@ -107,10 +107,19 @@ over 270000 ms, and tells the agent to run the job in the background and check i
 minutes. Refusals are logged to `~/.config/plane-fleet/cache-keeper.jsonl`. Turn it off with
 `touch ~/.config/plane-fleet/cache-keeper-off`.
 
+## Running the PM: compact at 300k
+
+Start the PM with `claude --autocompact 300k`. Its context grows with every call, and the
+default window on a 1M model only compacts near 967k, so late calls cost about twice early
+ones. `hooks/pm-recompact.py` (a `SessionStart` hook on `compact`) then adds the live
+`run-lane.sh status` and the PM's hard rules to the compacted context. It acts only in a
+session whose transcript shows the team-pm role.
+
 On a linked install (agents linked into your agents folder instead of a plugin install), the
-plugin's `hooks/hooks.json` does not run. Register both hooks in your user settings the same
-way: a `PreToolUse` entry with matcher `Agent` for `usage-pacer.py`, and one with matcher
-`Bash|Monitor` for `cache-keeper.py`.
+plugin's `hooks/hooks.json` does not run. Register the hooks in your user settings the same
+way: a `PreToolUse` entry with matcher `Agent` for `usage-pacer.py`, one with matcher
+`Bash|Monitor` for `cache-keeper.py`, and a `SessionStart` entry with matcher `compact` for
+`pm-recompact.py`.
 
 ## Example
 

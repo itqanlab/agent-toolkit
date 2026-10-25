@@ -79,6 +79,14 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 
 ## 0) Config, states, preflight
 
+**Run the PM with a 300k compaction window: `claude --autocompact 300k`, then `/team-pm`.** The
+PM's context grows about 1.3k tokens a call and every call carries all of it: a median 177k
+early in a session and 650k by call 400, and calls over 400k were 48% of PM spend (measured
+2026-10-25). The default window on a 1M model compacts near 967k. With 300k the session
+compacts about every 140 calls, and the `pm-recompact` hook then adds the live `status` and
+your hard rules to the compacted context. After a compaction, trust that status and Plane over
+the summary. If the session was started without the flag, say so in the opening summary.
+
 Read the project config (`scripts/lanes/run-lane.sh config`: `.plane/config.json` plus the per-user override). If missing, build it —
 `references/config-schema.md`.
 
