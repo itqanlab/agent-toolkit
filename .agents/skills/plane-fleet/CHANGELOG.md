@@ -4,6 +4,16 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.6.0] - 2026-10-25
+
+### Added
+
+- `hooks/pm-recompact.py`, a `SessionStart` hook on `compact`: in a PM session it adds the live `run-lane.sh status` and the PM's hard rules to the compacted context, so the PM continues from facts, not from the summary.
+
+### Changed
+
+- The PM runs with `claude --autocompact 300k`. Its context grew about 1.3k tokens a call, to 650k by call 400, and calls over 400k were 48% of PM spend; the default window on a 1M model compacts near 967k.
+
 ## [1.5.0] - 2026-10-25
 
 ### Added
