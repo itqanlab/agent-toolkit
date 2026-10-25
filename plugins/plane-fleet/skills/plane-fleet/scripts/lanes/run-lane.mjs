@@ -383,6 +383,17 @@ async function run(opts) {
         if (!textParts.has(id)) order.push(id);
         textParts.set(id, ev.part.text ?? "");
       }
+      // opencode reports tokens per step; sum them into the codex shape the log reads.
+      const t = ev.type === "step_finish" ? ev.part?.tokens : null;
+      if (t) {
+        const u = tokenUsage || { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, reasoning_output_tokens: 0 };
+        const read = t.cache?.read || 0;
+        u.input_tokens += (t.input || 0) + read + (t.cache?.write || 0);
+        u.cached_input_tokens += read;
+        u.output_tokens += t.output || 0;
+        u.reasoning_output_tokens += t.reasoning || 0;
+        tokenUsage = u;
+      }
     }
   });
   const dec = new StringDecoder("utf8");
