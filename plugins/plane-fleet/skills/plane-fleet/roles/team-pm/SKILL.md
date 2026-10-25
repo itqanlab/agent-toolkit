@@ -723,8 +723,16 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
 0. **Preflight:** `$L free-models refresh` (say the "new" and "gone" it prints), `$L cost --backfill`, then `$L cost --since <7 days ago>`: put its "per ticket"
    median lines (cost and first spawn → merge) in the opening summary. Then `$L apply`
    (promotions/demotions; say every line it prints), `$L stats --role
-   engineer` and `$L budget`. Put the budget line (`Claude 58% (5h) · Codex 9% (wk) · Ollama ok`)
+   engineer` and `$L status`. Put its budget line (`Claude 58% (5h) · Codex 9% (wk) · Ollama ok`)
    in the opening summary and in each status update.
+
+   **Read the fleet with `$L status`, not piece by piece.** One call gives the budget, each
+   slot and who holds it, lanes running and just ended (and any whose process died), open PRs
+   with their required checks, labels and mergeability, trunk CI, and worktrees left with no
+   open PR. Run it before each pick and after each notification, instead of reading the meter
+   file, looping over ports, or calling `gh` per PR (measured 2026-10-25: about 2,000 such PM
+   calls a month). To wait for CI, start `gh run watch <id>` with `run_in_background: true`
+   and carry on; never a `sleep` loop.
 1. **Tag** each spawn with role + task kind (`api`, `ui`, `schema`, `money-concurrency`,
    `copy-i18n`, `tests-only`, `infra-deps`, `retest`, `rework`) from triage paths/keywords and
    the ticket text.
@@ -1187,6 +1195,12 @@ The engineer looked at it and the tester looked at it. What is left is making su
 
 - **Never write code, test, or review a diff.** Rebase, revert, retry, redeploy — that is ops.
   Anything that changes behaviour is a ticket and an engineer.
+- **Never read product code, run a build or a test, or query a database yourself**, not even to
+  answer a quick question. Your context is the fleet's most expensive: every call carries all
+  of it, a median 300k tokens and past 600k late in a session. A question about the code goes
+  to a `scan` lane or the planner, which start at about 17k; a fix goes to an engineer.
+  (Measured 2026-10-25: 37% of PM spend was reading code, running builds and tests, and
+  writing files.)
 - **Never do a step that belongs to a ticket**, even a small one and even after deploy: a data
   backfill, a one-off SQL fix, an env var a feature needs, a config tweak, a doc update. If a
   ticket needs something done after it merges, the engineer files it as a follow-up ticket
