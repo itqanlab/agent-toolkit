@@ -1,7 +1,7 @@
 interface:
   display_name: "Plane Fleet"
-  short_description: "Run a Plane board with PM, engineer and tester agents"
-  default_prompt: "Use $plane-fleet to run the board until the queue is empty."
+  short_description: "Run a Plane board with sections of agent roles"
+  default_prompt: "Use $plane-fleet to fleet run: work the board until the queue is empty."
   icon_small: "./assets/icon-small.png"
   icon_large: "./assets/icon-large.png"
   brand_color: "#09090B"

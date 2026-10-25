@@ -2,7 +2,7 @@
 """
 usage-pacer: PreToolUse hook on the Agent tool (Claude Code). Gates spawns of fleet roles on
 the Claude budget. It is the Claude half of the fleet's per-executor pacer: the rules (hard
-stop, pace allowance, stale meter, switch files) live in fleetctl.py, which run-lane.sh also
+stop, pace allowance, stale meter, switch files) live in fleetctl.py, which the fleet command also
 asks before it starts a Codex or opencode lane. Same thresholds for every executor.
 
 Meter: the file named by budget.executors.claude.status_file (a statusline relay that writes
@@ -22,13 +22,17 @@ import json, os, sys, time, datetime
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-FLEET = ("team-engineer", "team-tester", "team-ticket-writer")
+# A general-purpose spawn is a fleet role when its prompt names the role file (old names: before 2.0).
+FLEET = {"engineering/engineer/role.md": "team-engineer", "engineering/tester/role.md": "team-tester",
+         "core/planner/skills/write-ticket.md": "team-ticket-writer",
+         "team-engineer": "team-engineer", "team-tester": "team-tester", "team-ticket-writer": "team-ticket-writer"}
 # Agent types spawned by subagent_type; logged under the role they run so history stays comparable.
 FLEET_AGENTS = {"fleet-engineer": "team-engineer", "fleet-tester": "team-tester",
-                "fleet-planner": "fleet-planner", "fleet-plane": "fleet-plane"}
+                "fleet-planner": "fleet-planner", "fleet-board": "fleet-board", "fleet-plane": "fleet-board",
+                "fleet-scanner": "fleet-scanner"}
 LANES_DIRS = [d for d in (
     os.environ.get("FLEETCTL_DIR"),
-    os.path.join(HERE, "..", "skills", "plane-fleet", "scripts", "lanes"),
+    os.path.join(HERE, "..", "skills", "plane-fleet", "core", "scripts"),
 ) if d]
 
 
@@ -52,8 +56,9 @@ def main():
         return 0
     tool_input = event.get("tool_input", {})
     prompt = json.dumps(tool_input)
-    role = FLEET_AGENTS.get(tool_input.get("subagent_type", "")) \
-        or next((r for r in FLEET if r in prompt), None)
+    # a plugin install names agents <plugin>:<section>:<agent>
+    role = FLEET_AGENTS.get(str(tool_input.get("subagent_type", "")).split(":")[-1]) \
+        or next((v for k, v in FLEET.items() if k in prompt), None)
     if not role:
         return 0
     now = time.time()
@@ -72,7 +77,7 @@ def main():
     if check["used_pct"] is None and check["state"] == "ok":
         return 0  # unknown meter: no judgement
     portable = (" Portable work (engineers, scans) can go to a Codex or opencode lane instead: "
-                "`run-lane.sh pick` only offers executors with budget.") if role == "team-engineer" else ""
+                "`fleet pick` only offers executors with budget.") if role == "team-engineer" else ""
     tail = f" Budget: {line}." if line else ""
     if check["state"] == "stop":
         row["decision"] = "hard-stop"

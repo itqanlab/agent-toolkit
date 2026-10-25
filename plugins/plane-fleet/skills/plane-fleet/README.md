@@ -1,25 +1,29 @@
 # plane-fleet
 
-Run a [Plane](https://plane.so) board with a team of agent roles. A PM picks tickets oldest
+Run a [Plane](https://plane.so) board with teams of agent roles, one section per kind of work.
+In engineering, a PM picks tickets oldest
 first and fires engineers in parallel, each in its own git worktree and environment slot. The
 moment a PR opens, a tester checks it blind in the browser against the ticket, then reviews the
 code and adds tests. The PM merges approved PRs in groups, confirms CI and the deploy, moves
 tickets to Done and tells the client. Nobody waits for anybody.
 
-## Roles
+## Sections and roles
 
-| Role | File | Ends at |
-| --- | --- | --- |
-| PM | `roles/team-pm/SKILL.md` | merged, deployed, CI/CD green, `Done`, client told |
-| engineer | `roles/team-engineer/SKILL.md` | draft PR open, browser-reviewed, ticket `In Review` |
-| tester | `roles/team-tester/SKILL.md` | `Approved` (label `qa-approved`) or `Rework` |
-| ticket writer | `roles/team-ticket-writer/SKILL.md` | new ticket in `Todo` with an investigate gate |
-| solo | `roles/solo-ship/SKILL.md` | the whole loop in one session, ticket by ticket |
+| Section | Role | File | Ends at |
+| --- | --- | --- | --- |
+| core | PM | `core/pm/role.md` | merged, deployed, CI/CD green, `Done`, client told |
+| core | planner | `core/planner/role.md` | a plan of right-sized tickets; writes ticket bodies with `skills/write-ticket.md` |
+| core | board specialist | `core/board/role.md` | the plan filed, merged or reshaped on Plane |
+| core | scanner | `core/scanner/role.md` | a read-only answer with the commands behind each number |
+| core | solo | `core/solo/role.md` | the whole loop in one session, ticket by ticket |
+| engineering | engineer | `engineering/engineer/role.md` | draft PR open, browser-reviewed, ticket `In Review` |
+| engineering | tester | `engineering/tester/role.md` | `Approved` (label `qa-approved`) or `Rework` |
+| social | planned | `social/README.md` | its roles are built and tested before they run |
 
-The entry point is `SKILL.md`, which routes a request to the right role. The roles are full
-skills in their own right: you can link `roles/team-pm` into your skills folder as `team-pm` and
-call it directly. Each role finds the shared files by resolving the plugin folder physically, so
-a symlinked install works.
+Every role folder has the same parts: `role.md` (who it is, its limits, its report, and an index
+of its skills) and `skills/`, one file per thing it does, read only when that step comes. The
+entry point is `SKILL.md`, which routes a request to the right role. Each role finds the shared
+files by resolving the fleet folder physically, so a symlinked install works.
 
 ## Requirements
 
@@ -39,13 +43,15 @@ a symlinked install works.
 
 ## Setup
 
-1. Install the plugin, or link `skills/plane-fleet` (and, if you like, each `roles/<name>`) into
-   your agent's skills folder. On a linked install, also link each file in the plugin's
-   `agents/` folder into `~/.claude/agents/`, so the PM can spawn `fleet-engineer`,
-   `fleet-tester`, `fleet-planner` and `fleet-plane`. New agent types show up in the next session.
+1. Install the plugin, or link `skills/plane-fleet` into your agent's skills folder. A plugin install
+   finds the agent cards in `agents/<section>/` by itself, named `plane-fleet:<section>:<agent>`. On a
+   linked install, link each card file (`agents/core/*.md`, `agents/engineering/*.md`) straight
+   into your agents folder, without the section folder: user agents are named by their file, so
+   the PM spawns `fleet-engineer`, `fleet-tester`, `fleet-planner`, `fleet-board` and
+   `fleet-scanner`. New agent types show up in the next session.
 2. Set the three Plane variables in the environment your agent starts from.
 3. In each repo, let the PM or solo role write `.plane/config.json` on first run, or write it
-   from `references/config-schema.md`. Keep private values (client contact, server names,
+   from `core/references/config-schema.md`. Keep private values (client contact, server names,
    timezone) in `~/.config/plane-fleet/projects/<repo-name>.json` instead of the repo.
 4. Optional: give engineers and testers environment slots (`fleet.slots` and
    `fleet.slot_recipe`) so they can run the app and check their work in a browser.
@@ -56,17 +62,17 @@ Every role runs as a sub-session by default. A role can also run on another codi
 background lane:
 
 ```bash
-scripts/lanes/run-lane.sh pick --role engineer --kind api --cwd <repo>
-scripts/lanes/run-lane.sh codex --model <model> --role engineer --ticket PROJ-12 \
+core/scripts/fleet pick --role engineer --kind api --cwd <repo>
+core/scripts/fleet codex --model <model> --role engineer --ticket PROJ-12 \
   --cwd <repo> --brief brief.md --out /tmp/PROJ-12-engineer
-scripts/lanes/run-lane.sh budget          # one line: Claude 46% (5h) · Codex 20% (wk) · Ollama ok
-scripts/lanes/run-lane.sh stats           # first-pass rate per role, task kind and executor
-scripts/lanes/run-lane.sh apply           # promote or demote executors, logged for veto
+core/scripts/fleet budget          # one line: Claude 46% (5h) · Codex 20% (wk) · Ollama ok
+core/scripts/fleet stats           # first-pass rate per role, task kind and executor
+core/scripts/fleet apply           # promote or demote executors, logged for veto
 ```
 
-`references/executors.md` has the whole design. In short:
+`core/references/executors.md` has the whole design. In short:
 
-- **Registry.** `references/executors.json` lists executors, models, roles, task kinds and
+- **Registry.** `core/references/executors.json` lists executors, models, roles, task kinds and
   ranked candidates (champion first). It ships Claude-only. Opt in to other CLIs in
   `~/.config/plane-fleet/executors.json`.
 - **Selection.** Mostly the champion, about one pick in five a challenger, never an experiment
@@ -83,7 +89,7 @@ User-level state lives in `~/.config/plane-fleet/`, or wherever `PLANE_FLEET_HOM
 
 | CLI | Needs |
 | --- | --- |
-| Codex | the `codex` CLI, signed in, and the two profiles from `references/codex-profiles/` copied into `$CODEX_HOME` |
+| Codex | the `codex` CLI, signed in, and the two profiles from `core/references/codex-profiles/` copied into `$CODEX_HOME` |
 | opencode | the `opencode` CLI and a provider in its config, for example an OpenAI-compatible `ollama-cloud` provider with `baseURL` `https://ollama.com/v1` and `apiKey` `{env:OLLAMA_API_KEY}` |
 
 Engineer and tester lanes on Codex run with full access, because Codex's sandbox keeps every
@@ -100,7 +106,7 @@ the hard stop. Without a meter configured it judges nothing. Turn it off with
 ## The cache keeper hook
 
 `hooks/cache-keeper.py` runs before every `Bash` and `Monitor` call and acts only inside the
-fleet agents (`fleet-engineer`, `fleet-tester`, `fleet-planner`, `fleet-plane`). An agent's
+fleet agents (`fleet-engineer`, `fleet-tester`, `fleet-planner`, `fleet-board`, `fleet-scanner`). An agent's
 prompt cache lives 5 minutes, and a call that waits longer makes the next call write the whole
 context again. So it refuses a foreground Bash timeout over 270000 ms and a Monitor deadline
 over 270000 ms, and tells the agent to run the job in the background and check it every 4
@@ -109,11 +115,11 @@ minutes. Refusals are logged to `~/.config/plane-fleet/cache-keeper.jsonl`. Turn
 
 ## Running the PM: compact at 300k
 
-Start the PM with `claude --autocompact 300k`. Its context grows with every call, and the
+Start the PM with `claude --autocompact 300k`, then `/plane-fleet run`. Its context grows with every call, and the
 default window on a 1M model only compacts near 967k, so late calls cost about twice early
 ones. `hooks/pm-recompact.py` (a `SessionStart` hook on `compact`) then adds the live
-`run-lane.sh status` and the PM's hard rules to the compacted context. It acts only in a
-session whose transcript shows the team-pm role.
+`fleet status` and the PM's hard rules to the compacted context. It acts only in a session
+whose transcript shows the PM role.
 
 On a linked install (agents linked into your agents folder instead of a plugin install), the
 plugin's `hooks/hooks.json` does not run. Register the hooks in your user settings the same
@@ -123,7 +129,7 @@ way: a `PreToolUse` entry with matcher `Agent` for `usage-pacer.py`, one with ma
 
 ## Example
 
-> run the board
+> fleet run
 
 The PM reads `.plane/config.json`, checks the board, claims the three oldest workable tickets,
 gives each engineer a slot, and spawns a tester the moment a PR opens. It merges approved PRs

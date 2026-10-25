@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- plane-fleet. A board with three columns, cards moving right. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <!-- fleet. A board with three columns, cards moving right. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
   <g>
     <path class="main tint" d="M136 152 H376 A16 16 0 0 1 392 168 V344 A16 16 0 0 1 376 360 H136 A16 16 0 0 1 120 344 V168 A16 16 0 0 1 136 152 Z"/>
     <path class="line" d="M200 152 V360 M312 152 V360"/>

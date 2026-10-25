@@ -9,7 +9,7 @@ in a month, $529 or 12% of agent spend, almost all after a sleep loop, an e2e ru
 the agent waited on for 8 to 10 minutes. A check every 4 minutes costs one cache read instead.
 
 Only fleet agents are held: the hook input's agent_type is fleet-engineer, fleet-tester,
-fleet-planner or fleet-plane (a plugin install may prefix it, as plane-fleet:fleet-engineer).
+fleet-planner, fleet-board or fleet-scanner (a plugin install prefixes it, as plane-fleet:engineering:fleet-engineer).
 The main session and every other agent pass untouched.
 
   Bash:    a foreground call with a timeout over 270000 ms is refused. Run it in the background
@@ -22,7 +22,7 @@ Refusals go back to the agent as the reason, and to cache-keeper.jsonl in PLANE_
 import json, os, sys, time
 
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-FLEET_AGENTS = ("fleet-engineer", "fleet-tester", "fleet-planner", "fleet-plane")
+FLEET_AGENTS = ("fleet-engineer", "fleet-tester", "fleet-planner", "fleet-board", "fleet-scanner", "fleet-plane")
 LIMIT_MS = 270000
 WHY = ("The prompt cache of this session lives 5 minutes. A call that waits longer makes the next "
        "call write the whole context again (measured: 12% of fleet agent spend).")
