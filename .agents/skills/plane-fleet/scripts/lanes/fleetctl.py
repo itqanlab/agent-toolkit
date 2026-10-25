@@ -17,11 +17,13 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
   fleetctl.py config  [--get a.b.c] [--cwd DIR]   .plane/config.json + the per-user project override
+  fleetctl.py free-models [list|refresh] [--json]   the free models opencode serves today (freemodels.py)
 
 Layers, later wins: <this dir>/../executors.json  <  user override (log.user_override)
   <  user override projects.<project>  <  <repo>/.plane/config.json fleet.executors
 """
 import argparse, datetime, glob, hashlib, json, os, random, re, subprocess, sys, time
+import freemodels
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet root>/scripts/lanes/
@@ -634,10 +636,15 @@ def family(reg, c):
     return fam.get(c["executor"], c["executor"])
 
 
-def candidates_for(reg, role, kind):
+def candidates_for(reg, role, kind, notes=None):
+    """The role's list for this kind, with free models added or removed by free_model_policy."""
     table = (reg.get("candidates") or {}).get(role) or {}
     lst = table.get(kind) if kind and kind in table else table.get("*")
-    return [c for c in (lst or []) if isinstance(c, dict)], (kind if kind in table else "*")
+    cands, n = freemodels.apply_policy(reg, role, [c for c in (lst or []) if isinstance(c, dict)],
+                                       freemodels.load_state(STATE_HOME))
+    if notes is not None:
+        notes.extend(n)
+    return cands, (kind if kind in table else "*")
 
 
 def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=None, pair_experiment=False, rng=random):
@@ -652,7 +659,10 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
         cands, list_kind, pinned = [esc["to"]], "escalation", True
         out["reason"] = "escalated: " + ", ".join(fired)
     else:
-        cands, list_kind = candidates_for(reg, role, kind)
+        free_notes = []
+        cands, list_kind = candidates_for(reg, role, kind, free_notes)
+        if free_notes:
+            out["free_models"] = free_notes
         pinned = not portable
         out["reason"] = f"champion for {role}/{list_kind}"
     if not cands:
@@ -679,7 +689,10 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
         rows = load_rows(reg)
         count = lambda c: sum(1 for r in rows if r.get("role") == role and rkey(r) == ckey(c)
                               and (list_kind == "*" or r.get("task_kind") == list_kind))
-        chosen = min(challengers, key=count)
+        # ties (most often: none run yet) go to the newest discovered free model, so a model on a
+        # short trial gets tried while it is still served
+        newest = lambda c: -int(str(c.get("first_seen") or "0").replace("-", "") or 0)
+        chosen = min(challengers, key=lambda c: (count(c), newest(c)))
         out["experiment"] = True
         out["reason"] = f"experiment: {ckey(chosen)} for {role}/{list_kind}"
     elif no_explore:
@@ -752,11 +765,15 @@ def apply_changes(reg, dry=False, rows=None):
     user_path = P(reg, "user_override")
     user = read_json(user_path, {}) or {}
     changes = []
+    free_state = freemodels.load_state(STATE_HOME)
     for role, table in (reg.get("candidates") or {}).items():
         if not isinstance(table, dict):
             continue
         for kind, lst in table.items():
-            if kind.startswith("$") or not isinstance(lst, list) or len(lst) < 2:
+            if kind.startswith("$") or not isinstance(lst, list):
+                continue
+            lst = freemodels.apply_policy(reg, role, [c for c in lst if isinstance(c, dict)], free_state)[0]
+            if len(lst) < 2:
                 continue
             auto = (reg.get("task_kinds", {}).get(kind) or {}).get("auto_promote", True) is not False
             stat = lambda c: board.get((role, kind, ckey(c)))
@@ -1073,6 +1090,7 @@ def selftest():
         check("--cause stored", r4.get("fail_cause"), "ticket")
         import fleetcost
         fleetcost.selftest(check)
+        freemodels.selftest(check)
     finally:
         STATE_HOME = old_home
         if old_env is None:
@@ -1128,6 +1146,8 @@ def main(argv=None, quiet=False):
     a = sub.add_parser("apply"); a.add_argument("--dry-run", action="store_true"); a.add_argument("--cwd")
     sd = sub.add_parser("seed"); sd.add_argument("--cwd")
     cf = sub.add_parser("config"); cf.add_argument("--get"); cf.add_argument("--cwd")
+    fm = sub.add_parser("free-models"); fm.add_argument("action", nargs="?", default="list", choices=["list", "refresh"])
+    fm.add_argument("--json", action="store_true"); fm.add_argument("--cwd")
     args, rest = ap.parse_known_args(argv)
     # Bare key=value words (log add ... duration_ms=1 tokens=2) land here wherever they sit on the
     # line; argparse would otherwise drop them or refuse them after an option.
@@ -1220,6 +1240,30 @@ def main(argv=None, quiet=False):
             for k in args.get.split("."):
                 cfg = cfg.get(k) if isinstance(cfg, dict) else None
         print(json.dumps(cfg, indent=2))
+    elif args.cmd == "free-models":
+        pol = freemodels.policy(reg)
+        if args.action == "refresh":
+            exe = (reg.get("executors") or {}).get(pol["executor"]) or {}
+            before = {k for k, v in (freemodels.load_state(STATE_HOME).get("models") or {}).items() if v.get("live")}
+            found = {}
+            for prov in pol.get("providers") or []:
+                got, err = freemodels.discover(exe.get("binary") or pol["executor"], prov)
+                if err:
+                    print(f"free-models: {err}; the last list is kept", file=sys.stderr)
+                    return 4
+                for f in got:
+                    found[f["model"]] = f
+            st, eligible = freemodels.refresh(STATE_HOME, list(found.values()), pol,
+                                              source=f"{exe.get('binary') or pol['executor']} models --refresh --verbose")
+            live = {k for k, v in st["models"].items() if v.get("live")}
+            new, gone = sorted(live - before), sorted(before - live)
+            print(f"free models: {len(eligible)} usable of {len(live)} live"
+                  + (f" · new: {', '.join(new)}" if new else "") + (f" · gone: {', '.join(gone)}" if gone else ""))
+        st = freemodels.load_state(STATE_HOME)
+        if args.json:
+            print(json.dumps(st, indent=2))
+        elif args.action == "list":
+            print(freemodels.render(st, pol))
     elif args.cmd == "seed":
         n, by = seed(reg)
         print(f"seeded {n} rows " + json.dumps(by))

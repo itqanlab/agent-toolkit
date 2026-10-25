@@ -720,7 +720,7 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
 
 `L=scripts/lanes/run-lane.sh`. Details live in executors.md; the loop is:
 
-0. **Preflight:** `$L cost --backfill`, then `$L cost --since <7 days ago>`: put its "per ticket"
+0. **Preflight:** `$L free-models refresh` (say the "new" and "gone" it prints), `$L cost --backfill`, then `$L cost --since <7 days ago>`: put its "per ticket"
    median lines (cost and first spawn → merge) in the opening summary. Then `$L apply`
    (promotions/demotions; say every line it prints), `$L stats --role
    engineer` and `$L budget`. Put the budget line (`Claude 58% (5h) · Codex 9% (wk) · Ollama ok`)

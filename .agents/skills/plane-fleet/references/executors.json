@@ -158,7 +158,7 @@
         "opencode/nemotron-3.5-lightning-free",
         "opencode/longcat-2.5-preview-free"
       ],
-      "free_models_source": "`opencode models`, 2026-10-22. nemotron-3-ultra-free and big-pickle answered a smoke test that day.",
+      "free_models_source": "`opencode models`, 2026-10-22. Only a fallback when no discovery ran in free_model_policy.max_age_days: free models change almost daily, so `run-lane.sh free-models refresh` finds today's (freemodels.py). Two of these six were gone by 2026-10-25.",
       "efforts": "Passed as --variant <effort>. Names are the provider's own (e.g. minimal, high, max); an unknown one is the provider's error."
     },
     "claude-ollama": {
@@ -464,6 +464,15 @@
     "opencode": 0.1,
     "claude-ollama": 0.1,
     "opencode:opencode/": 0
+  },
+  "free_model_policy": {
+    "$comment": "Free models may keep prompts. `free-models refresh` keeps the opencode models that cost nothing, call tools and have min_context; pick adds the live ones as challengers for `roles` only, drops them from every other role, and run-lane refuses them elsewhere or outside a read-only sandbox. Owner decision 2026-10-25: read-only scans only.",
+    "roles": ["scan"],
+    "executor": "opencode",
+    "providers": ["opencode"],
+    "max_age_days": 3,
+    "min_context": 128000,
+    "require_toolcall": true
   },
   "prices": {
     "$comment": "USD per 1M tokens, for `cost` only: API list prices to compare options. Plans (Claude Max, ChatGPT, Ollama Cloud) bill differently. A model id matches its exact key, else the longest key it starts with. cache_read defaults to 0.1 x input when absent. Add other executors' models in the user override; a model with no price shows tokens only, never a guessed dollar figure.",

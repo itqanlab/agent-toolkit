@@ -76,8 +76,24 @@ To compare efforts, list the same model twice with different efforts:
 | provider | models | cost |
 |---|---|---|
 | `ollama-cloud` | `kimi-k2.7-code`, `glm-5.3`, `deepseek-v4-pro:0813`, … (`models` in the registry) | Ollama Cloud plan, shared with `claude-ollama` |
-| `opencode` | `opencode/nemotron-3-ultra-free`, `opencode/big-pickle`, … (`free_models`) | free, no key; free tiers may keep prompts |
+| `opencode` | discovered daily: `run-lane.sh free-models` | free, no key; free tiers may keep prompts |
 | `zai-coding-plan` | `zai-coding-plan/glm-5.3`, … | Z.ai GLM coding plan (`opencode auth login`) |
+
+**Free models are discovered, not listed.** New ones appear almost daily, some only for a short
+trial before a release, and others go away (2 of the 6 listed on 2026-10-22 were gone three days
+later). `run-lane.sh free-models refresh` asks opencode (`opencode models opencode --refresh
+--verbose`) and keeps the models that cost nothing, call tools and have at least
+`free_model_policy.min_context`. It records each one's first and last day seen in
+`{state_home}/free-models.json`; `run-lane.sh free-models` prints the list. Then:
+
+- `pick` adds every live free model as a challenger for the roles in `free_model_policy.roles`
+  (owner decision 2026-10-25: `scan` only, since a free tier may keep the prompt). A new model
+  has no runs, so the next experiment tries it, newest first.
+- A free model that is no longer served drops out, even where a list names it.
+- Every other role loses free models, whatever the registry or an override lists, and
+  `run-lane` refuses one outside those roles or outside a read-only sandbox.
+- With no refresh in `max_age_days`, nothing is added and `pick` says the list is stale; the
+  registry's `free_models` is then only a fallback.
 
 opencode takes effort as `--variant`; the runner passes `--effort` through. Variant names are
 the provider's own. Ollama Cloud models are also reachable through Claude Code

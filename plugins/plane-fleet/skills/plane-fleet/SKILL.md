@@ -85,6 +85,7 @@ scripts/lanes/run-lane.sh budget
 scripts/lanes/run-lane.sh stats --role engineer
 scripts/lanes/run-lane.sh cost --since 2026-10-01      # real spend and time per merged ticket
 scripts/lanes/run-lane.sh cost --ticket PROJ-12        # one ticket's sessions in order
+scripts/lanes/run-lane.sh free-models refresh          # today's free models, for read-only scans
 ```
 
 The token counts the log keeps for Claude spawns are the size of each agent's last call, not
