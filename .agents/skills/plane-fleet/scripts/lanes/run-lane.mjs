@@ -177,6 +177,9 @@ function codexArgv(o, exe, finalPath) {
   argv.push(...prof.args);
   if (o.effort) argv.push("-c", `model_reasoning_effort="${o.effort}"`);
   for (const name of exe.disable_mcp || []) argv.push("-c", `mcp_servers.${name}.enabled=false`);
+  // Plugins bring their own tools (cua_repl drives the user's real browser and desktop), so
+  // turning off an MCP server is not enough: name the plugin too.
+  for (const name of exe.disable_plugins || []) argv.push("-c", `plugins."${name}".enabled=false`);
   // codex exec runs with approval_policy=never, and MCP calls need approval unless the
   // server says otherwise: without this every plane call fails ("requires approval").
   for (const name of exe.mcp_approve || []) argv.push("-c", `mcp_servers.${name}.default_tools_approval_mode="approve"`);

@@ -14,6 +14,14 @@ opencode. Everything else in your role skill and the standing brief applies to y
   key in a config file.
 - If the `plane` tools are missing or fail to start, stop. Report `BLOCKED · plane MCP
   unavailable` as your final message. Do not work around it.
+- Never open Plane in a browser, and never guess its web address. You don't need the web UI:
+  the MCP does everything. The project's Plane is self-hosted, so `app.plane.so` is someone
+  else's site. (2026-10-24: a tester lane opened `app.plane.so/<workspace>/browse/<ticket>` in
+  the owner's Chrome to attach a screenshot.)
+- An attachment the MCP refuses stays local. Name its path in your comment and move on. Never
+  upload a screenshot, log or file to an outside host (catbox, imgur, pastebins, file drops)
+  to get a URL: that publishes the app's screens to anyone with the link. (Same run: a lane
+  uploaded a slot screenshot to catbox.moe.)
 - The rules in `references/plane-api.md` apply to you: raw HTML in
   `description_html` and `comment_html`, send `priority` with every state change, read each
   write back.
@@ -37,6 +45,11 @@ opencode. Everything else in your role skill and the standing brief applies to y
 | `Bash run_in_background`, `Monitor` | run it in the foreground with a timeout, or background it and poll with `sleep` loops |
 | browser review via Claude's browser tools | your own Playwright: `npx playwright` from the worktree, headless Chromium. Never the owner's Chrome |
 | `mcp__nx-mcp__*` | `npx nx show project <name> --json`, `npx nx graph --file=...` |
+
+Never control the owner's desktop or browser: no computer use, no `cua_repl`, no browser or
+Chrome plugin tools, even if they show up in your tool list. The runner turns those plugins off
+(`disable_plugins` in the executor registry); if one is still there, the registry missed it.
+Don't use it, and say so in your final message.
 
 ## Hooks and gates
 

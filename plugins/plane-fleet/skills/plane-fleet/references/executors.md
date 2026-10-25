@@ -211,7 +211,10 @@ read-only `ls` in the smoke test. Only give opencode read-only roles until that 
   failed until the runner passed `mcp_servers.plane.default_tools_approval_mode="approve"`.
   `mcp_overrides` can point the lane's `plane` server at the same server build Claude uses, so
   both see the same tools (only non-secret fields such as `command`; argv is visible in `ps`).
-  `disable_mcp` switches off MCP servers a lane never needs.
+  `disable_mcp` switches off MCP servers a lane never needs. `disable_plugins` does the same
+  for Codex plugins (`"browser@openai-bundled"` and so on), which bring tools of their own:
+  the computer-use and browser plugins give a lane `cua_repl`, which drives the owner's real
+  Chrome and desktop. Turning off the MCP server of the same name does not remove it.
 - opencode: a headless run auto-rejects reads outside the working dir, and one rejection ends
   the run. The runner allows the fleet folder (`{fleet_root}/**`, and nothing else outside)
   through `OPENCODE_CONFIG_CONTENT`.
