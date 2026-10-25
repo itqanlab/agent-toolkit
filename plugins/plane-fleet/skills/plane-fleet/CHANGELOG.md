@@ -4,6 +4,19 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.5.0] - 2026-10-25
+
+### Added
+
+- `hooks/cache-keeper.py`: in fleet agents, refuses a foreground Bash timeout over 270000 ms and a Monitor deadline over 270000 ms (or none), and tells the agent to run the job in the background and check it every 4 minutes. An agent's prompt cache lives 5 minutes; waits past it made the next call rewrite the whole context, 12% of agent spend over a month and 24% in its last week. Refusals are logged; `cache-keeper-off` turns it off. `cost` shows the refusals next to the rewrite cost.
+- `run-lane.sh status`: budget, slots and who holds them, lanes running and just ended (a dead lane is flagged), open PRs with required checks, labels and mergeability, trunk CI, and worktrees with no open PR, in one call. The PM used about 2,000 separate calls a month for these.
+
+### Changed
+
+- The standing brief limits every wait to 4 minutes and says how to wait longer.
+- The PM never reads product code, runs builds or tests, or queries a database itself: 37% of its spend went there, on a context of 300k tokens and more. It reads the fleet with `status` and waits for CI with `gh run watch` in the background.
+- On a linked install, register `cache-keeper.py` in user settings like the pacer (README).
+
 ## [1.4.0] - 2026-10-25
 
 ### Added
