@@ -1,6 +1,6 @@
 {
   "name": "plane-fleet",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Run a Plane board with a team of agent roles: a PM that claims tickets and lands approved PRs, parallel engineers each in its own worktree and environment slot, blind testers that check every PR in the browser and add tests, and a ticket writer. Roles can also run on other coding CLIs, picked per spawn by task kind and remaining budget.",
   "author": {
     "name": "Itqan Lab",

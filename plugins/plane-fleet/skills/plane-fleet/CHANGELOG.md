@@ -4,6 +4,20 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [1.4.0] - 2026-10-25
+
+### Added
+
+- `run-lane.sh free-models refresh` discovers the free models opencode serves today: no cost, tool calls, and at least `min_context`. It keeps each model's first and last day seen in `{state_home}/free-models.json`. `run-lane.sh free-models` lists them. New free models appear almost daily, some only for a short trial; 2 of the 6 listed on 2026-10-22 were gone three days later.
+- `free_model_policy` in the registry: the roles that may use free models (default `scan`; a free tier may keep the prompt), the providers to ask, and how old a list may be.
+
+### Changed
+
+- `pick` adds every live free model as a challenger for the allowed roles, and an experiment tries the newest untried one first. A model that is no longer served drops out. Every other role loses free models, whatever a list says.
+- `run-lane` refuses a free model outside the allowed roles or outside a read-only sandbox.
+- The registry's static `free_models` list is only a fallback when no discovery is fresh.
+- The PM runs `free-models refresh` in preflight.
+
 ## [1.3.0] - 2026-10-25
 
 ### Added
