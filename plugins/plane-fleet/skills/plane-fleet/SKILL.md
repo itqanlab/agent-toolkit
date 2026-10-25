@@ -34,8 +34,8 @@ folder, the one that holds this file.
 ## Agents
 
 Four agent types ship in the plugin's `agents/` folder. Each carries only the tools its role
-uses, so a spawn starts at about 23k tokens instead of about 40k for `general-purpose`
-(measured 2026-10-22). On a linked install, link them into your agent's agents folder too
+uses, so its first call carries about 17k tokens of context instead of about 72k for
+`general-purpose`, and so does every later call (measured 2026-10-25). On a linked install, link them into your agent's agents folder too
 (`README.md`, Setup).
 
 | Agent | Role | Writes |

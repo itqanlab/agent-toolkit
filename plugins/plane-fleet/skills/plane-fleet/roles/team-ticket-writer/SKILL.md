@@ -147,7 +147,8 @@ Angular error handler unwrapping `HttpErrorResponse` before our filter saw it. T
   same screen or component go together. See `references/ticket-rules.md` §2 "Shape".
 
 List the files you expect each ticket to touch in its body, so the PM can check the size at
-pick time. Why: every ticket carries about 350k tokens of fixed cost. Rework rises from 5%
+pick time. Why: every ticket carries a fixed cost (a median $2.9 under 50 changed lines,
+measured 2026-10-25), and size drives rework. Rework rises from 5%
 under 200 lines to 25% at 500 and more, and to 42% at 21 or more files (measured 2026-10-05).
 
 **Check for a standing sweep first.** If the report is one more instance of a pattern that

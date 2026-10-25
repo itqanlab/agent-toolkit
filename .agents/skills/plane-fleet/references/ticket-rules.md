@@ -13,8 +13,10 @@ filed, 117 shipped, 73M tokens).
 - Most of it was the same few problems filed again and again. "A name in the wrong
   language shows in the UI" was filed 8 times. "Route admits a role its API refuses" was filed 4 times.
   Duplicate pairs were usually worked twice, not cancelled.
-- Every ticket costs about 350k tokens before any code changes: worktree, slot, gate, blind
-  tester. That is about 75% of a typical ticket's cost.
+- Every ticket pays a fixed cost before any code changes: worktree, slot, gate, blind tester.
+  Measured 2026-10-25 on one project (312 merged tickets, Claude spend at API list prices,
+  lanes not priced): agent cost per ticket was a median $2.9 under 50 changed lines, $6.9 at
+  150 to 400, $9.0 at 400 to 1000 and $19.8 at 1000 to 3000, where half went back to Rework.
 - A reworked ticket costs 2.45x a clean one. Rework rate: 5% under 200 changed lines, 16% at
   200 to 499, 25% at 500 and more, 42% at 21 or more files.
 
@@ -75,7 +77,7 @@ The size table says how big a ticket may be. This says what goes in it.
 - **A ticket delivers one thing someone can see working, end to end.** The schema, the server
   and the client for that one thing go in the same ticket. Never split by layer (1/3 schema,
   2/3 server, 3/3 client) while the whole stays under the ceiling. A layer ticket cannot be
-  checked by a blind tester, and each extra ticket pays the ~350k fixed cost again. Seen
+  checked by a blind tester, and each extra ticket pays the fixed cost again. Seen
   2026-10-22: one feature (a new discount kind) was filed as three tickets, schema, server and
   client.
 - **One outcome may run past the 500-line target, up to the ceiling.** The target tells you

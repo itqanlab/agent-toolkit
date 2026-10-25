@@ -63,7 +63,11 @@ here.
 ## 1) Measured costs — real numbers, so estimates are not invented
 
 From one full `/team-pm` run on the CRM repo, 2026-09-05 (15 logged subagent runs,
-**3.53M subagent tokens**):
+**3.53M subagent tokens**). These are what the log held: the size of each agent's last call,
+not what it processed. Measured 2026-10-25 on another project, a median engineer session
+processed 9.8M tokens and a tester 14.3M, 44 and 56 times the logged figure. Use them only as a
+relative size between roles; `run-lane.sh cost` gives the real spend, and the live meter in §0
+Step 1 is the number to plan a window on.
 
 | role | model | tokens per session |
 |---|---|---|

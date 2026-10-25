@@ -238,9 +238,11 @@ tagged `project` (the repo name). Older per-project run logs can be folded in wi
 so rows still written there are not lost.
 
 ```bash
-# a Claude spawn: numbers from the Agent result, as --set (or bare k=v words, same thing)
+# a Claude spawn: duration and agent id from the Agent result, as --set (or bare k=v words)
 $L log add --ticket PROJ-134 --role engineer --kind api --executor claude --model sonnet \
-   --outcome pr_opened --reason "champion" --set duration_ms=1234000 tokens=230000 rework_count=0
+   --outcome pr_opened --reason "champion" --set duration_ms=1234000 agent_id=a1b2c3 rework_count=0
+# a tester's fail names why: missed | ticket | spec_changed | environment
+$L log add --ticket PROJ-134 --role tester --executor claude --model opus --outcome verify_fail --cause missed
 # a lane: ticket, role, executor, model, duration and tokens come from its result.json
 $L log add --from-result /tmp/PROJ-134-engineer/lane/result.json --kind api --outcome pr_opened --reason "PR 212"
 $L log add ... --experiment                                   # an experiment pick
@@ -259,7 +261,9 @@ line win over `--from-result`. Before 2026-10-15 `log add` dropped `--set` value
 bare `k=v` words after an option, so older spawn rows have no tokens or duration.
 
 Row fields: `ts, project, ticket, role, task_kind, executor, model, experiment, reason,
-duration_ms, tokens` (Claude: the session total), or for a lane `input_tokens,
+duration_ms, agent_id`, and `tokens` on older Claude rows (the size of the agent's last call,
+not its spend; measured 2026-10-25 at a median 44 to 56 times less than the session processed),
+or for a lane `input_tokens,
 cached_input_tokens, output_tokens, reasoning_output_tokens`, `tokens` = input + output,
 `result_path` and `lane_status` when it did not complete. Then `claude_meter_delta_pct` when
 known, `outcome` (`pr_opened`, `blocked`, `verify_pass`, `verify_fail`, `done`, `lane_failed`,

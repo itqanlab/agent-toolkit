@@ -155,7 +155,7 @@ execution; this board has burned that way before.
 5. **Post findings as a Plane comment before the first commit** — confirmed / stale / extra.
    In-scope extras fold into this PR. So does a small fix of the same kind in a file or screen
    you already touch (about 20 lines, same feature folder): fixing it now costs a few minutes,
-   and a ticket for it costs about 350k tokens of fixed overhead. Out-of-scope extras go through
+   and a ticket of its own costs a median $2.9 even under 50 lines (measured 2026-10-25). Out-of-scope extras go through
    the filing ladder (§5).
 
    **Ticket scope already locked** (author marked "do not re-open", or a sibling ticket

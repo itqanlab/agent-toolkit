@@ -634,14 +634,20 @@ Agent(description: "engineer PROJ-140", subagent_type: "fleet-engineer", model: 
       prompt: "Fleet folder: <fleet>. Work PROJ-140. Slot: B. ...")
 ```
 
+**Name every spawn `<role> <TICKET> [note]`** in its `description`: `engineer PROJ-134`,
+`rework PROJ-134 round 2`, `tester PROJ-134`, `retest PROJ-134`, and `planner`, `plane`,
+`merge`, `notify` or `scan` for the rest. `$L cost` reads the ticket and the role from it; a
+spawn named otherwise lands under "other" and its ticket's cost comes out too low.
+
 `<fleet>` is the absolute path of the fleet folder you resolved at the start (see the note at
 the top of this file). Sub-sessions don't share your working directory, so every path in a
 brief is absolute.
 
 **Always spawn the fleet agent types** (`fleet-engineer`, `fleet-tester`), not
 `general-purpose`. They carry only the tools the role uses and read the standing brief and
-their role file on their own. Measured 2026-10-22 on one project: 23k tokens at startup against
-40k for `general-purpose`, on every spawn. If the agent types are not installed (an
+their role file on their own. Measured 2026-10-25 on one project: an agent's first call carries
+a median 17k tokens of context against 72k for `general-purpose` (23 and 872 sessions), and every
+later call carries that difference again. If the agent types are not installed (an
 "agent type not found" error), fall back to `general-purpose` with
 "Read <fleet>/roles/team-engineer/SKILL.md and follow it" in the prompt, and say so.
 
@@ -654,19 +660,20 @@ free again only after its session reported teardown.
 **You must pass an explicit `model` on every `Agent` call.** Omitting it silently inherits the
 session's own model, which on this setup is `opus[1m]` — the most expensive tier, for every
 worker, every verifier and every trivial rebase. That is not a decision; it is a default nobody
-chose. One measured run spawned ~30 subagents at 185k–330k tokens each, roughly **7M tokens all
-at top tier**, and hit the 5-hour usage limit mid-run.
+chose. One measured run spawned ~30 subagents, all at top tier, and hit the 5-hour usage limit
+mid-run. (Their logged 185k–330k tokens each was only the size of each agent's last call; the
+real spend was far larger. Measured 2026-10-25: a median engineer session processes 9.8M tokens
+and a tester 14.3M, about 44 and 56 times what the log shows. `$L cost` reads the real figure.)
 
 **Passing the model explicitly also drops the 1M-context variant, which is a separate cost
 multiplier from the tier.** The `Agent` tool offers `opus` / `sonnet` / `haiku` / `fable` — there
 is no `[1m]` option — so an extended-context model can *only* arrive by inheritance. Naming the
 model is therefore two savings at once, and the second one costs nothing to take.
 
-**Be careful how you justify that, though.** The `tokens` figure in the run log is total tokens
-consumed across a whole session — input plus output over many turns — **not peak context
-occupancy**. A session can burn 300k tokens while never holding more than a fraction of that at
-once. So the log cannot tell you whether any subagent needed extended context, and you must not
-claim it can.
+**Be careful how you justify that, though.** The `tokens` figure an `Agent` result reports is the
+size of the subagent's **last call**: close to its peak context, and nothing like what it spent.
+So it can show that a session stayed well inside the standard window, but it says nothing about
+cost. For cost, use `$L cost`.
 
 The honest test is behavioural, not arithmetic. Spawn on the standard variant and watch for the
 symptoms of context pressure: a subagent reporting truncation or compaction, losing earlier
@@ -713,7 +720,9 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
 
 `L=scripts/lanes/run-lane.sh`. Details live in executors.md; the loop is:
 
-0. **Preflight:** `$L apply` (promotions/demotions; say every line it prints), `$L stats --role
+0. **Preflight:** `$L cost --backfill`, then `$L cost --since <7 days ago>`: put its "per ticket"
+   median lines (cost and first spawn → merge) in the opening summary. Then `$L apply`
+   (promotions/demotions; say every line it prints), `$L stats --role
    engineer` and `$L budget`. Put the budget line (`Claude 58% (5h) · Codex 9% (wk) · Ollama ok`)
    in the opening summary and in each status update.
 1. **Tag** each spawn with role + task kind (`api`, `ui`, `schema`, `money-concurrency`,
@@ -742,8 +751,12 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    the ticket **once on the role's Claude fallback**. A second lane failure on the same executor
    that day → stop using it for that role this run and say so.
 6. **Log every spawn** at its end. Claude: `$L log add --ticket … --role … --kind … --executor
-   claude --model … --outcome … [--experiment] --reason "…" --set duration_ms=… tokens=…` with the
-   numbers from the Agent result. Lane: `$L log add --from-result <out>/result.json --kind …
+   claude --model … --outcome … [--experiment] --reason "…" --set duration_ms=… agent_id=…` with
+   the duration and the agent id (the `task-id` of its notification) from the Agent result. Do not
+   log its `tokens`: that is the last call's size, not the spend. `$L cost --backfill` writes the
+   real usage onto the row from the session file, matched by `agent_id`. A tester's
+   `verify_fail` needs `--cause missed|ticket|spec_changed|environment` (the table under "Read a
+   low pass rate correctly"); the log refuses one without it. Lane: `$L log add --from-result <out>/result.json --kind …
    --outcome … --reason "…"` (ticket, role, executor, model, duration and tokens come from the
    file). One log for all projects, `~/.config/plane-fleet/executor-outcomes.jsonl`.
    **Back-fill** as the ticket moves: `$L log backfill --ticket … --role engineer --set
