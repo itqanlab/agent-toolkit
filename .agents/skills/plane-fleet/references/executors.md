@@ -338,6 +338,12 @@ cache writes and output) and is only for comparing candidates. Until `cost --bac
 Claude row real usage, its cost comes from `tokens`, the last call's size, and reads far too low.
 Scoring is global; `--project` filters.
 
+**Fleet status:** `$L status [--json]` is the PM's view in one call: the budget line, each slot
+and the worktree holding its ports, lanes running and ended in the last 6 hours (a running lane
+whose process is gone is flagged), open PRs with their required checks (`ci.required_jobs`),
+labels and mergeability, the last trunk CI runs, and worktrees with no open PR. The board
+itself stays a Plane MCP read.
+
 **Promotion and demotion:** `$L apply` (`--dry-run` to preview), at every PM preflight:
 - a challenger with n ≥ 5, first-pass ≥ the champion's and lower mean cost becomes champion
 - a champion below 70% over its last 5 scored runs swaps with the next candidate

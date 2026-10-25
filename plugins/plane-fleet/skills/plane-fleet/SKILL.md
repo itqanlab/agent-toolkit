@@ -93,6 +93,7 @@ its spend. `cost` reads the spend from the session files themselves.
 
 ## Board tools
 
+- `scripts/lanes/run-lane.sh status` — budget, slots, lanes, open PRs with required checks, trunk CI and leftover worktrees, in one call
 - `scripts/board-drift.sh` — find tickets whose board state disagrees with git and GitHub
 - `scripts/repo-scan.sh` — the repo half of the PM's pre-pick triage
 - `scripts/git-tidy.sh` — clear merged local branches and stale worktrees

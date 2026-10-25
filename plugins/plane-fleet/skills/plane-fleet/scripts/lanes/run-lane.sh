@@ -10,6 +10,7 @@
 #   run-lane.sh cost   [--since ISO] [--ticket T] [--json] [--backfill]   real spend and time per ticket
 #   run-lane.sh apply  [--dry-run]           run-lane.sh seed       run-lane.sh models
 #   run-lane.sh free-models [list|refresh]    the free models opencode serves today
+#   run-lane.sh status [--json]               budget, slots, lanes, open PRs and CI in one call
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
 # Docs: executors.md next to this folder.
 set -euo pipefail
@@ -22,6 +23,6 @@ if ! command -v node >/dev/null 2>&1 || ! command -v opencode >/dev/null 2>&1; t
   export PATH
 fi
 case "${1:-}" in
-  pick|budget|log|stats|report|cost|selftest|apply|seed|config|free-models) exec python3 "$here/fleetctl.py" "$@" ;;
+  pick|budget|log|stats|report|cost|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"
