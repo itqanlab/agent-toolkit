@@ -12,6 +12,7 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py log     backfill --ticket T --role R --set k=v [k=v ...]
   fleetctl.py stats   [--role R] [--kind K] [--project P] [--json]
   fleetctl.py report  --project P --since ISO [--until ISO]   Done, approvals, tokens, hours (see report -h)
+  fleetctl.py cost    [--since ISO] [--until ISO] [--ticket T] [--json] [--backfill]   real spend and time, from the sessions
   fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
@@ -435,7 +436,7 @@ def fold_usage_rows(rows):
             target = index.get((r.get("project"), r.get("ticket"), r.get("role"), r.get("for_ts")))
             if target is not None:
                 for k, v in r.items():
-                    if k in NUMERIC_KEYS or k in ("lane_status", "result_path"):
+                    if k in NUMERIC_KEYS or k in ("lane_status", "result_path", "agent_id", "usage_source"):
                         if target.get(k) is None:
                             target[k] = v
                 target["backfilled"] = True
@@ -477,7 +478,7 @@ def append_row(reg, row):
 
 
 NUMERIC_KEYS = ("duration_ms", "tokens", "input_tokens", "output_tokens", "cached_input_tokens",
-                "reasoning_output_tokens", "rework_count", "claude_meter_delta_pct", "tool_uses")
+                "reasoning_output_tokens", "rework_count", "claude_meter_delta_pct", "tool_uses", "usd")
 
 
 def coerce(key, v):
@@ -862,12 +863,30 @@ REPORT_HELP = """Window report for one project: what shipped and what it cost.
                 sessions, so they are left out of the session and token totals.
   Approved      tickets with a tester row outcome=verify_pass.
   Sessions      every other spawn row, by role/executor/model: count, tokens, hours (duration_ms).
-                Claude tokens are `tokens`. Codex shows output_tokens and input_tokens apart:
+                Claude tokens are `tokens`: the size of the agent's LAST call, not what it spent
+                (`cost` reads the real spend from the sessions). Codex shows output_tokens and input_tokens apart:
                 input is mostly cache reads (cached_input_tokens), so it is not comparable.
   Per ticket    all session tokens in the window divided by Done (or Approved) tickets, Claude and
                 Codex separately. Work on tickets not yet Done is in the numerator too.
   First pass    the first tester verdict per ticket in the window: verify_pass vs verify_fail.
   Rework        rework rounds per ticket = tester verify_fail verdicts in the window (top 5).
+"""
+
+COST_HELP = """What tickets really cost and how long they took, read from the sessions themselves.
+
+  Spend         every Claude call in the repo's Claude Code sessions (the PM's own and its
+                agents'), priced with the registry's `prices` block: API list prices, to compare
+                options. Plans bill differently. Models with no price show tokens only.
+  Lanes         usage from each lane row's result (Codex, opencode, claude-ollama).
+  Tickets       an agent belongs to the tickets named in its spawn description, else in the
+                first lines of its brief. Its role comes from the agent type and the description
+                ('<role> <TICKET>', team-pm §3).
+  Merged        the ticket's first PR merged into trunk after its first spawn (GitHub, `gh`).
+  Cycle         first spawn to merge. 'agents working' is the time any of its sessions ran.
+  --ticket T    one ticket's sessions in order, with cost, calls and outcome.
+  --backfill    adds a usage row for each Claude spawn row that has none, so the scoreboard
+                compares Claude and lanes on the same tokens.
+Session summaries are cached in {state_home}/cost-cache by file size and time.
 """
 
 
@@ -1040,6 +1059,8 @@ def selftest():
                              "role": "engineer", "executor": "claude", "model": "sonnet", "outcome": "pr_opened",
                              "source_key": f"{folder}/fleet-model-runs.jsonl|2026-09-01T00:00:00Z|ST-9|worker"})
         check("a moved repo's legacy row counts once", sum(1 for r in load_rows(reg) if r.get("ticket") == "ST-9"), 1)
+        import fleetcost
+        fleetcost.selftest(check)
     finally:
         STATE_HOME = old_home
         if old_env is None:
@@ -1080,6 +1101,12 @@ def main(argv=None, quiet=False):
         lg.add_argument(f"--{f}")
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
+    co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+    co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
+    co.add_argument("--ticket"); co.add_argument("--json", action="store_true")
+    co.add_argument("--backfill", action="store_true", help="write the real usage onto the log's Claude spawn rows")
+    co.add_argument("--dry-run", action="store_true", help="with --backfill: show what would be written")
+    co.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
     rp = sub.add_parser("report", description=REPORT_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     rp.add_argument("--project"); rp.add_argument("--since", required=True); rp.add_argument("--until"); rp.add_argument("--cwd")
     sub.add_parser("selftest")
@@ -1155,6 +1182,9 @@ def main(argv=None, quiet=False):
             print(f"backfilled {args.ticket} {args.role}: {', '.join(sets)}")
     elif args.cmd == "report":
         print(report(reg, args.project or reg.get("_project"), args.since, args.until))
+    elif args.cmd == "cost":
+        import fleetcost
+        return fleetcost.run(sys.modules[__name__], args)
     elif args.cmd == "stats":
         board = scoreboard(reg, load_rows(reg), args.role, args.kind, args.project)
         if args.json:

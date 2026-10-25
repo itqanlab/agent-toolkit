@@ -7,13 +7,14 @@
 #   run-lane.sh budget [line|status|check EXE|backoff EXE]
 #   run-lane.sh log    add|backfill ... [--set k=v ...] [--from-result <out>/result.json]
 #   run-lane.sh stats  [--role R] [--project P]   run-lane.sh report --project P --since ISO   run-lane.sh selftest
+#   run-lane.sh cost   [--since ISO] [--ticket T] [--json] [--backfill]   real spend and time per ticket
 #   run-lane.sh apply  [--dry-run]           run-lane.sh seed       run-lane.sh models
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
 # Docs: executors.md next to this folder.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${1:-}" in
-  pick|budget|log|stats|report|selftest|apply|seed|config) exec python3 "$here/fleetctl.py" "$@" ;;
+  pick|budget|log|stats|report|cost|selftest|apply|seed|config) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 # nvm installs node and opencode per version; make sure a lane started from a bare
 # shell (run_in_background) still finds them.

@@ -83,7 +83,12 @@ defaults and no other CLI installed.
 scripts/lanes/run-lane.sh pick --role engineer --kind api --cwd <repo>
 scripts/lanes/run-lane.sh budget
 scripts/lanes/run-lane.sh stats --role engineer
+scripts/lanes/run-lane.sh cost --since 2026-10-01      # real spend and time per merged ticket
+scripts/lanes/run-lane.sh cost --ticket PROJ-12        # one ticket's sessions in order
 ```
+
+The token counts the log keeps for Claude spawns are the size of each agent's last call, not
+its spend. `cost` reads the spend from the session files themselves.
 
 ## Board tools
 

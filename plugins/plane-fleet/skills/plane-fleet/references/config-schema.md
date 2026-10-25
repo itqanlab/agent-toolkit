@@ -98,6 +98,9 @@ by key; lists and plain values replace.
       // add redis / bucket keys per slot if the app uses them
     },
     "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
+    "cost": {                            // OPTIONAL, for `run-lane.sh cost`
+      "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved
+    },
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []
     },

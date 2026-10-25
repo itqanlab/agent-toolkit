@@ -277,6 +277,34 @@ total; Codex output and input apart, input being ~99% cache reads), first-pass a
 first tester verdict per ticket), rework rounds per ticket (tester `verify_fail` count, top 5)
 and the share of Done tickets with `client_visible=true`. `$L report -h` defines each line.
 
+**Real cost:** `$L cost [--since <iso>] [--until <iso>]` reads what was actually spent, from the
+sessions themselves:
+
+- every Claude call in the repo's Claude Code session files, the PM's own and each agent's,
+  deduplicated by message id and priced with the registry's `prices` block (API list prices, to
+  compare options; plans bill differently; a model without a price shows tokens only)
+- each lane's usage from its log row, and merge times from GitHub (`gh`)
+- per merged ticket: agent cost and agent + PM share, first spawn → merge, hours agents worked;
+  cost by role; cost and cycle time by rework rounds; test failures by `fail_cause`
+- where the money goes: cache reads, cache writes and output; whole-context cache rewrites after
+  a wait of 5 minutes or more (the default cache lifetime); each agent type's first-call context;
+  the PM's calls per merged ticket, average context per call and cost by activity
+
+`$L cost --ticket PROJ-134` prints that ticket's sessions in order with cost, calls and outcome.
+`--json` gives the same as data. An agent belongs to the tickets in its spawn `description`
+(`<role> <TICKET>`, team-pm §3), else to those in the first lines of its brief. Repo sessions
+are found by folder name under `$CLAUDE_CONFIG_DIR/projects` (default `~/.claude/projects`),
+worktrees included. A repo that moved keeps its old sessions under the old folder name: list
+it in `.plane/config.json` `fleet.cost.claude_project_dirs`.
+
+Claude Code deletes session files after `cleanupPeriodDays` (30 by default). `cost` keeps a
+summary of every session it has read in `{state_home}/cost-cache` and keeps counting a session
+after its file is gone, so run it at least every few weeks, or raise `cleanupPeriodDays`.
+
+`$L cost --backfill [--dry-run]` adds the real usage to each Claude spawn row that has none,
+matched by `agent_id`, else by the agent of the same ticket and role that ended within 30
+minutes before the row. The scoreboard then compares Claude and lanes on the same tokens.
+
 **What a row is scored on.** Engineer: `verify_first_pass`, or else the first tester verdict
 after it on the same ticket. Old rows put the engineer's flag on the tester row. Tester: the
 verdict held (not `reverted`, no `bug_filed`), only once those are back-filled. Until then
@@ -284,8 +312,10 @@ testers show `—`.
 
 **Scoreboard:** `$L stats [--role R] [--kind K] [--project P]` gives, per (role, kind,
 executor:model), n, first-pass rate ("not enough data" under 5), rework rate, mean minutes and
-mean cost. Cost is in relative units (`cost_weights`, per million tokens) and is only for
-comparing candidates. Scoring is global; `--project` filters.
+mean cost. Cost is in relative units (`cost_weights`, per million tokens of uncached input,
+cache writes and output) and is only for comparing candidates. Until `cost --backfill` gives a
+Claude row real usage, its cost comes from `tokens`, the last call's size, and reads far too low.
+Scoring is global; `--project` filters.
 
 **Promotion and demotion:** `$L apply` (`--dry-run` to preview), at every PM preflight:
 - a challenger with n ≥ 5, first-pass ≥ the champion's and lower mean cost becomes champion
