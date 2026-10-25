@@ -45,6 +45,13 @@ decisions) comes in the brief itself.
     `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "<your slot scratch dir>"`, and
     `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
     anything else you find instead of killing it.
+- **No wait longer than 4 minutes in one call.** Your prompt cache lives 5 minutes. A call
+  that blocks longer makes your next call write your whole context again, and those rewrites
+  were 12% of agent spend (measured 2026-10-25). So: a foreground Bash `timeout` of at most
+  270000; an e2e suite, a build or a server start runs with `run_in_background: true`, and
+  you check its output or its port with waits of at most 240 s each until it is done; a
+  `Monitor` gets `timeout_ms` of at most 270000. Do not end your turn to wait for a
+  background job: check it. A hook refuses longer waits in fleet agents.
 - Run `git config core.bare` before and after any test run. It must print `false`. If it prints
   `true`, run `git config core.bare false` and say so in your report.
 - Report what you could NOT demonstrate as plainly as what you could.

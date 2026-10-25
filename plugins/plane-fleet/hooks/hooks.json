@@ -1,5 +1,5 @@
 {
-  "description": "plane-fleet usage pacer: holds new fleet-role subagents when the Claude budget is ahead of pace or past the hard stop.",
+  "description": "plane-fleet hooks: the usage pacer holds new fleet-role subagents when the Claude budget is ahead of pace or past the hard stop; the cache keeper refuses waits in fleet agents longer than their 5-minute prompt cache.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/usage-pacer.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Monitor",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/cache-keeper.py\""
           }
         ]
       }

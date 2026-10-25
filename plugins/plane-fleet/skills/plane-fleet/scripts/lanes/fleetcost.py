@@ -642,6 +642,23 @@ def analyse(mains, agents, lanes, prs, prices, identifier, since, until, log_row
     }
 
 
+def keeper_refusals(state_home, t0, t1):
+    """Waits the cache-keeper hook refused in the window, or None when it never ran."""
+    path = os.path.join(state_home, "cache-keeper.jsonl")
+    if not os.path.exists(path):
+        return None
+    n = 0
+    with open(path, errors="replace") as f:
+        for line in f:
+            try:
+                t = epoch(json.loads(line).get("ts"))
+            except ValueError:
+                continue
+            if t and (not t0 or t >= t0) and (not t1 or t < t1):
+                n += 1
+    return n
+
+
 def render(res, project, prices, prs_error=None, sources=None):
     L = []
     merged = res["merged"]
@@ -709,7 +726,8 @@ def render(res, project, prices, prs_error=None, sources=None):
     L.append("  " + " · ".join(f"{k} {100 * v / st:.0f}%" for k, v in sorted(sp.items(), key=lambda kv: -kv[1]) if v))
     if a["usd"]:
         L.append(f"  whole-context cache rewrites after a wait of 5+ min: {a['rewrite_calls']} calls, "
-                 f"{money(a['rewrite_usd'])} ({100 * a['rewrite_usd'] / a['usd']:.0f}% of agent cost)")
+                 f"{money(a['rewrite_usd'])} ({100 * a['rewrite_usd'] / a['usd']:.0f}% of agent cost)"
+                 + (f"; long waits the cache keeper refused: {res['keeper_refusals']}" if res.get("keeper_refusals") is not None else ""))
     fc = [(k, q) for k, q in a["first_ctx"].items() if q]
     if fc:
         L.append("  context at an agent's first call, median: " + ", ".join(
@@ -832,6 +850,7 @@ def run(fleetctl, args):
     prs, err = merged_prs(main_repo, trunk, day)
     proj_rows = [r for r in rows if not project or r.get("project") == project]
     res = analyse(mains, agents, lanes, prs, prices, identifier, since, args.until, proj_rows)
+    res["keeper_refusals"] = keeper_refusals(fleetctl.STATE_HOME, *window(since, args.until))
     if args.ticket:
         x = res["tickets"].get(args.ticket)
         if not x:

@@ -97,6 +97,21 @@ roles.
 the hard stop. Without a meter configured it judges nothing. Turn it off with
 `touch ~/.config/plane-fleet/pacer-off`, or keep only the hard stop with `pace-off`.
 
+## The cache keeper hook
+
+`hooks/cache-keeper.py` runs before every `Bash` and `Monitor` call and acts only inside the
+fleet agents (`fleet-engineer`, `fleet-tester`, `fleet-planner`, `fleet-plane`). An agent's
+prompt cache lives 5 minutes, and a call that waits longer makes the next call write the whole
+context again. So it refuses a foreground Bash timeout over 270000 ms and a Monitor deadline
+over 270000 ms, and tells the agent to run the job in the background and check it every 4
+minutes. Refusals are logged to `~/.config/plane-fleet/cache-keeper.jsonl`. Turn it off with
+`touch ~/.config/plane-fleet/cache-keeper-off`.
+
+On a linked install (agents linked into your agents folder instead of a plugin install), the
+plugin's `hooks/hooks.json` does not run. Register both hooks in your user settings the same
+way: a `PreToolUse` entry with matcher `Agent` for `usage-pacer.py`, and one with matcher
+`Bash|Monitor` for `cache-keeper.py`.
+
 ## Example
 
 > run the board
