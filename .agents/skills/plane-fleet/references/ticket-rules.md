@@ -1,6 +1,7 @@
 # Ticket rules: when to file, and how big a ticket should be
 
-Owner decision 2026-10-06. Read by team-engineer, team-tester, team-ticket-writer and team-pm.
+Owner decision 2026-10-06, shape rules added 2026-10-22. Read by team-engineer, team-tester,
+team-ticket-writer, team-pm and the fleet-planner and fleet-plane agents.
 The numbers come from a measured review of one fleet week (2026-09-29 to 10-05: 224 tickets
 filed, 117 shipped, 73M tokens).
 
@@ -61,12 +62,36 @@ The cap stays: at most 2 new tickets per session, and the PM triages every one.
 - **Sweeps and cross-cutting changes are sliced one feature folder per ticket, at most about
   15 files each.** Wide and shallow is the worst shape we measured: two sweeps of 31 and 39
   files each took 7 or 8 sessions.
-- **The floor: a change under about 50 lines does not get a ticket of its own.** Batch it with
-  its siblings in the same area into one ticket. For example, all small CI and quality-gate
-  edits ship together; so do small e2e spec fixes. The exceptions are anything urgent and
-  anything that unblocks the trunk.
+- **The floor: a change under about 150 lines does not get a ticket of its own** (raised from
+  50 on 2026-10-22). Batch it with its siblings in the same area into one ticket. For example,
+  all small CI and quality-gate edits ship together; so do small e2e spec fixes. The
+  exceptions are anything urgent and anything that unblocks the trunk.
 - **Estimate at writing time.** The ticket lists the files it expects to touch. If the list
-  is past the target, split it now, not after a rework.
+  is past the ceiling, split it now, not after a rework.
+
+### Shape: one outcome per ticket (owner, 2026-10-22)
+
+The size table says how big a ticket may be. This says what goes in it.
+
+- **A ticket delivers one thing someone can see working, end to end.** The schema, the server
+  and the client for that one thing go in the same ticket. Never split by layer (1/3 schema,
+  2/3 server, 3/3 client) while the whole stays under the ceiling. A layer ticket cannot be
+  checked by a blind tester, and each extra ticket pays the ~350k fixed cost again. Seen
+  2026-10-22: one feature (a new discount kind) was filed as three tickets, schema, server and
+  client.
+- **One outcome may run past the 500-line target, up to the ceiling.** The target tells you
+  where to cut when there is a real choice. It never forces a layer split.
+- **Siblings ship together.** Open tickets on the same component or screen with the same kind
+  of fix are one ticket. Seen 2026-10-22 on one board: three open tickets each for the shared
+  table component, for field errors shown in the wrong place, and for the server's reason
+  hidden from the user.
+- **The one-session test.** One engineer can finish it in one session and one tester can check
+  it in one pass. If yes, and it is under the ceiling, it is one ticket.
+- **When it must split** (over the ceiling), split by outcome: each part ships on its own and a
+  tester can check it on its own. Name the parts by what they deliver, not by layer.
+- **Investigation is not a ticket of its own** when the answer is likely to be a small fix.
+  Put the investigation in the implementation ticket's §0 gate. File an investigation ticket
+  only when the outcome is a decision or a set of new tickets.
 
 ## 3. Merge groups (PM)
 

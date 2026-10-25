@@ -139,9 +139,12 @@ Angular error handler unwrapping `HttpErrorResponse` before our filter saw it. T
 - **Mechanical work** (table migration, deletion, rename): up to about 20 files.
 - **Over 20 files or 2000 lines:** split it before filing.
 - **Sweeps:** one feature folder per ticket, at most about 15 files.
-- **Floor:** under about 50 lines doesn't get a ticket of its own. Add it to a sibling ticket
+- **Floor:** under about 150 lines doesn't get a ticket of its own. Add it to a sibling ticket
   in the same area, or to a batch ticket (all small CI/gate edits together, all small e2e
   fixes together), unless it's urgent or unblocks trunk.
+- **Shape:** one outcome per ticket, end to end. Schema, server and client for one feature go
+  in one ticket; never split by layer while the whole is under the ceiling. Siblings on the
+  same screen or component go together. See `references/ticket-rules.md` §2 "Shape".
 
 List the files you expect each ticket to touch in its body, so the PM can check the size at
 pick time. Why: every ticket carries about 350k tokens of fixed cost. Rework rises from 5%
