@@ -70,6 +70,21 @@ To compare efforts, list the same model twice with different efforts:
                 {"executor":"codex","model":"gpt-5.6-sol","effort":"low"} ]
 ```
 
+**opencode serves three providers.** A bare model id uses the executor's `provider`
+(`ollama-cloud`). Name the others as `provider/model`:
+
+| provider | models | cost |
+|---|---|---|
+| `ollama-cloud` | `kimi-k2.7-code`, `glm-5.3`, `deepseek-v4-pro:0813`, … (`models` in the registry) | Ollama Cloud plan, shared with `claude-ollama` |
+| `opencode` | `opencode/nemotron-3-ultra-free`, `opencode/big-pickle`, … (`free_models`) | free, no key; free tiers may keep prompts |
+| `zai-coding-plan` | `zai-coding-plan/glm-5.3`, … | Z.ai GLM coding plan (`opencode auth login`) |
+
+opencode takes effort as `--variant`; the runner passes `--effort` through. Variant names are
+the provider's own. Ollama Cloud models are also reachable through Claude Code
+(`claude-ollama`), which keeps Claude Code's permission profiles; opencode's write agent runs
+with `--auto` and no OS sandbox. Run both routes as separate candidates and let the scoreboard
+decide.
+
 Escalation triggers still pin the engineer to claude `opus`: `schema`, `concurrency`,
 `unknown_root_cause`, `rework_once`, `architecture`, `disprove_gate`.
 

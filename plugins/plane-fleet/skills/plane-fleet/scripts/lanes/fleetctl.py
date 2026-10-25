@@ -535,7 +535,10 @@ def now_iso():
 def cost_units(reg, r):
     w = reg.get("cost_weights", {})
     key = f"{r.get('executor')}:{r.get('model')}"
-    weight = w.get(key, w.get(r.get("executor") or "", None))
+    provider = str(r.get("model") or "").split("/", 1)[0] + "/" if "/" in str(r.get("model") or "") else None
+    weight = w.get(key, w.get(f"{r.get('executor')}:{provider}") if provider else None)
+    if weight is None:
+        weight = w.get(r.get("executor") or "", None)
     tok = r.get("tokens")
     if isinstance(tok, dict):  # codex usage block (older rows)
         tok = (tok.get("input_tokens", 0) - tok.get("cached_input_tokens", 0)) + tok.get("output_tokens", 0)
@@ -604,9 +607,10 @@ def rkey(r):
 def family(reg, c):
     fam = reg.get("families", {})
     # '<executor>:<prefix>' first, then '*:<prefix>' (open models served by more than one executor).
+    model = str(c["model"]).split("/", 1)[-1]  # "opencode/nemotron-..." is still nemotron
     for scope in (c["executor"], "*"):
         for k, v in fam.items():
-            if k.startswith(scope + ":") and str(c["model"]).startswith(k.split(":", 1)[1]):
+            if k.startswith(scope + ":") and model.startswith(k.split(":", 1)[1]):
                 return v
     return fam.get(c["executor"], c["executor"])
 

@@ -13,7 +13,7 @@
         "fable"
       ],
       "default_model": "sonnet",
-      "notes": "Today's behaviour and the fallback for every lane. Always pass an explicit model (team-pm \u00a73). Gated by the usage pacer hook."
+      "notes": "Today's behaviour and the fallback for every lane. Always pass an explicit model (team-pm §3). Gated by the usage pacer hook."
     },
     "codex": {
       "kind": "codex",
@@ -143,7 +143,23 @@
         "OLLAMA_API_KEY"
       ],
       "notes": "Opt-in. Needs the opencode CLI and an ollama-cloud provider in its config (see executors.md).",
-      "default_model_why": "A code-specialised model built for tool use; a read-only scan is mostly file reads and greps."
+      "default_model_why": "A code-specialised model built for tool use; a read-only scan is mostly file reads and greps.",
+      "providers": {
+        "$comment": "A model id without a provider/ prefix uses `provider` above. Pass provider/model for the others.",
+        "ollama-cloud": "Ollama Cloud plan (OLLAMA_API_KEY). Same plan as the claude-ollama executor.",
+        "opencode": "opencode's own hosted models. The *-free ones cost nothing and need no key; free tiers may keep prompts.",
+        "zai-coding-plan": "Z.ai GLM coding plan, through `opencode auth login`."
+      },
+      "free_models": [
+        "opencode/nemotron-3-ultra-free",
+        "opencode/big-pickle",
+        "opencode/step-5-preview-free",
+        "opencode/mimo-v2.6-flash-free",
+        "opencode/nemotron-3.5-lightning-free",
+        "opencode/longcat-2.5-preview-free"
+      ],
+      "free_models_source": "`opencode models`, 2026-10-22. nemotron-3-ultra-free and big-pickle answered a smoke test that day.",
+      "efforts": "Passed as --variant <effort>. Names are the provider's own (e.g. minimal, high, max); an unknown one is the provider's error."
     },
     "claude-ollama": {
       "kind": "claude-cli",
@@ -281,7 +297,7 @@
   },
   "fallback_rules": {
     "registry_missing": "use claude with the team-pm model defaults",
-    "lane_failed": "non-zero exit, status != completed, no PR for an engineer, or timeout -> dead session (team-pm \u00a73 heartbeat), then re-queue once on the role's fallback",
+    "lane_failed": "non-zero exit, status != completed, no PR for an engineer, or timeout -> dead session (team-pm §3 heartbeat), then re-queue once on the role's fallback",
     "never_below": {
       "engineer": "sonnet"
     },
@@ -431,17 +447,23 @@
     "*:nemotron": "nvidia",
     "*:gpt-oss": "openai",
     "*:gemma": "google",
-    "*:muse": "meta"
+    "*:muse": "meta",
+    "*:big-pickle": "opencode-zen",
+    "*:step": "stepfun",
+    "*:mimo": "xiaomi",
+    "*:longcat": "meituan",
+    "*:qwen": "alibaba"
   },
   "cost_weights": {
-    "$comment": "Relative cost units per million tokens, only to compare candidates. Tune freely.",
+    "$comment": "Relative cost units per million tokens, only to compare candidates. Tune freely. Keys: executor:model, then executor:provider/ (opencode models named provider/model), then executor.",
     "claude:opus": 5,
     "claude:sonnet": 1,
     "claude:haiku": 0.25,
     "claude:fable": 1,
     "codex": 0.5,
     "opencode": 0.1,
-    "claude-ollama": 0.1
+    "claude-ollama": 0.1,
+    "opencode:opencode/": 0
   },
   "budget": {
     "$comment": "Same shape for every executor. Override per user in {state_home}/budget.json. Switch files in {state_home}: pacer-off / pace-off (all executors) or pacer-off-<executor> / pace-off-<executor>. pace-off skips the pace rule and keeps the hard stop.",
