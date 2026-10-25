@@ -31,11 +31,10 @@ Walk it top to bottom. File a new ticket only if you reach step 5.
    list the board and grep by keywords AND by the file paths involved. Search alone is not
    enough. Two testers filing the same bug cost a full cycle.
 3. **It's one of the standing sweep patterns.** Add a `file:line` line to that sweep ticket's
-   "Known instances". Never file a single instance on its own. The sweeps:
-   - names or labels in the wrong language for the active locale
-   - a route or menu entry that admits a role its API refuses
-   - raw i18n keys or server error codes shown to the user
-   Find the sweep ticket ids on the board by title ("Sweep: ..."). If you see a new pattern
+   "Known instances". Never file a single instance on its own. Each project keeps its own
+   sweeps as open tickets titled "Sweep: ...": list the board and match by title. Typical
+   ones are labels in the wrong language for the active locale, a route that admits a role
+   its API refuses, and raw i18n keys or error codes shown to the user. If you see a new pattern
    for the third time, propose a new sweep to the PM in your report instead of filing a
    third ticket.
 4. **It's a step that runs after merge or at the main release** (a prod check, a backfill
@@ -116,7 +115,7 @@ can still find. A heuristic tool always has one more edge case.
 - The PM records that call as a `PM SCOPE DECISION:` comment, so the next tester judges the
   narrower scope.
 - A helper script inside a docs or catalog ticket is advisory unless the ticket says it is a
-  CI gate. Measured 2026-10-14: HLMNA-672 (low, docs) took 7 sessions and about 1.2M tokens,
+  CI gate. Measured 2026-10-14: a low-priority docs ticket took 7 sessions and about 1.2M tokens,
   mostly review rounds on its scanner, while the catalog itself was right after round 2.
 
 ## 5. PM bookkeeping

@@ -69,8 +69,8 @@ edits there even though another open PR also touches them:
   1. Small and in a file you already touch? Engineer: fix it in this PR. Tester: put it in your
      verdict notes.
   2. Already covered? Comment on that ticket.
-  3. A sweep pattern (wrong-language names, route vs API role, raw keys)? Add a file:line line
-     to the sweep ticket.
+  3. One more instance of a pattern that has an open "Sweep: ..." ticket on the board? Add a
+     file:line line to that sweep ticket.
   4. A post-release check? Add it to the Release checklist ticket.
   5. Only a real user-facing, money, data, security or blocking problem gets a new ticket
      (/team-ticket-writer). Name its id in your report.

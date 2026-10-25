@@ -54,8 +54,8 @@ comment_html: "<h3>Findings</h3><p>Blocked by <code>PROJ-144</code>.</p>"   ✅
 comment_html: "&lt;h3&gt;Findings&lt;/h3&gt;"                                 ❌ renders as text
 ```
 
-Escape **only** literal angle brackets you want the reader to see, such as `<hlm-card>` inside
-a real `<code>` tag: `<code>&lt;hlm-card&gt;</code>`.
+Escape **only** literal angle brackets you want the reader to see, such as `<app-card>` inside
+a real `<code>` tag: `<code>&lt;app-card&gt;</code>`.
 
 **Check the reply every time.** Update replies carry `description_escaped` and comment replies
 carry `comment_escaped`, with a warning when Plane stored the markup as text. If either is

@@ -119,7 +119,7 @@ vendor's source) at filing time and cite it the same way you cite repo code, e.g
 captureException`. If the behaviour can't be settled by reading, file a short `investigation`
 ticket first, and file the build ticket from its findings.
 
-Why: 2026-10-16, HLMNA-815 went through three rework rounds. One of them came from Sentry's
+Why: 2026-10-16, an error-filter ticket went through three rework rounds. One of them came from Sentry's
 Angular error handler unwrapping `HttpErrorResponse` before our filter saw it. Ten minutes in
 `node_modules` at filing time would have put that in the ticket.
 
@@ -150,8 +150,8 @@ List the files you expect each ticket to touch in its body, so the PM can check 
 pick time. Why: every ticket carries about 350k tokens of fixed cost. Rework rises from 5%
 under 200 lines to 25% at 500 and more, and to 42% at 21 or more files (measured 2026-10-05).
 
-**Check for a standing sweep first.** If the report is one more instance of a sweep pattern
-(wrong-language names, route vs API role, raw keys shown to users), add it to that sweep's
+**Check for a standing sweep first.** If the report is one more instance of a pattern that
+has an open "Sweep: ..." ticket on the board, add it to that sweep's
 "Known instances" instead of filing a ticket. Post-release checks go on the "Release
 checklist" ticket.
 
@@ -281,7 +281,7 @@ context makes escaping feel careful — it is not.
 **Read the response back:** a correct description returns wrapped in `<div><p>…`; an escaped
 one returns `<span>&lt;p&gt;…`. If it is wrong, fix it immediately with `workitem(action="update")`
 (same content, unescaped). Escape only angle brackets the reader should see — a code sample
-containing `<hlm-card>` needs `&lt;hlm-card&gt;` *inside* a real `<code>` tag.
+containing `<app-card>` needs `&lt;app-card&gt;` *inside* a real `<code>` tag.
 
 - `name`: one line, imperative or symptom-first, no ids. e.g.
   `Transfer lifecycle: quantities and item statuses are never persisted`.

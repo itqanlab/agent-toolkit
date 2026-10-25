@@ -135,7 +135,7 @@ entry point the ticket names, in the running app. Calling the function under tes
 outcome lands in an external service (Sentry, a courier, a store), read what that service
 actually stored back from its API and check it there. Don't rely on what the app sent.
 
-Why: 2026-10-16, a tester approved HLMNA-815 by calling `beforeSend` directly. On the real
+Why: 2026-10-16, a tester approved an error-filter ticket by calling `beforeSend` directly. On the real
 path, Angular's error handler had already unwrapped the error, so 4xx responses leaked anyway.
 
 ### "Not applicable" is a finding, never a quiet pass
@@ -251,7 +251,7 @@ You decide **approve** or **rework**. You never decide **who** fixes it. That go
 
 Not this ticket's fault → walk the filing ladder in
 `references/ticket-rules.md` §1 first: comment on an existing ticket, or add
-a `file:line` line to a standing sweep (wrong-language names, route vs API role, raw keys).
+a `file:line` line to the board's matching "Sweep: ..." ticket.
 File with `/team-ticket-writer`, linked, only for a real user-facing, money, data or security
 defect with no home yet. A **regression** (worked before, broken now) is `urgent` and is always
 filed. (2026-10-06: testers filed 37% of a week's tickets, and only 35% of those ever closed.)
