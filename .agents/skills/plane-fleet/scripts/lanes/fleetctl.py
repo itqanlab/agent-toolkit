@@ -374,6 +374,16 @@ def legacy_rows(reg):
     return out
 
 
+def legacy_identity(r):
+    """A legacy row's identity without the folder it was read from. A repo that moves gets a
+    new Claude projects folder with a copy of its old run log; both copies are one row."""
+    k = r.get("source_key")
+    if not k or "|" not in k:
+        return None
+    src, rest = k.split("|", 1)
+    return (r.get("project"), os.path.basename(src), rest)
+
+
 def load_rows(reg):
     """Spawn rows with back-fills applied. Legacy files are read live and win over seeded copies."""
     spawns, backfills = [], []
@@ -386,12 +396,18 @@ def load_rows(reg):
             (backfills if r.get("type") == "backfill" else spawns).append(r)
     except OSError:
         pass
-    live = {r["source_key"]: r for r in legacy_rows(reg)}
-    merged = []
+    live = {}
+    for r in legacy_rows(reg):
+        live.setdefault(legacy_identity(r), r)
+    merged, seen = [], set()
     for r in spawns:
-        k = r.get("source_key")
-        merged.append(live.pop(k) if k and k in live else r)
-    merged += live.values()
+        k = legacy_identity(r)
+        if k is None:
+            merged.append(r)
+        elif k not in seen:
+            seen.add(k)
+            merged.append(live.pop(k, r))
+    merged += [r for k, r in live.items() if k not in seen]
     merged.sort(key=lambda r: r.get("ts") or "")
     merged = fold_usage_rows(merged)
     for b in sorted(backfills, key=lambda r: r.get("ts") or ""):
@@ -816,7 +832,7 @@ def seed(reg):
     try:
         for line in open(P(reg, "path")):
             try:
-                k = json.loads(line).get("source_key")
+                k = legacy_identity(json.loads(line))
                 if k:
                     have.add(k)
             except Exception:
@@ -826,10 +842,10 @@ def seed(reg):
     added = 0
     by_project = {}
     for r in legacy_rows(reg):
-        if r["source_key"] in have:
+        if legacy_identity(r) in have:
             continue
         append_row(reg, r)
-        have.add(r["source_key"])
+        have.add(legacy_identity(r))
         added += 1
         by_project[r["project"]] = by_project.get(r["project"], 0) + 1
     return added, by_project
@@ -1019,6 +1035,11 @@ def selftest():
         check("no effort, no key", "effort" in r1, False)
         board = scoreboard(reg, list(rows.values()), role="tester")
         check("scoreboard keys effort", ("tester", "*", "codex:gpt-x@high") in board, True)
+        for folder in ("-old-path-repo", "-new-path-repo"):  # one legacy row, seeded from two folders
+            append_row(reg, {"type": "spawn", "ts": "2026-09-01T00:00:00Z", "project": "st", "ticket": "ST-9",
+                             "role": "engineer", "executor": "claude", "model": "sonnet", "outcome": "pr_opened",
+                             "source_key": f"{folder}/fleet-model-runs.jsonl|2026-09-01T00:00:00Z|ST-9|worker"})
+        check("a moved repo's legacy row counts once", sum(1 for r in load_rows(reg) if r.get("ticket") == "ST-9"), 1)
     finally:
         STATE_HOME = old_home
         if old_env is None:
