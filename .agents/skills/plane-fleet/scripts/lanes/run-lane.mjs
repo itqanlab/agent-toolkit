@@ -95,6 +95,20 @@ function loadRegistry(cwd) {
   return { registry: reg, source };
 }
 
+// Free models may keep prompts, so the owner allows them only for some roles (freemodels.py,
+// free_model_policy). pick already leaves them out elsewhere; this stops a direct call too.
+function freeModelRefusal(registry, executor, model, role, sandbox) {
+  const pol = { roles: ["scan"], executor: "opencode", ...(registry.free_model_policy || {}) };
+  if (executor !== pol.executor) return null;
+  let state = {};
+  try { state = JSON.parse(readFileSync(join(STATE_HOME, "free-models.json"), "utf8")); } catch {}
+  const known = new Set([...Object.keys(state.models || {}), ...(registry.executors?.[executor]?.free_models || [])]);
+  if (!known.has(model) && !/^opencode\/.+-free$/.test(model)) return null;
+  if (!pol.roles.includes(role)) return `${model} is a free model and may keep prompts: free_model_policy allows it only for ${pol.roles.join(", ") || "no role"}, not ${role}`;
+  if (sandbox !== "read-only") return `${model} is a free model: it runs read-only only, not ${sandbox}`;
+  return null;
+}
+
 // ---------- args ----------
 function parseArgs(argv) {
   const opts = { positional: [] };
@@ -261,6 +275,8 @@ async function run(opts) {
   const model = opts.model;
   const modelWarning = (exe.models || []).includes(model.replace(/^[^/]+\//, "")) ? null : `model "${model}" is not in the registry list for ${executor}; running it anyway`;
   const sandbox = opts.sandbox || role.sandbox || "read-only";
+  const refusal = freeModelRefusal(registry, executor, model, opts.role, sandbox);
+  if (refusal) usage(refusal);
   const timeoutSec = Number(opts.timeout || role.timeout_sec || 3600);
   if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) usage("--timeout must be a positive number of seconds");
 
