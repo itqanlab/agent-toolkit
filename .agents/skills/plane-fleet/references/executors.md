@@ -263,7 +263,8 @@ duration_ms, tokens` (Claude: the session total), or for a lane `input_tokens,
 cached_input_tokens, output_tokens, reasoning_output_tokens`, `tokens` = input + output,
 `result_path` and `lane_status` when it did not complete. Then `claude_meter_delta_pct` when
 known, `outcome` (`pr_opened`, `blocked`, `verify_pass`, `verify_fail`, `done`, `lane_failed`,
-`deferred`), `verify_first_pass, rework_count, ci_first_pass`, and later `reverted`,
+`deferred`), `fail_cause` on a `verify_fail` (required), `verify_first_pass, rework_count,
+ci_first_pass`, and later `reverted`,
 `bug_filed`. `log add` needs `--executor` on every row, the PM's own Done rows included (use the PM's executor and model). A Done row (`--role pm --outcome done`) carries `client_visible`: `true` when the
 client can see the change (UI, copy, a report they read), `false` for tests, infra, refactors
 and internal tooling. Back-fills are separate rows and apply to the latest matching spawn. A

@@ -28,6 +28,8 @@ FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet roo
 BASE_REGISTRY = os.path.join(FLEET_ROOT, "references", "executors.json")
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
 OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred")
+# Why a tester failed a PR (team-pm §3 "Read a low pass rate correctly"); only "missed" counts against the model.
+FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
 def X(p):
     """~ expands; {state_home} is PLANE_FLEET_HOME (default ~/.config/plane-fleet); {fleet_root} is this folder."""
     if not isinstance(p, str):
@@ -1059,6 +1061,16 @@ def selftest():
                              "role": "engineer", "executor": "claude", "model": "sonnet", "outcome": "pr_opened",
                              "source_key": f"{folder}/fleet-model-runs.jsonl|2026-09-01T00:00:00Z|ST-9|worker"})
         check("a moved repo's legacy row counts once", sum(1 for r in load_rows(reg) if r.get("ticket") == "ST-9"), 1)
+        import contextlib, io
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail"], quiet=True)
+            check("verify_fail without a cause is refused", "logged", "refused")
+        except SystemExit:
+            check("verify_fail without a cause is refused", True, True)
+        main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"], quiet=True)
+        r4 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-4", {})
+        check("--cause stored", r4.get("fail_cause"), "ticket")
         import fleetcost
         fleetcost.selftest(check)
     finally:
@@ -1101,6 +1113,7 @@ def main(argv=None, quiet=False):
         lg.add_argument(f"--{f}")
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
+    lg.add_argument("--cause", choices=FAIL_CAUSES, help="why the tester failed it; required with --outcome verify_fail")
     co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
     co.add_argument("--ticket"); co.add_argument("--json", action="store_true")
@@ -1165,9 +1178,13 @@ def main(argv=None, quiet=False):
                    "executor": args.executor, "model": args.model, "experiment": bool(args.experiment),
                    **({"effort": args.effort} if args.effort else {}),
                    "reason": args.reason, "outcome": args.outcome}
+            if args.cause:
+                fields["fail_cause"] = args.cause
             row.update(fields)
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
+            if row["outcome"] == "verify_fail" and row.get("fail_cause") not in FAIL_CAUSES:
+                ap.error(f"verify_fail needs --cause {'|'.join(FAIL_CAUSES)}: only 'missed' counts against the model")
             append_row(reg, row)
             if not quiet:
                 extra = " ".join(f"{k}={v}" for k, v in fields.items() if k != "result_path")
