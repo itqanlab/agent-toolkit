@@ -18,9 +18,19 @@ the PM, which puts it through the queue.
    (the PM role, merge queue). A single PR marked ready runs the full CI, about 40 minutes on the one
    runner, and then trunk runs it again after the merge. On 2026-10-16 three PRs were marked
    ready one by one and each one held up the runner twice (owner: CI should not run per PR).
-2. **Attach one client-ready screenshot to the Plane ticket**: the screen the client will look
-   at, real-looking data, no dev overlays. The manager uses it for the client message after
-   deploy. It does not run the app itself.
+2. **Take one client-ready screenshot**: the screen the client will look at, real-looking
+   data, no dev overlays. The manager uses it for the client message after deploy. It does not
+   run the app itself. Attach it with the Plane MCP if the MCP accepts it. The MCP only uploads
+   from a public URL, so a local file is usually refused: then save it to
+   `~/.cache/plane-fleet/shots/<IDENTIFIER>-<n>.png` and put that full path in the verdict
+   comment. That counts as done. Never leave it only in the slot or worktree folder: teardown
+   deletes those (2026-10-26: 10 of 16 shots for one client message were gone that way). **Never open Plane in a browser to attach
+   it**, and never guess Plane's web address: the board is self-hosted, so `app.plane.so` is
+   someone else's site (2026-10-24 and 2026-10-26: tester lanes opened it in the owner's
+   Chrome for exactly this step). **Never make a public URL for it either**: no tunnel
+   (cloudflared, ngrok, localtunnel), no local web server exposed to the internet, no upload
+   host. 2026-10-25/26: five tester lanes ran `cloudflared tunnel` over their scratch folder
+   so the MCP could fetch the screenshot, which put the folder on the open internet.
 3. Ticket → `Approved` (priority preserved), with a comment: Phase A table, tests you added
    (commit shas), non-blocking review notes, trunk-conflict note if any.
 4. Non-blocking findings (a nicer name, an unrelated smell) go in this comment's

@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [Unreleased]
+
+### Changed
+
+- Testers take the client screenshot and attach it through the Plane MCP only. When the MCP refuses a local file, they save it to `~/.cache/plane-fleet/shots/<IDENTIFIER>-<n>.png` and name that path in the verdict comment. They never open Plane in a browser, never guess its web address, and never open a tunnel or upload host to get a public URL (`engineering/tester/skills/verdict.md`, `engineering/tester/role.md`, `core/references/non-claude-adapter.md`).
+
 ## [2.1.0] - 2026-10-26
 
 ### Added

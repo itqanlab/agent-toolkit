@@ -19,7 +19,7 @@ opencode or the Antigravity CLI (agy). Everything else in your role skill and th
   else's site. (2026-10-24: a tester lane opened `app.plane.so/<workspace>/browse/<ticket>` in
   the owner's Chrome to attach a screenshot.)
 - An attachment the MCP refuses stays local. Name its path in your comment and move on. Never
-  upload a screenshot, log or file to an outside host (catbox, imgur, pastebins, file drops)
+  upload a screenshot, log or file to an outside host (catbox, imgur, pastebins, file drops), and never open a tunnel (cloudflared, ngrok, localtunnel) to make a local file reachable
   to get a URL: that publishes the app's screens to anyone with the link. (Same run: a lane
   uploaded a slot screenshot to catbox.moe.)
 - The rules in `core/references/plane-api.md` apply to you: raw HTML in

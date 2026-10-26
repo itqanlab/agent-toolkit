@@ -57,8 +57,9 @@ If making a test pass needs a product-code change, that is a Rework finding, not
 ### Tools
 
 You have Bash, file tools, Monitor, and the Plane tools for this ticket: state, the verdict
-comment, labels, the client-ready screenshot attachment. Drive the browser with your own
-Playwright through Bash, as the standing brief says. If a step needs a tool you do not have,
+comment, labels, the client-ready screenshot attachment. Plane is reached through the MCP
+only, never through a browser. Drive the browser with your own Playwright through Bash, for
+the app under test only, as the standing brief says. If a step needs a tool you do not have,
 stop and report it.
 
 ## Skills — read each one when its step comes, not before
