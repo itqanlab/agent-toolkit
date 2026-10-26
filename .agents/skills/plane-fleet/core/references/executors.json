@@ -232,6 +232,65 @@
         "OLLAMA_API_KEY"
       ],
       "notes": "Opt-in. Same harness, skills, hooks and CLAUDE.md as a Claude lane, with an open model behind it. Not in any candidates list by default."
+    },
+    "antigravity": {
+      "kind": "antigravity",
+      "invocation": "core/scripts/fleet antigravity --model <m> --role <role> --ticket <ID> --cwd <repo> --brief <file> --out <dir>",
+      "binary": "agy",
+      "install": "Antigravity CLI (agy), signed in with the Google account that holds the AI Pro plan",
+      "tested_version": "1.3.1",
+      "models": [
+        "gemini-4-argon",
+        "gemini-3.8-flash",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "gpt-oss-120b"
+      ],
+      "models_source": "`agy models`, 2026-10-26. It lists each model per effort (gemini-3.8-flash-high, ...); the runner passes the base id and --effort, which agy accepts.",
+      "default_model": "gemini-3.8-flash",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "efforts_note": "agy --effort takes low|medium|high|xhigh|max, but `agy models` lists only low, medium and high (gpt-oss-120b: medium only).",
+      "permission_profiles": {
+        "full": {
+          "args": [
+            "--dangerously-skip-permissions"
+          ],
+          "use_for": "engineer and tester: both commit and push"
+        },
+        "read-only": {
+          "args": [
+            "--dangerously-skip-permissions"
+          ],
+          "use_for": "scans, triage, review",
+          "note": "Same flag as full: the lane guard hook is the gate. Measured 2026-10-26 on agy 1.3.1: a hook can deny but cannot grant (allow, ask and permissionOverrides never passed agy's own check headless), and agy's own denial ends the run with no report, while a hook denial reaches the model and the run goes on. So agy allows everything and the guard denies writes, unlisted commands, Plane writes and any tool outside read_tools."
+        }
+      },
+      "lane_guard": {
+        "$comment": "Policy for core/references/antigravity-plugin/lane-guard.mjs, a PreToolUse and Stop hook that acts only in fleet lanes (run-lane sets FLEET_LANE_POLICY). agy has no per-run tool list, so this is how a lane loses browser tools and how a read-only lane gets its commands without global allow rules.",
+        "deny_tools": ["browser_.*", "open_browser_url", "click_browser_pixel", "capture_browser_screenshot", "capture_browser_console_logs",
+          "execute_browser_javascript", "read_browser_page", "list_browser_pages", "invoke_subagent", "define_subagent", "manage_subagents",
+          "schedule", "send_message", "manage_inbox", "manage_task", "run_workflow", "search_marketplace", "generate_image", "delete_knowledge"],
+        "read_tools": ["view_file", "read_file", "list_dir", "find_by_name", "grep_search", "command_status",
+          "read_resource", "list_resources", "finish", "wait", "wait_5_seconds"],
+        "write_tools": ["write_file", "write_to_file", "replace_file_content", "multi_replace_file_content", "sed_file", "notebook_edit", "notebook_execution", "send_command_input"],
+        "read_only_commands": ["git log", "git show", "git diff", "git status", "git branch", "git ls-files", "git grep", "git rev-parse",
+          "git worktree list", "rg", "grep", "ls", "wc", "cat", "head", "tail",
+          "gh pr view", "gh pr list", "gh pr diff", "gh pr checks", "gh run list", "gh run view"],
+        "mcp_read_actions": "^(list|retrieve|get|search|body|query|resolve)",
+        "full_deny_commands": ["(^|[;&|(]\\s*)(open|xdg-open|osascript|cloudflared|ngrok|lt|localtunnel)(\\s|$)"]
+      },
+      "mcp_servers": [
+        "plane"
+      ],
+      "mcp_source": "~/.claude.json",
+      "mcp_note": "agy reads MCP servers only from ~/.gemini/config/mcp_config.json (no per-run flag). `fleet antigravity-setup` registers each server there as `fleet mcp-exec <name>`, which reads the real entry from mcp_source at start. No secret is copied. The lane guard turns off every other MCP server in a lane.",
+      "plugin": "core/references/antigravity-plugin (linked by antigravity-setup as ~/.gemini/config/plugins/plane-fleet-lanes)",
+      "quota": "Google AI Pro plan, separate from Claude. Three pools with their own windows, read live by `agy -p /usage` (see budget.executors.antigravity).",
+      "notes": "Opt-in. Claude models here run on the Google plan, not on the Claude subscription. Global agy plugins still load in every lane; the lane guard denies their tools."
     }
   },
   "roles": {
@@ -438,6 +497,9 @@
   "families": {
     "claude": "anthropic",
     "codex": "openai",
+    "antigravity:gemini": "google",
+    "antigravity:claude": "anthropic",
+    "antigravity:gpt": "openai",
     "$comment": "An '<executor>:<prefix>' or '*:<prefix>' key matches models that start with <prefix>; '*:' covers every executor that serves open models (opencode, claude-ollama).",
     "*:kimi": "moonshot",
     "*:glm": "zhipu",
@@ -463,6 +525,7 @@
     "codex": 0.5,
     "opencode": 0.1,
     "claude-ollama": 0.1,
+    "antigravity": 0.3,
     "opencode:opencode/": 0
   },
   "free_model_policy": {
@@ -524,6 +587,18 @@
         "max_lanes_per_window": null,
         "state_as": "opencode",
         "$comment": "state_as: shares the lane counter and any 429 back-off with opencode, since both draw on one Ollama Cloud plan."
+      },
+      "antigravity": {
+        "source": "antigravity-usage",
+        "cache_minutes": 5,
+        "pools": {
+          "$comment": "Model id prefix -> the /usage bucket ids it draws on; the longest prefix wins. From `agy -p /usage --output-format json`, 2026-10-26, Pro plan: Argon has its own weekly limit there.",
+          "gemini": ["gemini-weekly", "gemini-5h"],
+          "gemini-4-argon": ["gemini-argon-wtu-weekly"],
+          "claude": ["3p-weekly", "3p-5h"],
+          "gpt": ["3p-weekly", "3p-5h"]
+        },
+        "$comment": "A live meter. Each lane is judged on its model's pool, every window in it (5h and weekly). The reading is cached cache_minutes, since the call takes about 4 s."
       }
     }
   },

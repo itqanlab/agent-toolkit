@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// run-lane — run one fleet role on a CLI executor (codex, opencode, or Claude Code on another
-// provider such as claude-ollama) and write
+// run-lane — run one fleet role on a CLI executor (codex, opencode, antigravity, or Claude Code
+// on another provider such as claude-ollama) and write
 // <out>/result.json. Launched by the PM with Bash run_in_background, so the PM is
 // notified when it exits. Never commits by itself. Never prints secrets.
 //
 // Usage:
-//   fleet <codex|opencode|claude-ollama> --model <m> --role <role> --ticket <ID> --cwd <dir>
+//   fleet <codex|opencode|antigravity|claude-ollama> --model <m> --role <role> --ticket <ID> --cwd <dir>
 //               --brief <file> --out <dir> [--sandbox restricted|full|read-only]
 //               [--timeout <sec>] [--effort <level>] [--dry-run]
 //               [--ignore-budget]
-//   fleet models [codex|opencode|claude-ollama]
+//   fleet models [codex|opencode|antigravity|claude-ollama]
+//   fleet antigravity-setup    register the fleet's MCP servers (plane) with agy, once
+//   fleet mcp-exec <name>      start an MCP server from its ~/.claude.json entry (agy runs this)
 //   fleet pick|budget|log|stats|report|apply|seed ...   -> fleetctl.py (selection, pacer, log, report)
 //   After a lane: fleet log add --from-result <out>/result.json --outcome O [--kind K] takes
 //   ticket, role, executor, model, durationMs and usage from result.json.
@@ -26,7 +28,7 @@ import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
-import { realpathSync } from "node:fs";
+import { realpathSync, symlinkSync } from "node:fs";
 
 const HOME = homedir();
 // Everything resolves from this file's real location: <fleet root>/core/scripts/run-lane.mjs.
@@ -172,6 +174,10 @@ function composePrompt(o, role) {
   }
   if (o.sandbox === "read-only") {
     parts.push("This lane is READ-ONLY. Do not edit files, commit, push, or write to Plane. Report only.");
+    // the lane guard allows only these; saying so up front saves denied calls
+    if (o.kind === "antigravity" && o.allow?.length) {
+      parts.push(`Shell here runs only commands that start with: ${o.allow.join(", ")}. One command per call, no pipes, redirects, && or $(...). Prefer your own file tools (view_file, grep_search, find_by_name, list_dir) for reading and searching.`);
+    }
   }
   parts.push("");
   parts.push("## Brief from the PM");
@@ -225,6 +231,32 @@ function claudeCliArgv(o, exe, mcpPath) {
   if (o.effort) argv.push("--effort", o.effort);
   return argv;
 }
+// Antigravity CLI: the prompt goes on stdin as one stream-json message; MCP comes from agy's
+// global config (antigravity-setup), since agy has no per-run MCP flag.
+function antigravityArgv(o, exe) {
+  const prof = exe.permission_profiles?.[o.sandbox];
+  if (!prof) usage(`${o.executor} has no permission profile "${o.sandbox}" (have: ${Object.keys(exe.permission_profiles || {}).join(", ")})`);
+  const argv = ["--input-format", "stream-json", "--output-format", "stream-json", "--model", o.model,
+    "--disable-slash-commands", "--add-dir", FLEET_ROOT, ...prof.args];
+  if (o.effort) argv.push("--effort", o.effort);
+  return argv;
+}
+const AGY_MCP = join(HOME, ".gemini/config/mcp_config.json");
+const AGY_PLUGIN = join(HOME, ".gemini/config/plugins/plane-fleet-lanes");
+const GUARD_SRC = join(FLEET_ROOT, "core/references/antigravity-plugin");
+// What antigravity-setup should have done: MCP servers registered, lane guard plugin linked here.
+function agyMcpMissing(exe) {
+  let have = {};
+  try { have = JSON.parse(readFileSync(AGY_MCP, "utf8")).mcpServers || {}; } catch {}
+  const missing = (exe.mcp_servers || []).filter((n) => !have[n]);
+  let linked = false;
+  try { linked = realpathSync(AGY_PLUGIN) === realpathSync(GUARD_SRC); } catch {}
+  // every lane runs with --dangerously-skip-permissions, so a lane without its guard never starts
+  let disabled = false;
+  try { disabled = JSON.parse(readFileSync(join(HOME, ".gemini/config/config.json"), "utf8")).plugins?.["plane-fleet-lanes"]?.enabled === false; } catch {}
+  return [...missing, ...(linked ? [] : ["lane guard plugin not linked"]), ...(disabled ? ["lane guard plugin disabled in agy"] : [])];
+}
+
 // Copy the named MCP servers out of the user's Claude config into a 0600 file for this lane only.
 function writeLaneMcp(exe, out) {
   const names = exe.mcp_servers || [];
@@ -267,7 +299,7 @@ async function run(opts) {
   if (!registry) usage(`registry ${REGISTRY} is missing: spawn the claude fallback instead`);
   const exe = registry.executors?.[executor];
   if (!exe) usage(`unknown executor "${executor}" (have: ${Object.keys(registry.executors || {}).join(", ")})`);
-  if (exe.kind !== executor && !["codex", "opencode", "claude-cli"].includes(exe.kind)) usage(`executor kind ${exe.kind} is not runnable here`);
+  if (exe.kind !== executor && !["codex", "opencode", "claude-cli", "antigravity"].includes(exe.kind)) usage(`executor kind ${exe.kind} is not runnable here`);
   const kind = exe.kind;
   const role = registry.roles?.[opts.role];
   if (!role) usage(`unknown role "${opts.role}" (have: ${Object.keys(registry.roles || {}).join(", ")})`);
@@ -281,7 +313,7 @@ async function run(opts) {
   if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) usage("--timeout must be a positive number of seconds");
 
   mkdirSync(out, { recursive: true });
-  const o = { executor, kind, model, role: opts.role, ticket: opts.ticket, cwd, brief, sandbox, effort: opts.effort };
+  const o = { executor, kind, model, role: opts.role, ticket: opts.ticket, cwd, brief, sandbox, effort: opts.effort, allow: exe.lane_guard?.read_only_commands };
   const paths = {
     prompt: join(out, "prompt.md"), events: join(out, "events.jsonl"), stderr: join(out, "stderr.log"),
     final: join(out, "last-message.txt"), result: join(out, "result.json"), started: join(out, "started.json"),
@@ -291,7 +323,11 @@ async function run(opts) {
   const bin = exe.binary || kind;
   const laneMcp = kind === "claude-cli" ? writeLaneMcp(exe, out) : null;
   const argv = kind === "codex" ? codexArgv(o, exe, paths.final)
-    : kind === "claude-cli" ? claudeCliArgv(o, exe, laneMcp?.path) : opencodeArgv(o, exe);
+    : kind === "claude-cli" ? claudeCliArgv(o, exe, laneMcp?.path)
+    : kind === "antigravity" ? antigravityArgv(o, exe) : opencodeArgv(o, exe);
+  const stdinText = kind === "antigravity"
+    ? JSON.stringify({ event: "user", message: { content: readFileSync(paths.prompt, "utf8") } }) + "\n"
+    : readFileSync(paths.prompt, "utf8");
   const env = { ...process.env };
   // Credentials the executor's own config references as env vars ({env:NAME}): taken from the
   // environment, else from the file the registry names. Values never reach argv, logs or stdout.
@@ -301,6 +337,17 @@ async function run(opts) {
       const v = readEnvVar(expand(exe.env_file), name);
       if (v) env[name] = v;
     }
+  }
+  if (kind === "antigravity") {
+    // Read by the lane guard hook (antigravity-plugin/lane-guard.mjs); nothing in it is secret.
+    const g = exe.lane_guard || {};
+    const policy = { sandbox, mcp_servers: exe.mcp_servers || [], deny_tools: g.deny_tools || [], write_tools: g.write_tools || [],
+      read_tools: g.read_tools || [], seen: join(out, "guard-seen"),
+      allow_commands: g.read_only_commands || [], mcp_read_actions: g.mcp_read_actions || "^$",
+      full_deny_commands: g.full_deny_commands || [], denied_log: join(out, "denied.jsonl") };
+    for (const f of [policy.denied_log, policy.seen]) rmSync(f, { force: true });
+    writeFileSync(join(out, "lane-policy.json"), JSON.stringify(policy, null, 2) + "\n");
+    env.FLEET_LANE_POLICY = join(out, "lane-policy.json");
   }
   if (kind === "opencode" && exe.config_content) {
     const { $comment, ...cfg } = exe.config_content;
@@ -324,7 +371,8 @@ async function run(opts) {
   if (opts["dry-run"]) {
     process.stdout.write(JSON.stringify({ bin, argv, cwd, sandbox, timeoutSec, prompt: paths.prompt, registry: source, modelWarning,
       ...(laneMcp ? { mcpServers: (exe.mcp_servers || []).filter((n) => !laneMcp.missing.includes(n)), mcpMissing: laneMcp.missing } : {}),
-      ...(kind === "claude-cli" ? { providerKey: env.ANTHROPIC_AUTH_TOKEN ? "set" : "MISSING" } : {}) }, null, 2) + "\n");
+      ...(kind === "claude-cli" ? { providerKey: env.ANTHROPIC_AUTH_TOKEN ? "set" : "MISSING" } : {}),
+      ...(kind === "antigravity" ? { mcpMissing: agyMcpMissing(exe) } : {}) }, null, 2) + "\n");
     if (laneMcp) rmSync(laneMcp.path, { force: true });
     return 0;
   }
@@ -382,6 +430,11 @@ async function run(opts) {
     finish({ status: "unavailable", exitCode: 127, signal: null, lastMessage: "", error: `${exe.auth_env} not found in the environment or env_file` });
     return 127;
   }
+  if (kind === "antigravity" && agyMcpMissing(exe).length) {
+    finish({ status: "unavailable", exitCode: 127, signal: null, lastMessage: "",
+      error: `agy setup incomplete (${agyMcpMissing(exe).join(", ")}): run \`fleet antigravity-setup\` once` });
+    return 127;
+  }
   if (!version) {
     finish({ status: "unavailable", exitCode: 127, signal: null, lastMessage: "", error: `${bin} not found or --version failed` });
     return 127;
@@ -392,12 +445,27 @@ async function run(opts) {
 
   const child = spawn(bin, argv, { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
   const errOut = createWriteStream(paths.stderr);
-  let threadId = null; let sessionId = null; let tokenUsage = null; let cliResult = null;
+  let threadId = null; let sessionId = null; let tokenUsage = null; let cliResult = null; let agyResult = null;
   const textParts = new Map(); const order = [];
   const scan = makeScanner((ev) => {
     if (kind === "codex") {
       if (ev.type === "thread.started" && ev.thread_id) threadId = ev.thread_id;
       if (ev.type === "turn.completed" && ev.usage) tokenUsage = ev.usage;
+    } else if (kind === "antigravity") {
+      if (ev.conversation_id) sessionId = ev.conversation_id;
+      if (ev.event === "step_update" && ev.step_update?.step_type === "agent_response" && ev.step_update.text_delta) {
+        const id = `step-${ev.step_update.step_index}`;
+        if (!textParts.has(id)) order.push(id);
+        textParts.set(id, (textParts.get(id) || "") + ev.step_update.text_delta);
+      }
+      if (ev.event === "result" && ev.result) {
+        agyResult = ev.result;
+        // input_tokens leaves cache reads out (total_tokens = input + output); fold them in as codex does.
+        const u = ev.result.usage || {};
+        const cached = u.cache_read_tokens || 0;
+        tokenUsage = { input_tokens: (u.input_tokens || 0) + cached, cached_input_tokens: cached,
+          output_tokens: u.output_tokens || 0, reasoning_output_tokens: u.thinking_tokens || 0, num_turns: ev.result.num_turns ?? null };
+      }
     } else if (kind === "claude-cli") {
       if (ev.session_id) sessionId = ev.session_id;
       if (ev.type === "result") {
@@ -432,7 +500,7 @@ async function run(opts) {
   child.stdout.on("data", (c) => { appendFileSync(paths.events, c); scan(dec.write(c)); });
   child.stderr.on("data", (c) => errOut.write(c));
   child.stdin.on("error", () => {});
-  child.stdin.end(readFileSync(paths.prompt, "utf8"));
+  child.stdin.end(stdinText);
 
   const killTree = (sig) => { try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch {} } };
   let reason = null;
@@ -452,15 +520,21 @@ async function run(opts) {
     lastMessage = cliResult && !cliResult.is_error && typeof cliResult.result === "string" ? cliResult.result.trim() : "";
     if (lastMessage) writeFileSync(paths.final, lastMessage + "\n");
   }
+  else if (kind === "antigravity") {
+    // response is the final turn; the streamed steps are a fallback when the result never came
+    lastMessage = agyResult?.status === "SUCCESS" && typeof agyResult.response === "string" ? agyResult.response.trim()
+      : agyResult ? "" : (order.length ? textParts.get(order[order.length - 1]).trim() : "");
+    if (lastMessage) writeFileSync(paths.final, lastMessage + "\n");
+  }
   else { lastMessage = order.map((id) => textParts.get(id)).join("").trim(); if (lastMessage) writeFileSync(paths.final, lastMessage + "\n"); }
 
   // Quota or rate limit hit: record a back-off so the pacer holds this executor for a while.
-  const RATE_RE = /\b429\b|rate[ _-]?limit|too many requests|usage limit|quota (exceeded|reached)|insufficient_quota/i;
+  const RATE_RE = /\b429\b|rate[ _-]?limit|too many requests|usage limit|quota (exceeded|reached)|insufficient_quota|RESOURCE_EXHAUSTED|credits balance is too low/i;
   let rateLimited = false;
   try {
     const tail = (p) => { const t = readFileSync(p, "utf8"); return t.slice(-200000); };
     const errText = existsSync(paths.stderr) ? tail(paths.stderr) : "";
-    const evText = existsSync(paths.events) ? tail(paths.events).split("\n").filter((l) => /"type":"(error|turn\.failed|session\.error)"|"error"|"is_error":true/.test(l)).join("\n") : "";
+    const evText = existsSync(paths.events) ? tail(paths.events).split("\n").filter((l) => /"type":"(error|turn\.failed|session\.error)"|"error"|"is_error":true|"status":"ERROR"/.test(l)).join("\n") : "";
     rateLimited = RATE_RE.test(errText) || RATE_RE.test(evText);
   } catch {}
   if (rateLimited) fleetctl(["budget", "backoff", executor, "--reason", "rate limited in lane", "--cwd", cwd]);
@@ -471,6 +545,13 @@ async function run(opts) {
   finish({
     status, exitCode, childExitCode: code, signal: signal || null, lastMessage,
     threadId, sessionId, usage: tokenUsage, rateLimited,
+    // agy soft-denies a tool it may not use and carries on: say which, so a read-only lane's gaps show
+    ...(agyResult?.denied_actions?.length ? { deniedActions: agyResult.denied_actions.map((d) => d.action) } : {}),
+    ...(kind === "antigravity" ? {
+      guardSeen: existsSync(join(out, "guard-seen")),
+      guardDenied: (() => { try { return readFileSync(join(out, "denied.jsonl"), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } })(),
+    } : {}),
+    ...(agyResult && agyResult.status !== "SUCCESS" ? { agyStatus: agyResult.status, agyError: agyResult.error || null } : {}),
     ...(status !== "completed" ? { stderrTail, error: status === "failed" && !lastMessage ? "no final message from the executor" : undefined } : {}),
   });
   return exitCode;
@@ -482,6 +563,39 @@ const cmd = opts.positional[0];
 if (!cmd) usage("missing executor or subcommand");
 if (["pick", "budget", "log", "stats", "report", "selftest", "apply", "seed", "config"].includes(cmd)) {
   usage(`"${cmd}" is handled by fleetctl.py: call it through the fleet command`);
+} else if (cmd === "mcp-exec") {
+  // agy starts this as an MCP server: read the real entry (command, args, env with its secrets)
+  // from the Claude config at start, so the secrets live in one file only.
+  const name = opts.positional[1];
+  if (!name) usage("mcp-exec needs a server name");
+  let def = null;
+  try { def = JSON.parse(readFileSync(expand(opts.source || "~/.claude.json"), "utf8")).mcpServers?.[name]; } catch {}
+  if (!def?.command) usage(`no stdio MCP server "${name}" in ${opts.source || "~/.claude.json"}`);
+  const child = spawn(def.command, def.args || [], { stdio: "inherit", env: { ...process.env, ...(def.env || {}) } });
+  for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(sig, () => child.kill(sig));
+  child.on("exit", (code, sig) => process.exit(code ?? (sig ? 1 : 0)));
+} else if (cmd === "antigravity-setup") {
+  // agy has no per-run MCP flag: register each server the registry names in agy's global config,
+  // pointing at mcp-exec. Uses agy's own `mcp add`, so its file format stays agy's business.
+  const { registry } = loadRegistry(process.cwd());
+  const exe = registry?.executors?.antigravity;
+  if (!exe) usage("no antigravity executor in the registry");
+  const fleetBin = join(FLEET_ROOT, "core/scripts/fleet");
+  for (const name of exe.mcp_servers || []) {
+    const r = spawnSync(exe.binary || "agy", ["mcp", "add", name, fleetBin, "mcp-exec", name], { encoding: "utf8" });
+    process.stdout.write(`${name}: ${r.status === 0 ? "registered" : "FAILED"} (${fleetBin} mcp-exec ${name})\n${r.status === 0 ? "" : (r.stderr || r.stdout)}`);
+    if (r.status !== 0) process.exit(1);
+  }
+  // The lane guard hook ships as an agy plugin. A link keeps it in step with this folder.
+  mkdirSync(dirname(AGY_PLUGIN), { recursive: true });
+  let current = null;
+  try { current = realpathSync(AGY_PLUGIN); } catch {}
+  if (current !== realpathSync(GUARD_SRC)) {
+    if (existsSync(AGY_PLUGIN) || current) rmSync(AGY_PLUGIN, { force: true });
+    symlinkSync(GUARD_SRC, AGY_PLUGIN, "dir");
+  }
+  process.stdout.write(`lane guard: ${AGY_PLUGIN} -> ${GUARD_SRC}\n`);
+  process.exit(0);
 } else if (cmd === "models") {
   const { registry } = loadRegistry(opts.cwd || process.cwd());
   const which = opts.positional[1];

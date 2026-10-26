@@ -1,0 +1,15 @@
+{
+  "fleet-lane-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "command": "[ -z \"$FLEET_LANE_POLICY\" ] || node ./lane-guard.mjs pre || echo '{\"decision\":\"deny\",\"reason\":\"fleet lane guard failed to run; stop and report BLOCKED\"}'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
