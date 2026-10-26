@@ -2,7 +2,7 @@
 
 The fleet has **roles** (engineer, tester, scan, ticket writer, PM) and **executors** (the
 program that runs a role: a Claude subagent, the Codex CLI, opencode on Ollama Cloud, Claude Code
-on Ollama Cloud). Any role
+on Ollama Cloud, the Antigravity CLI on a Google AI plan). Any role
 can in principle run on any executor. The PM picks one per spawn.
 
 The role skills don't change. An engineer is an engineer whether Claude or Codex runs it: same
@@ -57,6 +57,10 @@ installed:
     "engineer": { "*": [ {"executor":"codex","model":"gpt-5.6-sol"}, {"executor":"claude","model":"sonnet"} ] },
     "scan":     { "*": [ {"executor":"opencode","model":"kimi-k2.7-code"}, {"executor":"claude","model":"haiku"} ] } } }
 ```
+
+**Opting in to Antigravity** (Google AI Pro plan, the `agy` CLI): run `fleet antigravity-setup`
+once (see "Antigravity" below), then name it in a candidates list the same way, for example
+`{"executor":"antigravity","model":"gemini-3.8-flash","effort":"low"}` for `scan`.
 
 **Effort is part of a candidate.** A candidate may carry `"effort"`, and then it is its own
 entry everywhere: `codex:gpt-5.6-sol@low` and `codex:gpt-5.6-sol@high` are scored, explored and
@@ -144,6 +148,7 @@ than the window elapses plus `pace_allowance_pct` (20). Override per user in
 |---|---|---|
 | claude | the file in `budget.executors.claude.status_file`: a statusline relay that writes the harness's `rate_limits.five_hour` block. None set = no meter | 5 h |
 | codex | newest `~/.codex/sessions/YYYY/MM/DD/*.jsonl` `token_count` event `rate_limits` (`primary`/`secondary` `used_percent`, `window_minutes`, `resets_at`) | as reported (weekly on the current plan) |
+| antigravity | `agy -p /usage --output-format json`, cached `cache_minutes` (5). Three pools, each judged on all its windows; a lane is judged on its own model's pool (`pools` maps a model prefix to bucket ids) | 5 h and weekly per pool |
 | opencode, claude-ollama / Ollama Cloud | no usage API: a local lane counter per window, plus a back-off after any 429 or quota error. Both draw on one plan, so `state_as: opencode` makes them share the counter and the back-off | 5 h |
 
 Each source answers `ok`, `hold` (pace or back-off) or `stop` (hard stop), with `resume_at`. An
@@ -165,7 +170,9 @@ Gates:
   escalations) returns `decision: wait` with `resume_at`.
 
 One line for preflight and status updates: `fleet budget` →
-`Claude 58% (5h) · Codex 9% (wk) · Ollama ok (2 lanes) · Claude Code/Ollama ok (2 lanes)`.
+`Claude 58% (5h) · Codex 9% (wk) · Ollama ok (2 lanes) · Claude Code/Ollama ok (2 lanes) · Antigravity gemini 1% · gemini-4-argon 0% · claude/gpt 6%`.
+Antigravity shows the highest window per pool. `fleet budget check antigravity --model <m> --json`
+judges one model's pool; `pick` does the same for each Antigravity candidate.
 
 ## Running a lane
 
@@ -200,11 +207,11 @@ child's environment only.
 
 ### Sandbox
 
-| `--sandbox` | Codex | opencode | claude-ollama |
-|---|---|---|---|
-| `full` | profile `fleet-engineer-full` + `--dangerously-bypass-approvals-and-sandbox` | `build` agent + `--auto` | `--dangerously-skip-permissions` |
-| `restricted` | profile `fleet-engineer` (workspace write, network on, caches, pnpm store, /tmp) | — | — |
-| `read-only` | `-s read-only` | `plan` agent, no `--auto` | allow Read, Grep, Glob, Bash, `mcp__plane__*`; deny Edit, Write, NotebookEdit |
+| `--sandbox` | Codex | opencode | claude-ollama | antigravity |
+|---|---|---|---|---|
+| `full` | profile `fleet-engineer-full` + `--dangerously-bypass-approvals-and-sandbox` | `build` agent + `--auto` | `--dangerously-skip-permissions` | `--dangerously-skip-permissions` + the lane guard |
+| `restricted` | profile `fleet-engineer` (workspace write, network on, caches, pnpm store, /tmp) | — | — | — |
+| `read-only` | `-s read-only` | `plan` agent, no `--auto` | allow Read, Grep, Glob, Bash, `mcp__plane__*`; deny Edit, Write, NotebookEdit | `--dangerously-skip-permissions` + the lane guard's read-only policy |
 
 **Why engineers and testers run `full` on Codex.** Tested 2026-10-09 on codex-cli 0.161.0. The
 restricted profile passed network, `gh api user`, `git ls-remote` (keychain), a local Postgres,
@@ -244,7 +251,73 @@ read-only `ls` in the smoke test. Only give opencode read-only roles until that 
   2026-10-16, plan mode blocks MCP calls even with an allow rule. `--effort` passes through.
   Smoke tested 2026-10-16 on kimi-k2.7-code and glm-5.3: Bash, Plane reads, a denied Write in
   read-only, and an edit + test run + commit in full mode. No commit trailer is added.
+- antigravity: see "Antigravity" below.
 - All: `NX_DAEMON=false` in the child environment.
+
+### Antigravity
+
+Measured 2026-10-26 on agy 1.3.1, Google AI Pro plan.
+
+**Setup, once per machine:** `fleet antigravity-setup`. agy has no per-run flag for MCP servers
+or tools, so setup puts two things in agy's global config:
+
+1. Each server in `mcp_servers` (plane) goes into `~/.gemini/config/mcp_config.json` as
+   `fleet mcp-exec <name>`. That launcher reads the real entry (command, args, env) from
+   `~/.claude.json` when agy starts it, so the Plane key stays in one file.
+2. The lane guard plugin, `core/references/antigravity-plugin/`, is linked as
+   `~/.gemini/config/plugins/plane-fleet-lanes`. A link, so it follows this folder.
+
+Run setup again if the fleet folder moves. A lane refuses to start (`unavailable`, naming the
+setup command) when a server is missing, or when the guard is not linked or is disabled in agy.
+
+**The lane guard is the gate.** agy has no per-run tool list, and its permission system does not
+fit headless lanes. Measured:
+
+| what | result |
+|---|---|
+| agy's own denial (default mode, no allow rule) | ends the run with no report, even when the brief says carry on |
+| a `PreToolUse` hook that answers `deny` | the model gets the reason as a tool error and carries on to its report |
+| a hook that answers `allow` or `ask`, with or without `permissionOverrides` | never got past agy's check in headless mode |
+| a hook that prints nothing / prints `{}` | neutral / **deny** |
+| a custom agent with a `tools:` list | did not shrink the tool list |
+
+So every lane, read-only included, runs with `--dangerously-skip-permissions`, and the guard
+(`lane-guard.mjs`, a `PreToolUse` hook) denies what the lane may not do. It reads the policy file
+run-lane writes per lane (`FLEET_LANE_POLICY`, from `lane_guard` in the registry). Without that
+variable it prints nothing, so the owner's own agy sessions are untouched. If `node` fails, the
+hook denies (fails closed).
+
+| lane | the guard denies |
+|---|---|
+| every lane | browser tools, subagents, scheduling and messaging tools (`deny_tools`); MCP servers other than `mcp_servers`; shell commands that open the owner's browser or desktop or a tunnel (`full_deny_commands`: `open`, `osascript`, `cloudflared`, ...) |
+| read-only | any tool outside `read_tools`; shell commands not on `read_only_commands`, or with a pipe, redirect, `&&`, `$(...)`, or a flag that writes or runs something (`--pre`, `--output`, `--web`, ...); Plane actions that are not reads (`mcp_read_actions`) |
+
+The deny list for full lanes is a guard rail, not a sandbox: `sh -c` gets around it, as with
+Codex in full mode. `result.json` gets `guardSeen` (the hook ran) and `guardDenied` (each
+denial and why). Tested live: a read-only lane told to write, pipe, open a browser and comment on
+Plane got four denials, no file, and still ended on a correct report. A full Argon lane made a
+branch, a passing test and a commit, and its `open https://example.com` was denied.
+
+**How a lane runs:** `agy --input-format stream-json --output-format stream-json --model <m>
+[--effort <e>] --disable-slash-commands --add-dir <fleet root> --dangerously-skip-permissions`.
+The prompt goes on stdin as one `{"event":"user","message":{"content":...}}` line; `-p` does not
+read stdin. The base model id plus `--effort` works (`gemini-3.8-flash --effort high`); `agy
+models` lists the same models per effort. `result.json` gets `sessionId` (the agy conversation
+id) and usage with cache reads folded into input.
+
+**Quota, measured on small smoke lanes (about 30 s each):**
+
+| model | pool | one lane cost |
+|---|---|---|
+| `gemini-3.8-flash` (low), read-only scan | Gemini | at most 0.35% of 5h, 0.1% of weekly |
+| `gemini-4-argon` (low), read-only scan | Argon, its own weekly limit | 0.6% of weekly |
+| `gemini-4-argon` (low), edit + test + commit | Argon | 0.6% of weekly |
+| `claude-sonnet-5-5` (low), edit + test + commit | Claude and GPT | 6% of 5h, 3% of weekly |
+
+The Claude pool drains fast: about 30 tiny lanes a week, and real engineer lanes are many times
+larger. Flash and Argon are where the Pro plan has room. The pacer stops each pool on its own,
+so a Claude candidate on Antigravity just stops being picked when its pool runs low. These are
+first readings, not a scoreboard; let `stats` decide.
 
 ## Outcomes log, scoreboard, promotion
 
@@ -362,10 +435,13 @@ either file. The PM says every line in its report.
   session that logged it. Ollama has no meter at all, only a lane count and back-off after a 429.
   A lane can still hit a quota mid-ticket; `run-lane` records the back-off and marks it
   `rateLimited`, and the PM treats it as a lane failure.
+- **Antigravity's own plugins still load in every lane** (browser, chrome-devtools, firebase and
+  others on this machine), and so does the global MCP config: there is no per-run switch. The lane
+  guard denies their tools. Setting up also gives the owner's own agy sessions the Plane server.
 - **No Agent or Skill tools in a Codex or opencode lane.** It reads skill files and follows
   them itself, and cannot spawn helpers. A claude-ollama lane has both, and its subagents run on
   the lane's model.
-- **Claude Code hooks do not run in a Codex or opencode lane.** The Plane-API blocker and the
+- **Claude Code hooks do not run in a Codex, opencode or Antigravity lane.** The Plane-API blocker and the
   usage pacer are Claude hooks. The adapter repeats their rules, but nothing enforces them there.
   A claude-ollama lane runs them all, which also means the usage pacer can hold its `Agent`
   calls on the Claude meter even though those subagents run on Ollama. Git hooks (husky) run

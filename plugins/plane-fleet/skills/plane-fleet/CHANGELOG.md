@@ -4,6 +4,16 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [Unreleased]
+
+### Added
+
+- Antigravity as a lane executor (`fleet antigravity ...`, the `agy` CLI on a Google AI plan). Models: `gemini-4-argon`, `gemini-3.8-flash`, `claude-opus-5-5`, `claude-sonnet-5-5`, `gpt-oss-120b`, with `--effort`. Opt-in: no candidates list names it by default.
+- A live meter for it: `agy -p /usage`, cached 5 minutes. Its three pools (Gemini, Claude and GPT, Argon) are judged apart, so `pick` and the lane gate look at the pool of the model being picked. `fleet budget check antigravity --model <m>` does the same by hand.
+- `fleet antigravity-setup`, run once: registers Plane with agy through `fleet mcp-exec plane`, which reads the server entry from `~/.claude.json` at start so no key is copied, and links the lane guard plugin into agy.
+- The lane guard, an agy `PreToolUse` hook that acts only in fleet lanes. agy cannot set tools per run and its own denials end a headless run, so every lane runs with skip-permissions and the guard denies browser tools, other MCP servers and, in read-only lanes, writes, unlisted commands and Plane writes. A denial reaches the model and the lane still ends on its report. `result.json` says whether the guard ran and what it denied.
+- The adapter page covers Antigravity.
+
 ## [2.0.0] - 2026-10-25
 
 ### Breaking

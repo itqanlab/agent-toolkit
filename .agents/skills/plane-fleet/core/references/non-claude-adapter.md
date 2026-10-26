@@ -1,8 +1,8 @@
-# Running a fleet role from Codex or opencode
+# Running a fleet role from Codex, opencode or Antigravity
 
 You are a fleet session (engineer, tester, scan, ...) started by the PM through `fleet`.
-The role skills were written for Claude Code. This page says how to follow them from Codex or
-opencode. Everything else in your role skill and the standing brief applies to you unchanged.
+The role skills were written for Claude Code. This page says how to follow them from Codex,
+opencode or the Antigravity CLI (agy). Everything else in your role skill and the standing brief applies to you unchanged.
 
 ## Plane: MCP only
 
@@ -47,7 +47,10 @@ opencode. Everything else in your role skill and the standing brief applies to y
 | `mcp__nx-mcp__*` | `npx nx show project <name> --json`, `npx nx graph --file=...` |
 
 Never control the owner's desktop or browser: no computer use, no `cua_repl`, no browser or
-Chrome plugin tools, even if they show up in your tool list. The runner turns those plugins off
+Chrome plugin tools, even if they show up in your tool list. On Antigravity that means none of
+`browser_*`, `open_browser_url`, `click_browser_pixel`, `capture_browser_screenshot`,
+`execute_browser_javascript`, `read_browser_page`, the browser subagent or `chrome-devtools`
+MCP tools; agy loads them in every session and the runner cannot turn them off. The runner turns those plugins off
 (`disable_plugins` in the executor registry); if one is still there, the registry missed it.
 Don't use it, and say so in your final message.
 
@@ -58,6 +61,16 @@ Don't use it, and say so in your final message.
 - Claude Code's own PreToolUse hooks (the Plane API blocker, the usage pacer) do not run in
   your session. Their rules still bind you. Follow them by hand.
 - Never raise a budget, threshold or timeout to get green. Report it.
+
+## Antigravity only
+
+- Your shell tool is `run_command`. Background commands report through `command_status`.
+- A fleet hook checks each tool call. When it refuses one, you get the reason as the tool's
+  error. Do not retry it or work around it: carry on and say in your report what you could not do.
+- In a read-only lane, use only the commands the lane prompt lists, one per call, no pipes. Read
+  and search with `view_file`, `grep_search`, `find_by_name` and `list_dir`.
+- Do not use subagents, scheduling, messaging, image generation or the marketplace. Do the work
+  yourself, in this session.
 
 ## Slots, ports and git
 

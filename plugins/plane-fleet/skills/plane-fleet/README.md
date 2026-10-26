@@ -91,10 +91,12 @@ User-level state lives in `~/.config/plane-fleet/`, or wherever `PLANE_FLEET_HOM
 | --- | --- |
 | Codex | the `codex` CLI, signed in, and the two profiles from `core/references/codex-profiles/` copied into `$CODEX_HOME` |
 | opencode | the `opencode` CLI and a provider in its config, for example an OpenAI-compatible `ollama-cloud` provider with `baseURL` `https://ollama.com/v1` and `apiKey` `{env:OLLAMA_API_KEY}` |
+| Antigravity | the `agy` CLI signed in to a Google AI plan, then `fleet antigravity-setup` once (registers Plane with agy and links the lane guard plugin) |
 
 Engineer and tester lanes on Codex run with full access, because Codex's sandbox keeps every
 `.git` path read-only and a lane must commit. opencode has no OS sandbox; give it read-only
-roles.
+roles. Antigravity's Claude models draw on a small pool of the Google plan; Gemini Flash and
+Argon have far more room (numbers in `core/references/executors.md`).
 
 ## The usage pacer hook
 

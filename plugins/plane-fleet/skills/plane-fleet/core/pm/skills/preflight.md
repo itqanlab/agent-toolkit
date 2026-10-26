@@ -271,9 +271,9 @@ cost technique matters most here because you read the board every pass: `fields`
    spending faster than the window elapses (more than 20 points ahead of an even pace). A
    blocked spawn is not an error to work around. Keep merging, testing what's open and writing
    the board, and spawn again after the time the message gives.
-   The hook gates **Claude spawns**. Codex and opencode lanes (`core/pm/skills/spawn.md` §3 Executors) are gated by
+   The hook gates **Claude spawns**. Codex, opencode and Antigravity lanes (`core/pm/skills/spawn.md` §3 Executors) are gated by
    `run-lane` with the same rules on their own meters, and `pick` routes portable work to an
-   executor that still has budget. `fleet budget` prints the one-line state of all three.
+   executor that still has budget. `fleet budget` prints the one-line state of all of them.
    The `pace-off` / `pacer-off` switches work per executor (see executors.md).
 
    **How to wait: a background timer, never the owner.** Start a background `sleep` until the

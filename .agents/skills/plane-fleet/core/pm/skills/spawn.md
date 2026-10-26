@@ -92,7 +92,7 @@ of one that games the gate is a rebuild plus a PM who can't trust the next green
 **Never quietly upgrade "to be safe."** If you deviate from the default, say which trigger fired
 in your pick announcement. An unexplained escalation is indistinguishable from not choosing.
 
-### Executors — Claude, Codex or opencode, picked per spawn
+### Executors — Claude, Codex, opencode or Antigravity, picked per spawn
 
 The table above is the **Claude** model choice. Who runs a role at all comes from the executor
 registry: `core/references/executors.md` (read it once per run) and
@@ -126,7 +126,7 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    then pick again. No registry, or the executor's binary is missing → Claude, as above.
 3. **Announce** its `pick_line`: `PROJ-134 → engineer/api · codex:gpt-5.6-sol · EXPERIMENT ·
    … · slot A` (and the trigger, if one fired).
-   **Spawn:** Claude via `Agent` exactly as above. Any lane executor (codex, opencode, claude-ollama): write the brief (same
+   **Spawn:** Claude via `Agent` exactly as above. Any lane executor (codex, opencode, claude-ollama, antigravity): write the brief (same
    content as a Claude brief: standing-brief line, ticket, slot and its values, owned files,
    shared registries) to `/tmp/<TICKET>-<role>/brief.md`, then **Bash `run_in_background: true`**:
    ```
@@ -172,7 +172,7 @@ was folded in and is still read; its row shape, for reference:
  "outcome":"pr_opened","verify_first_pass":null,"rework_count":0}
 ```
 
-`executor` is `claude` / `codex` / `opencode` / `claude-ollama`; `model` is the exact id (`gpt-5.6-sol`,
+`executor` is `claude` / `codex` / `opencode` / `claude-ollama` / `antigravity`; `model` is the exact id (`gpt-5.6-sol`,
 `kimi-k2.7-code`). For a Claude spawn pass `duration_ms` and `tokens` with `--set` (values are
 stored as numbers), and `--effort <level>` when the `Agent` call set one; `pick` returns the
 candidate's effort, and a spawn logged without it is scored as the default effort. For a lane pass `--from-result <out>/result.json`: it takes `durationMs`
