@@ -4,7 +4,7 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
-## [Unreleased]
+## [2.1.0] - 2026-10-26
 
 ### Added
 
