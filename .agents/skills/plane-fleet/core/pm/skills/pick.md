@@ -138,33 +138,49 @@ PR you think owns the file and name the shared path in your announcement. No sha
 hold. (2026-09-30: one ticket was held for a file the other PR didn't touch, and another was
 claimed, then un-claimed, on a guess.)
 
-**Migration serialization: one schema change in flight, everything else keeps going (owner,
-2026-10-04).** If a candidate ticket's own text signals a schema change (a new field, model or
-migration, or a prior worker flagged it), these rules apply:
+**Schema tickets: build in parallel, merge one at a time (owner, 2026-10-26).** If a candidate
+ticket's own text signals a schema change (a new field, model or migration, or a prior worker
+flagged it), these rules apply:
 
-- **Only one schema ticket at a time.** No second schema ticket starts while one is `In Progress`
-  or its PR is open. Two migrations built in parallel collide in the schema file (`fleet.schema_paths`) and in migration order.
-- **Non-schema work does NOT wait.** Fresh engineers keep filling slots during the window, as in a
-  real team where one engineer does the migration and the rest keep working. The file-overlap
-  filter keeps them off the schema PR's files (`gh pr view <n> --json files`), and their briefs
-  list those files as owned.
-- **The schema PR merges in a train of its own**, so a red develop run points at one PR.
+- **Schema tickets build in parallel when their models don't overlap.** Before you claim a second
+  (or third) schema ticket, name the models each one adds or changes (from triage and the ticket
+  text; ask a `scan` lane when it isn't clear). No shared model, table or enum → both build at
+  once. A shared one → the later ticket waits until the earlier one's PR merges.
+- **Every schema brief names the other schema tickets in flight and their models as off-limits**,
+  and asks for an **additive-only** migration (new tables, new nullable or defaulted columns, new
+  enum values) in **its own migration folder**, authored by hand per the repo's migration notes
+  (`fleet.schema_notes`). A migration that drops, renames or rewrites existing data is not
+  parallel-safe: that ticket builds alone.
+- **Cap: at most `fleet.parallel_schema` schema tickets building at once** (default 2). They still
+  count toward `fleet.parallel_workers`.
+- **Non-schema work does not wait.** Fresh engineers keep filling slots, as in a real team where
+  one engineer does the migration and the rest keep working. The file-overlap filter keeps them
+  off the schema PRs' files (`gh pr view <n> --json files`), and their briefs list those files
+  as owned.
+- **The merge stays serial: one schema PR per train**, so a red trunk run points at one PR. The
+  next schema PR in line then rebases onto the new trunk, **re-stamps its migration folder** so it
+  sorts after trunk's latest one, runs the repo's deploy-style migrate on a **fresh** slot DB and
+  the schema validator, pushes, and waits for green CI. That rebase is mechanical: it is yours
+  (`core/pm/skills/merge-queue.md` §5), or a short engineer lane if the schema file conflicts.
 
-(Before 2026-10-04 this rule held ALL engineer picks until the schema PR merged. The owner pointed
-out that a real team doesn't stop for a migration. It cost a full build + test cycle of idle
-engineer slots.)
+(Before 2026-10-04 one schema ticket held ALL engineer picks. Until 2026-10-26 it still held every
+other schema ticket from build to deploy, about 1.5 to 2 hours each. That day 10 of 22 new tickets
+were schema, and oldest-first put an urgent prod fix ninth in line. The owner: "what if we have
+tickets that need a db change, they cannot wait all that time per ticket." Two additive
+migrations on different models don't collide; only their order on trunk matters, and the
+re-stamp at merge fixes that.)
 
 **The migration window, so schema tickets don't starve.** Waiting their turn only works if the
 turn comes. Under oldest-first with a long approved queue it never did: six schema tickets sat blocked
 through a whole three-day run. So:
 
-- The window opens each time a train reaches `Done` and trunk is green.
+- The window opens each time a train reaches `Done` and trunk is green, or a schema slot frees
+  under `fleet.parallel_schema`.
 - If an eligible schema ticket exists at that moment, it is **the next engineer pick**, ahead of
   priority order, and it takes its slot before any fresh non-schema pick.
 - Testers, the merge queue and non-schema engineer picks keep running during the window.
-- Its PR lands in a train of its own. Nothing else is merged in that train.
-- One schema ticket per window. The next one waits for the next window.
-- Announce it: "migration window: PROJ-320 (schema), no other schema ticket until its PR merges".
+- Each schema PR lands in a train of its own. Nothing else is merged in that train.
+- Announce it: "schema: PROJ-320 (models Return, ReturnRule) building beside PROJ-331 (Branch), disjoint".
 
 **Check the budget mode before you fill a single slot (`core/pm/skills/preflight.md` §0.6).** In CONSERVE or WIND-DOWN you fill
 none — you land what is verified and stop picking. A slot you open now that cannot finish before

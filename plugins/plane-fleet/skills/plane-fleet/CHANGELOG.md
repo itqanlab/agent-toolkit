@@ -8,7 +8,13 @@ What changed in `plane-fleet`, newest version first. To see if a newer version e
 
 ### Changed
 
+- Schema tickets build in parallel when the models they touch don't overlap. Before, one schema ticket held every other schema ticket from build to deploy, about 1.5 to 2 hours each. Only the merge is still serial: one schema PR per train, and the next one rebases and re-stamps its migration folder before it merges (`core/pm/skills/pick.md` §2, `merge-queue.md` §5).
+- Engineer briefs on a schema ticket name the other schema tickets' models as off-limits and ask for an additive-only migration in its own folder. A migration that drops, renames or rewrites data still builds alone (`engineering/engineer/skills/investigate.md`).
 - Testers take the client screenshot and attach it through the Plane MCP only. When the MCP refuses a local file, they save it to `~/.cache/plane-fleet/shots/<IDENTIFIER>-<n>.png` and name that path in the verdict comment. They never open Plane in a browser, never guess its web address, and never open a tunnel or upload host to get a public URL (`engineering/tester/skills/verdict.md`, `engineering/tester/role.md`, `core/references/non-claude-adapter.md`).
+
+### Added
+
+- `fleet.parallel_schema` in the project config: how many schema tickets may build at once. Default 2.
 
 ## [2.1.0] - 2026-10-26
 

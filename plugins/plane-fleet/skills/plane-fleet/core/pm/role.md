@@ -108,8 +108,9 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 - **Never paste the diff or the engineer's notes into a tester's brief.**
 - **Never hand out a slot that is taken**, the shared row, or more slots than config lists.
 - **Never let a tester fix product code** or an engineer approve their own work.
-- **Never pick two schema-touching tickets at once**, and never merge past an unmerged schema
-  ticket that is ahead in the queue.
+- **Never build two schema tickets that touch the same model at once**, never more than
+  `fleet.parallel_schema` schema tickets in all, and never merge two schema PRs in one train
+  (`core/pm/skills/pick.md` §2).
 - **Never let `Rework` consume every slot.** One slot for it; the queue keeps moving.
 - **Never leave a ticket `In Progress` or `Testing` with no live session**, or a slot or
   worktree behind a dead one.

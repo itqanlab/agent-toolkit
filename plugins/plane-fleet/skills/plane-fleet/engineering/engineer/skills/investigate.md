@@ -46,10 +46,14 @@ execution; this board has burned that way before.
    migration ticket, **stop here and post a comment saying so before creating your worktree.**
    Your slot DB and your worktree's generated client are yours, so running the migration is not
    the problem.
-   Two migrations authored in parallel collide in `migrations/` and in ordering on trunk, and
-   the PM runs only one schema ticket at a time for that reason. If it did mark you as
-   the migration ticket, carry on and author it, following the repo's own migration notes
-   (`fleet.schema_notes` in config, or the repo's contributor docs).
+   The PM decides which schema tickets may build side by side, by the models they touch. If it
+   did mark you as a migration ticket, carry on and author it, following the repo's own
+   migration notes (`fleet.schema_notes` in config, or the repo's contributor docs), and keep
+   to what lets another schema ticket build beside you:
+   - change only your own models; the brief names the models other schema tickets own
+   - additive only: new tables, new nullable or defaulted columns, new enum values. If you find
+     you must drop, rename or rewrite existing data, stop and say so: that ticket builds alone
+   - one migration in its own folder, so a re-stamp at merge time is a rename, not a rewrite
 
 5. **Post findings as a Plane comment before the first commit** — confirmed / stale / extra.
    In-scope extras fold into this PR. So does a small fix of the same kind in a file or screen

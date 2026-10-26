@@ -6,7 +6,15 @@
 ## 5) Merge queue — you alone merge
 
 A PR is eligible when **all** hold: ticket `Approved`, label `qa-approved` present, CI green on
-its latest commit, trunk green (`core/pm/skills/stop-the-line.md` §1), and no schema ticket ahead of it still unmerged.
+its latest commit, trunk green (`core/pm/skills/stop-the-line.md` §1), and, for a schema PR, no other schema PR in
+the same train.
+
+**Schema PRs, one per train.** Schema tickets build in parallel (`core/pm/skills/pick.md` §2), so
+several schema PRs can be approved at once. Land the oldest first, in a train of its own. Before
+the next one merges, its branch is rebased onto the new trunk and its migration folder is
+re-stamped to sort after trunk's latest; then it runs the repo's deploy-style migrate on a fresh
+slot DB and the schema validator, and its CI goes green again. A clean rebase with only the
+re-stamp is a mechanical step and yours. A conflict inside the schema file is an engineer lane.
 
 1. **Order:** dependencies first, then oldest-approved, then by area.
 2. **Land one at a time**, each on the trunk the previous one produced:

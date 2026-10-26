@@ -90,6 +90,7 @@ by key; lists and plain values replace.
   "fleet": {                             // read by the PM role, the engineer role, the tester role
     "merge_train_size": 3,
     "parallel_workers": 2,               // engineers at once
+    "parallel_schema": 2,                // schema tickets building at once, on disjoint models (pick.md §2)
     "slot_policy": "one pool",           // testers take ANY free slot; no fixed tester cap
     "slots": {                           // one per running engineer/tester; never assign "shared"
       "shared": { "api": 3000, "client": 4200, "db": "app_dev" },
