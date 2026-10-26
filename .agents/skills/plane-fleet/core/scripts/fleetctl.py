@@ -6,7 +6,7 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
 
   fleetctl.py pick    --role R [--kind K] [--triggers a,b] [--urgent] [--attempt N]
                       [--pair-with exe:model [--pair-experiment]] [--cwd DIR] [--seed N]
-  fleetctl.py budget  [status|line|check EXE|backoff EXE [--minutes M] [--reason TEXT]|lane-start EXE] [--json]
+  fleetctl.py budget  [status|line|check EXE [--model M]|backoff EXE [--minutes M] [--reason TEXT]|lane-start EXE] [--json]
   fleetctl.py log     add --ticket T --role R --executor E --model M --outcome O [--kind K]
                       [--set k=v ...] [k=v ...] [--from-result <lane>/result.json]
   fleetctl.py log     backfill --ticket T --role R --set k=v [k=v ...]
@@ -208,7 +208,58 @@ def meter_codex(cfg, now):
     return None, None, None, "no codex session log with rate_limits"
 
 
-def budget_check(reg, exe, now=None):
+def antigravity_usage(reg, exe, cfg, now):
+    """`agy -p /usage --output-format json` -> {bucket id: (used %, resets_at, window minutes)}.
+    The call takes a few seconds, so the answer is cached in the executor's state file."""
+    st = read_state(reg, exe)
+    cache = st.get("usage") or {}
+    if cache.get("buckets") and now - cache.get("at", 0) < float(cfg.get("cache_minutes") or 5) * 60:
+        return {k: tuple(v) for k, v in cache["buckets"].items()}, None
+    binary = ((reg.get("executors") or {}).get(exe) or {}).get("binary") or "agy"
+    try:
+        r = subprocess.run([binary, "-p", "/usage", "--output-format", "json"], capture_output=True,
+                           text=True, timeout=30, cwd=os.path.expanduser("~"))
+        groups = json.loads(r.stdout)["command"]["data"]["groups"]
+    except Exception:
+        return None, "no meter (agy /usage failed)"
+    buckets = {}
+    for g in groups:
+        for b in g.get("buckets") or []:
+            if b.get("remaining_fraction") is None:
+                continue
+            try:
+                resets = datetime.datetime.fromisoformat(str(b.get("reset_time")).replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                resets = None
+            wmin = {"5h": 300, "weekly": 7 * 24 * 60}.get(b.get("window"), 0)
+            buckets[b["id"]] = (round((1 - float(b["remaining_fraction"])) * 100, 1), resets, wmin)
+    st = read_state(reg, exe)
+    st["usage"] = {"at": now, "buckets": buckets}
+    write_state(reg, exe, st)
+    return buckets, None
+
+
+def pool_of(cfg, model):
+    """The longest `pools` prefix the model starts with; None when the model is unknown."""
+    pools = {k: v for k, v in (cfg.get("pools") or {}).items() if not k.startswith("$")}
+    keys = [k for k in pools if str(model or "").startswith(k)]
+    return max(keys, key=len) if keys else None
+
+
+def judge(used, resets, window, hard, allow, now, pace=True):
+    """Hard stop, then pace: no faster than the window has elapsed plus the allowance."""
+    if used >= hard:
+        return "stop", resets, None
+    if pace and window and resets:
+        elapsed = max(0.0, min(1.0, (now - (resets - window)) / window))
+        allowed = min(hard, elapsed * 100 + allow)
+        if used > allowed:
+            catch_up = (resets - window) + (used - allow) / 100 * window
+            return "hold", min(catch_up, resets), f"ahead of pace ({allowed:.0f}% allowed now)"
+    return "ok", None, None
+
+
+def budget_check(reg, exe, now=None, model=None):
     now = now or time.time()
     cfg = budget_cfg(reg, exe)
     hard = float(cfg.get("hard_stop_pct", 95))
@@ -225,6 +276,36 @@ def budget_check(reg, exe, now=None):
     src = cfg.get("source")
     used = resets = None
     window = (cfg.get("window_minutes") or 0) * 60
+    if src == "antigravity-usage":
+        # Models share quota in pools (Gemini, Claude+GPT, Argon), each with its own windows.
+        # With a model, judge its pool; without one, report every pool and judge none.
+        buckets, note = antigravity_usage(reg, exe, cfg, now)
+        res["note"] = note
+        if buckets is None:
+            return res
+        pools = {k: v for k, v in (cfg.get("pools") or {}).items() if not k.startswith("$")}
+        res["pools"] = {p: {b: buckets[b][0] for b in ids if b in buckets} for p, ids in pools.items()}
+        if model is None:
+            return res
+        pool = pool_of(cfg, model)
+        if pool is None:
+            res["note"] = f"no pool for {model} (budget.executors.{exe}.pools)"
+            return res
+        res["pool"] = pool
+        pace = not switch_on(reg, exe, "pace-off")
+        rank = {"ok": 0, "hold": 1, "stop": 2}
+        for b in pools[pool]:
+            if b not in buckets:
+                continue
+            u, rs, wmin = buckets[b]
+            if rs and now >= rs:
+                u = 0.0  # that window has reset since the cached reading
+            state, resume, why = judge(u, rs, wmin * 60, hard, allow, now, pace)
+            if res["used_pct"] is None or u > res["used_pct"]:
+                res.update(used_pct=u, resets_at=rs, window_minutes=wmin)
+            if rank[state] > rank[res["state"]] or (state == res["state"] != "ok" and (resume or 0) > (res["resume_at"] or 0)):
+                res.update(state=state, resume_at=resume, note=why or f"{b} at {u:.0f}%")
+        return res
     if src == "claude-statusline":
         used, resets, note = meter_claude(cfg, now)
         res["note"] = note
@@ -251,15 +332,11 @@ def budget_check(reg, exe, now=None):
     res["used_pct"], res["resets_at"] = used, resets
     if used is None:
         return res  # unknown meter: no judgement, the skill's own budget rules apply
-    if used >= hard:
-        res.update(state="stop", resume_at=resets)
-        return res
-    if window and resets and not switch_on(reg, exe, "pace-off"):
-        elapsed = max(0.0, min(1.0, (now - (resets - window)) / window))
-        allowed = min(hard, elapsed * 100 + allow)
-        if used > allowed:
-            catch_up = (resets - window) + (used - allow) / 100 * window
-            res.update(state="hold", resume_at=min(catch_up, resets), note=f"ahead of pace ({allowed:.0f}% allowed now)")
+    state, resume, why = judge(used, resets, window, hard, allow, now, not switch_on(reg, exe, "pace-off"))
+    if state != "ok":
+        res.update(state=state, resume_at=resume)
+        if why:
+            res["note"] = why
     return res
 
 
@@ -286,7 +363,8 @@ def budget_backoff(reg, exe, minutes=None, reason="rate limited", now=None):
     return st["backoff_until"]
 
 
-LABELS = {"claude": "Claude", "codex": "Codex", "opencode": "Ollama", "claude-ollama": "Claude Code/Ollama"}
+LABELS = {"claude": "Claude", "codex": "Codex", "opencode": "Ollama", "claude-ollama": "Claude Code/Ollama",
+          "antigravity": "Antigravity"}
 
 
 def budget_line(reg, checks=None):
@@ -298,6 +376,19 @@ def budget_line(reg, checks=None):
             w = c.get("window_minutes") or 0
             span = "wk" if w >= 7 * 24 * 60 else (f"{w // 60}h" if w else "")
             s = f"{lab} {c['used_pct']:.0f}%" + (f" ({span})" if span else "")
+        elif c.get("pools"):
+            # the highest bucket per pool, prefixes on the same buckets named once:
+            # "Antigravity gemini 12% · gemini-4-argon 0% · claude/gpt 40%"
+            same = {}
+            for p, v in c["pools"].items():
+                if not v:
+                    continue
+                key = tuple(sorted(v))
+                if key in same:
+                    same[key][0].append(p)
+                else:
+                    same[key] = ([p], max(v.values()))
+            s = f"{lab} " + " · ".join(f"{'/'.join(ps)} {u:.0f}%" for ps, u in same.values())
         elif c.get("note") == "pacer off":
             s = f"{lab} pacer off"
         elif c.get("source") == "local-counter":
@@ -673,7 +764,16 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
     order = list(reg.get("budget", {}).get("executors", {})) + [e for e in execs if e not in reg.get("budget", {}).get("executors", {})]
     checks = {e: budget_check(reg, e) for e in order}
     out["budget"] = budget_line(reg, list(checks.values()))
-    ok = lambda c: checks.get(c["executor"], {"state": "ok"})["state"] == "ok"
+    # Pooled executors (Antigravity) are judged per model: one pool can be empty while another is full.
+    by_model = {}
+    def check_of(c):
+        e = c["executor"]
+        if not checks.get(e, {}).get("pools"):
+            return checks.get(e, {"state": "ok"})
+        if c["model"] not in by_model:
+            by_model[c["model"]] = budget_check(reg, e, model=c["model"])
+        return by_model[c["model"]]
+    ok = lambda c: check_of(c)["state"] == "ok"
 
     # explore?
     kmeta = kinds.get(kind, {})
@@ -710,9 +810,9 @@ def pick(reg, role, kind=None, triggers=(), urgent=False, attempt=0, pair_with=N
                 nxt = fb
             if nxt:
                 chosen = nxt
-                out["reason"] = f"budget: {champ['executor']} {checks[champ['executor']]['state']} → {ckey(nxt)}"
+                out["reason"] = f"budget: {champ['executor']} {check_of(champ)['state']} → {ckey(nxt)}"
         if chosen is None:
-            resumes = [checks[c["executor"]]["resume_at"] for c in cands if checks.get(c["executor"], {}).get("resume_at")]
+            resumes = [check_of(c)["resume_at"] for c in cands if check_of(c).get("resume_at")]
             out.update(decision="wait", resume_at=min(resumes) if resumes else None,
                        reason=f"no budget for {role}/{list_kind} ({'pinned' if pinned or fired else 'all candidates held'})")
             return out
@@ -1089,6 +1189,21 @@ def selftest():
         main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"], quiet=True)
         r4 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-4", {})
         check("--cause stored", r4.get("fail_cause"), "ticket")
+        pools = {"gemini": ["g-wk"], "gemini-4-argon": ["argon-wk"], "claude": ["3p-wk", "3p-5h"]}
+        check("pool: longest prefix", pool_of({"pools": pools}, "gemini-4-argon"), "gemini-4-argon")
+        check("pool: plain prefix", pool_of({"pools": pools}, "gemini-3.8-flash"), "gemini")
+        check("pool: unknown model", pool_of({"pools": pools}, "kimi-k3"), None)
+        t = 1_000_000.0
+        check("judge: hard stop", judge(96, t + 60, 300 * 60, 95, 20, t)[0], "stop")
+        check("judge: ahead of pace", judge(50, t + 290 * 60, 300 * 60, 95, 20, t)[0], "hold")
+        check("judge: on pace", judge(30, t + 150 * 60, 300 * 60, 95, 20, t)[0], "ok")
+        reg = load_registry(None, "st")
+        st_path = state_path(reg, "antigravity")
+        json.dump({"usage": {"at": time.time(), "buckets": {"3p-wk": [10, t + 9e6, 10080], "3p-5h": [97, time.time() + 600, 300],
+                                                             "g-wk": [5, time.time() + 9e6, 10080]}}}, open(st_path, "w"))
+        reg.setdefault("budget", {}).setdefault("executors", {})["antigravity"] = {"source": "antigravity-usage", "pools": pools}
+        check("antigravity: a full pool stops its model", budget_check(reg, "antigravity", model="claude-opus-5-5")["state"], "stop")
+        check("antigravity: other pools still run", budget_check(reg, "antigravity", model="gemini-3.8-flash")["state"], "ok")
         import fleetcost
         fleetcost.selftest(check)
         freemodels.selftest(check)
@@ -1129,6 +1244,7 @@ def main(argv=None, quiet=False):
     b = sub.add_parser("budget"); b.add_argument("action", nargs="?", default="line")
     b.add_argument("executor", nargs="?"); b.add_argument("--minutes", type=float); b.add_argument("--reason", default="rate limited")
     b.add_argument("--json", action="store_true"); b.add_argument("--cwd")
+    b.add_argument("--model", help="check EXE: judge this model's pool (Antigravity)")
     lg = sub.add_parser("log"); lg.add_argument("action", choices=["add", "backfill"])
     for f in ("ticket", "role", "executor", "model", "effort", "outcome", "kind", "project", "cwd", "reason"):
         lg.add_argument(f"--{f}")
@@ -1172,7 +1288,7 @@ def main(argv=None, quiet=False):
             checks = [budget_check(reg, e) for e in reg.get("budget", {}).get("executors", {})]
             print(json.dumps(checks, indent=2) if args.json or args.action == "status" else budget_line(reg, checks))
         elif args.action == "check":
-            c = budget_check(reg, args.executor)
+            c = budget_check(reg, args.executor, model=args.model)
             print(json.dumps(c) if args.json else f"{c['executor']}: {c['state']}" + (f" until {hhmm(c['resume_at'])}" if c["resume_at"] and c["state"] != "ok" else "") + (f" ({c['note']})" if c["note"] else ""))
             return 0 if c["state"] == "ok" else 3
         elif args.action == "backoff":
