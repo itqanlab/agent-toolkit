@@ -102,7 +102,7 @@
       "name": "plane-fleet",
       "source": "./plugins/plane-fleet",
       "description": "Run work from a Plane board with teams of agent roles, one section per kind of work. Engineering: a PM that claims tickets and lands approved PRs, parallel engineers each in its own worktree and environment slot, blind testers that check every PR in the browser and add tests. Core: a planner, a board specialist and a read-only scanner. Roles can also run on other coding CLIs, picked per spawn by task kind and remaining budget.",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"
