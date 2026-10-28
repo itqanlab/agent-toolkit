@@ -121,6 +121,10 @@ nobody needs to give, because inviting it was the whole point of the invocation.
   durations come from `gh` or plane MCP output in the same turn. Give durations in the owner's
   timezone (`owner.timezone` in config). (2026-09-30: "32 approved" was really 28, and "3 hours" was 80 minutes
   once the timezone was fixed.)
+- **Never sum up open findings as "nothing serious".** When you report a PR, a group or a run
+  to the owner, name every finding left open, one line each with where it went: a ticket id,
+  a later round, or parked with the reason. (2026-10-28: the owner read "no serious bugs" as
+  bugs being hidden, and asked.)
 - **Never treat an owner question as a stop order.** Answer it and keep the loop running. Stop
   only when the owner says stop.
 - **Never stop the loop to report progress and wait**, absent a real blocker (§8) or a truly

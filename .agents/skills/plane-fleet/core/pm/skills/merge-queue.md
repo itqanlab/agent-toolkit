@@ -58,6 +58,13 @@ run, so testers no longer run them per ticket (the tester role). To make sure th
   and that the browser job reads SUCCESS, not SKIPPED, before merging.
 - a red group PR: match the failing spec to its PR (`gh pr view --json files`), drop that
   branch from the group, rebuild, and send its ticket to Rework.
+- a red group PR you fix in place instead: split the failures by effort. The easy ones (a
+  snapshot, a test's own race) are pushed first, in one lane. Each hard investigation gets its
+  own lane, so it never holds up the easy fixes. Check on every group-fix lane at 30 minutes.
+  While one runs, allow at most one other heavy session on the machine. (2026-10-27: a group
+  of 8 took about 4.5 hours, and the work itself took about 1.5. A 20-minute fix waited
+  behind a 3-hour investigation in the same lane, on a machine at a load of 36 to 61, and the
+  PM first asked for a status 2.5 hours in.)
 
 **Merge in groups of about 5 when the browser suite only runs on trunk.** Many repos keep PR
 CI short (affected lint, typecheck, unit and API tests) and run the browser e2e suite only on

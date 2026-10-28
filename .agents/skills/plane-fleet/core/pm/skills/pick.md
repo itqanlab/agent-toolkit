@@ -195,6 +195,18 @@ the tester pushed to the branch; it continues on the **same branch and PR**. A t
 been sent to Rework twice in a row is worth flagging in your pick announcement (it's a data point
 worth surfacing, not a reason to stop other work).
 
+**After the third round, stop patching.** A ticket going into its fourth engineer round gets a
+fresh `opus` engineer briefed to rebuild against written invariants, not to fix the last
+finding:
+- write the ticket's invariants (three to five, each testable) in a PM comment on the ticket,
+  and in the brief
+- the engineer re-reads the whole diff against them, lists every path and screen each one
+  covers, with the test that proves it, and puts that list in the PR body
+- every failing test the testers pushed must pass unchanged
+- if the invariants don't fit the ticket's size, split it through the planner instead
+(2026-10-28: tickets patched one finding at a time took up to 9 rounds. Each round fixed the
+reported line and missed its sibling.)
+
 **Announce every pick**, one line each, naming priority and what's skipped for it.
 
 **Claim before spawning**: state → `In Progress`, assigned, for every ticket you're about to

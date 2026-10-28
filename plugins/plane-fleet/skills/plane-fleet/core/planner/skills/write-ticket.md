@@ -195,6 +195,15 @@ PII".</li>
 (e.g. "an <code>HttpClient</code> call subscribed with no error callback"), not a function to
 call directly.</li></ul>
 
+<h2>3c. Invariants and every path they cover</h2>
+<ul><li>Three to five rules that must hold after the change, each one testable. Example: "the
+refund on screen equals the refund booked, to the cent, for any selection".</li>
+<li>Under each rule, every path that can break it, with <code>file:line</code>: every writer
+of the field, every booking path, every screen that shows the value. Find them with a search
+and paste the search.</li>
+<li>Any rule the owner has to decide (which event to audit, what happens on a timeout) is
+decided here, not during review.</li></ul>
+
 <h2>4. Scope</h2>
 <p><b>In:</b> … <b>Out:</b> … (out-of-scope items name the ticket that owns them)</p>
 
@@ -217,6 +226,11 @@ service.** Testers judge against the ticket. A rule that isn't written down is a
 checks, and the first place it surfaces is the group review, after a full engineer and tester
 round. On 2026-10-15 all 5 group-review defects on the two Sentry tickets were missing
 must-not lines.
+
+**§3c is required on money, concurrency and audit tickets.** These are the tickets that
+went round after round: each review found the same rule broken on one more path. A rule left
+to be decided in review costs a full engineer and tester round each time it moves. The PM
+turns §3c into the focused review prompt (`core/pm/skills/spawn.md`).
 
 **Red-team the draft before filing (§3b tickets only).** Run one short pass on the draft
 body, for example `codex exec "Read this ticket. List the ways an engineer could satisfy every

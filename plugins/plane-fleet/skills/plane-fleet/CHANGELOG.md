@@ -4,6 +4,26 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.3.0] - 2026-10-28
+
+Fewer rework rounds, and a machine that doesn't choke. Measured on one project from 2026-10-26 to 28 (34 tickets): only 12 shipped in one round and 14 took three or more. Rework took at least 15 of 25 engineer hours.
+
+### Changed
+
+- The engineer's self-review now loops on P2s as well as P1s. When the brief carries the PM's focused review prompt, the engineer runs that one too, until one full pass reports neither. A P2 the engineer thinks doesn't apply goes to the PM before the push; on money, privacy, auth and audit tickets it blocks (`engineering/engineer/skills/open-pr.md` §3b).
+- For every finding, the engineer fixes the whole class: every writer of the field, every booking path, every caller, found by searching the whole repo. The sites checked go in the handoff, and the report line shows the focused pass count (`engineering/engineer/role.md` §6).
+- The PM writes the focused review prompt into every engineer brief: the ticket's invariants, the findings deferred to other tickets, and the failure kinds that matter (`core/pm/skills/spawn.md`).
+- The PM runs that review on every money, schema, API, privacy, auth and audit PR while the tester works, sends any finding to the running tester, and routes one Rework with everything instead of two (`core/pm/skills/spawn-tester.md` §4). On one project it found a P1 or P2 the tester's blind pass had missed on four PRs in a row.
+- After a third round, a ticket isn't patched again. A fresh `opus` engineer rebuilds it against three to five written invariants, or the planner splits it (`core/pm/skills/pick.md` §2).
+- A timed-out lane's commits are judged by the fallback engineer (keep, squash or rewrite) before anything is built on them (`core/pm/skills/spawn.md` §3, step 5).
+- A failed group PR fixed in place: easy fixes push first, each investigation gets its own lane, every lane gets a check at 30 minutes, and at most one other heavy session runs meanwhile (`core/pm/skills/merge-queue.md` §5).
+- The PM never sums up open findings as "nothing serious". Each one is named, with where it went (`core/pm/role.md` §7).
+
+### Added
+
+- A CPU load gate. No heavy spawn while the 1-minute load is over twice the core count, and at most 4 heavy sessions at once. Every session runs Jest at `--maxWorkers=2` and waits out a high load before starting Jest, Playwright or a server (`core/pm/skills/spawn-tester.md`, `engineering/references/standing-brief.md`). Four heavy lanes plus two pre-push hooks had taken a 12-core Mac to a load of 108.
+- Ticket section §3c, invariants and every path they cover, required on money, concurrency and audit tickets. Rules the owner has to decide get decided there, not in review (`core/planner/skills/write-ticket.md` §3).
+
 ## [2.2.0] - 2026-10-26
 
 ### Changed

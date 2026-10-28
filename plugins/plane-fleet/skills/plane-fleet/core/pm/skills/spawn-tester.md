@@ -15,9 +15,22 @@ that one line of the handoff:
   or start a new one with the finding). No tester yet.
 - a P2 marked "not applicable" with a reason you disagree with → post a `PM SCOPE DECISION:`
   saying it must be fixed, and send it back.
-- otherwise, spawn the tester. If you doubt the report, run
-  `codex review --base origin/<trunk>` on the pushed branch yourself. It takes about 5 minutes
-  and needs no slot.
+- the handoff shows no pass count for the brief's focused prompt, or a P2 left open without
+  your sign-off → back to the engineer. No tester yet.
+- otherwise, spawn the tester.
+
+**Run the focused review yourself, while the tester works.** On every PR of kind
+`money-concurrency`, `schema` or `api`, and on any ticket touching privacy, auth or audit: check out
+the pushed branch in a review worktree (`.claude/worktrees/pm-review-<pr>`, `git checkout
+--detach origin/<branch>`) and run the brief's focused prompt with `codex review "…"` in the
+background. It takes about 5 minutes and needs no slot.
+- A finding → send it to the running tester at once: reproduce it, write the failing test,
+  and put it in the same verdict. Don't send the engineer a second Rework later for it.
+- Wait for both the tester's verdict and your review before you route a Rework, so the engineer
+  gets every known finding in one round.
+(2026-10-27/28, one project: this review found a P1 or P2 the tester's blind pass had not
+reached on 993, 1006, 1011 and 1035, among them a double refund, a commit with no carrier
+request, and customer data in the logs.)
 
 The group review (`core/pm/skills/merge-queue.md` §5) still runs. It should only find what comes from combining branches.
 When it finds a per-PR defect, log it as a review escape (`log add --reason "review escape: …"`):
@@ -59,6 +72,16 @@ tell the owner once), and prints the gate: swap % and free disk.
 - Gate CLOSED (exit 2: free memory under 25% or under 6 GB free disk; swap is shown but not gated, macOS keeps it allocated) → spawn nothing new, not even
   a tester; let running sessions finish and re-check after each report. Lower the slot count
   you fill (start at 4 on a 32 GB machine) until the gate stays open with every slot busy.
+- **CPU load is a gate too.** Read `uptime` before every spawn. A 1-minute load above twice the
+  core count (`sysctl -n hw.ncpu` on macOS, `nproc` on Linux) → spawn nothing heavy until it
+  drops. Allow at most 4 heavy sessions at once: an engineer or tester running the gate, Jest,
+  e2e or a server. A focused review in a review worktree isn't heavy.
+- **Put the load rules in every brief:** Jest at `--maxWorkers=2`, server e2e at the worker
+  count its config sets, and wait (a `Monitor` until-loop, not `sleep`) while the 1-minute load
+  is over the gate before starting Jest, Playwright or a server. A pre-push hook runs its own
+  Jest workers, so two sessions pushing at once is the usual spike.
+  (2026-10-27/28: four heavy lanes plus two pre-push hooks drove a 12-core Mac to a load of 108.
+  A group-fix engineer's local runs timed out and crashed at loads of 36 to 61, which cost hours.)
 - A lane that died (timeout, ENOSPC) leaves its processes behind: sweep right after you
   clean its worktree. (2026-10-14: an Nx daemon from a dead Codex lane ran 3 hours, and a
   Playwright Chromium from another ran 4 hours; seven slots put 17 GB in swap, and swap on

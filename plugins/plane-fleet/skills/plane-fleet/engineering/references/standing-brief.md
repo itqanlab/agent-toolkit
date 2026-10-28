@@ -45,6 +45,10 @@ decisions) comes in the brief itself.
     `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "<your slot scratch dir>"`, and
     `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
     anything else you find instead of killing it.
+- **Share the CPU.** Run Jest with `--maxWorkers=2`, and server e2e at the worker count its
+  config sets, never more. Before you start Jest, Playwright or a server, check `uptime`. If the
+  1-minute load is over twice the core count, wait with a `Monitor` until-loop until it drops.
+  A run started on an overloaded machine times out and gets misread as a failing test.
 - **No wait longer than 4 minutes in one call.** Your prompt cache lives 5 minutes. A call
   that blocks longer makes your next call write your whole context again, and those rewrites
   were 12% of agent spend (measured 2026-10-25). So: a foreground Bash `timeout` of at most

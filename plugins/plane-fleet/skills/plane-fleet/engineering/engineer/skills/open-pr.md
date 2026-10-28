@@ -56,9 +56,20 @@
    It runs in a new process with none of your reasoning, so it is not you marking your own
    work. Start it in the background as soon as you commit, next to your narrow tests, so it
    costs little wall time.
-   - **Every P1: fix it, commit, and run the review again.** Repeat until no P1 is left.
-   - **Every P2: fix it, or write one line on why it does not apply.** A P2 fix does not need
-     another review pass.
+
+   **When your brief carries a focused review prompt, run that one too**, the same way:
+   `codex review "<the prompt from your brief>" > /tmp/<TICKET>-review-focused.md 2>&1`. It
+   names the ticket's invariants and the findings already deferred elsewhere, and it is the
+   review the PM runs after you. A generic pass calls a PR clean far more often than a focused
+   one does.
+   - **Every P1 and every P2: fix it, commit, and run both reviews again.** Repeat until one
+     full pass of each reports no P1 and no P2. Report how many passes it took.
+   - **Fix the class, not the line.** For every finding, find its siblings before you fix it:
+     every writer of that field, every path that books that money, every caller of that
+     function (grep the whole repo, not the files you touched). Fix all of them, and put the
+     list of sites you checked in the handoff.
+   - **A P2 you believe does not apply: stop and ask the PM before you push.** Never leave one
+     open with a note. On money, privacy, auth and audit tickets a P2 blocks.
    - P3 and style notes: your call.
    - A finding that is real but outside the ticket goes through `engineering/engineer/skills/follow-ups.md` §5 (file it, don't work it).
    - The review being unavailable (CLI missing, auth error) is a blocker to report (`engineering/engineer/role.md` §7), not a
@@ -68,6 +79,12 @@
    review found 5 privacy defects, then 2 more, then a race. That was three full
    engineer + tester rounds, about 50 minutes each, for defects a 5 to 10 minute review on the
    engineer's own diff would have caught in the first run.
+
+   Why it loops on P2s and wants the whole class (2026-10-26 to 28, one project, 34 tickets):
+   only 12 shipped in one round and 14 took three or more; rework was at least 15 of 25
+   engineer hours. Each review pass found one or two new issues next to the last fix. One
+   audit event was missing on one path, then on a second, then written twice on a third
+   (9 rounds). Two P2s left open "on purpose" came back as blockers.
 
 4. Push (the hook runs the full gate here; a failure means fix and push again) and open the PR:
    ```bash

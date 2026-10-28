@@ -141,6 +141,8 @@ modes that produce confident wrong answers:
    - a **migration flag** if this PR touches a schema file, restated even if you already
      flagged it at `engineering/engineer/skills/investigate.md` §1.4
    - anything left out of scope, and the ticket ids you filed for it
+   - for every review finding you fixed, the sibling sites you checked (the search you ran
+     and what it found), per `engineering/engineer/skills/open-pr.md` §3b
    - **`built against ticket updated_at <timestamp>`** — the ticket's `updated_at` as you read it
      at the start of §0. The tester compares this against the ticket's current value, and
      stops rather than judging your work if the spec was rewritten after you built it. Without
@@ -151,7 +153,7 @@ modes that produce confident wrong answers:
    that.
 3. **Report exactly one line** back to whoever spawned you. That line is your entire final
    message, with no summary before or after it:
-   `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, 0 P1 open · browser: 3/3 criteria walked as sales · slot A torn down`
+   `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, focused 3 passes, 0 P1 0 P2 open · browser: 3/3 criteria walked as sales · slot A torn down`
    The payload lives in the Plane comment. Do not paste the diff, the investigation, or a
    status essay into the reply.
 4. **Stop.** Do not wait for CI. Do not merge. Do not deploy. Do not pick another ticket.

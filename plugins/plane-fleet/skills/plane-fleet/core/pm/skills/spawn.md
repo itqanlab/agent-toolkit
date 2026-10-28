@@ -141,6 +141,10 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    clean up anything in `worktreesAdded`/`branchesAdded` that has nothing pushed), then re-queue
    the ticket **once on the role's Claude fallback**. A second lane failure on the same executor
    that day → stop using it for that role this run and say so.
+   A timed-out lane that left commits is not a head start. Brief the fallback engineer (`opus`)
+   to read those commits first and judge them: keep, squash or rewrite. It never builds on top
+   of them unread. (2026-10-27: a Codex lane timed out at 2 hours with 13 unpushed commits going
+   in circles; an Opus engineer replaced them with one fix.)
 6. **Log every spawn** at its end. Claude: `$L log add --ticket … --role … --kind … --executor
    claude --model … --outcome … [--experiment] --reason "…" --set duration_ms=… agent_id=…` with
    the duration and the agent id (the `task-id` of its notification) from the Agent result. Do not
@@ -260,6 +264,19 @@ tokens, then a resume with the decision the brief should have carried.)
 Then add, per spawn: the ticket id and state, **the slot letter and its values**, the PR
 number/branch (testers and rework engineers), the owned-file list from currently open PRs, and
 whatever is specific to that ticket.
+
+**Put the focused review prompt in every engineer brief**: the exact `codex review "…"` text you
+will run on the PR yourself (`core/pm/skills/spawn-tester.md` §4). Write it once per ticket, and
+reuse and extend it each round. It names:
+- the base (`git diff origin/<trunk>...HEAD`) and the ticket
+- the ticket's invariants, in one line each (from its §3c, or written by you if it has none)
+- the findings already deferred to other tickets, marked "do not report"
+- "Report P1/P2 only:" and the failure kinds that matter for this ticket
+
+The engineer loops it until a pass is clean (`engineering/engineer/skills/open-pr.md` §3b). When
+the PM's review is a stricter test than the engineer's, the engineer hands over a PR the PM then
+sends back. (2026-10-28: the generic review called four PRs clean in a row. The PM's focused
+prompt then found a P1 or P2 on each of them.)
 
 **Get the brief right the first time. A correction sent mid-run will likely be ignored.** A
 `SendMessage` to a subagent that is still working lands inside one of its tool results, where it
