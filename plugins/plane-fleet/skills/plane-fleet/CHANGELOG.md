@@ -4,6 +4,27 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.4.0] - 2026-10-29
+
+A machine gate that works on any OS and is enforced in code. On 2026-10-29 a 12-core, 32 GB Mac reached a load of 72 with 900 MB of swap left, running only a terminal, Docker and four fleet sessions. The biggest process wasn't a fleet session. watchman, the file watcher Jest uses, held 11 GB: its watch on the repo root covered every worktree's node_modules, and lane churn made it re-crawl the tree 5,863 times. The old gate read one macOS number, ignored swap, and was prose the PM skipped: four sessions were spawned at load 26.
+
+### Added
+
+- `fleet resources` (`core/scripts/fleetres.py`, standard library only). It measures memory the OS can still hand out, swap against RAM, load per core (CPU busy on Windows) and free disk on macOS, Linux (cgroup limits included) and Windows. Limits scale to the machine and can be set in `fleet.resources`. Levels: ok, tight, closed, critical (exit 0 to 3). It names the biggest processes, marks the fleet's own, and says what each usually is and whether its fix is safe (watchman, Nx daemons, headless browsers, VMs, browser tabs, indexers). It warns when a file watcher is rooted over the worktrees.
+- "Room for N heavy": how many more engineers or testers with a server, Jest or a browser the machine can take, from free memory less a reserve, capped by cores and `max_heavy`.
+- `fleet resources --wait`: blocks until the gate opens, at most 4 minutes. Briefs use it before Jest, Playwright or a server, in place of `uptime` arithmetic.
+- `--gate heavy|light` for scripts.
+- Watchers stay off the worktrees in every project. `fleet status` and every lane merge the worktree folders and package stores into the repo's `.watchmanconfig` `ignore_dirs`, keep an untracked one out of the checkout through `.git/info/exclude`, and drop a live watch on the repo so it restarts with the ignores. Briefs run Jest with `--no-watchman`.
+
+### Changed
+
+- `run-lane` defers a lane while the gate won't admit it (exit 75, `resources <level>` in the error). `--ignore-resources` skips the check.
+- The usage-pacer hook holds an engineer or tester Claude spawn on the same rule, and any fleet spawn at critical. The owner can switch it off with `resources-off` in `PLANE_FLEET_HOME`.
+- `fleet status` opens with a `machine:` line, the reasons, safe fixes for machine hogs, and watcher warnings.
+- `fleet-sweep.sh` prints the machine gate instead of the macOS-only check. `--min-free-mem-pct` and `--min-disk-gb` still override it for one run.
+- PM: a new hard rule, "never spawn past the machine gate", and a critical-level procedure: sweep, apply the safe fixes, tell the owner what is left, and only then stop the newest session's test run or server.
+- Standing brief: "Share the machine" uses `fleet resources --wait`, and no session starts a file watcher in a worktree.
+
 ## [2.3.0] - 2026-10-28
 
 Fewer rework rounds, and a machine that doesn't choke. Measured on one project from 2026-10-26 to 28 (34 tickets): only 12 shipped in one round and 14 took three or more. Rework took at least 15 of 25 engineer hours.

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Needs git, the GitHub CLI (gh) signed in, python3 and node 18 or newer, and a Plane MCP server named plane (see README.md). Optional: other coding CLIs for non-default executors. Network access to Plane and GitHub."
 metadata:
   author: itqanlab
-  version: 2.3.0
+  version: 2.4.0
   category: devops
   short: "Run a Plane board with sections of agent roles"
   starter: "fleet run: work the board until the queue is empty"
@@ -76,7 +76,8 @@ In the `engineering` section's references folder:
 
 ```bash
 scripts/fleet config --cwd <repo>          # the project config, merged
-scripts/fleet status                       # budget, slots, lanes, open PRs, trunk CI, in one call
+scripts/fleet status                       # machine gate, budget, slots, lanes, open PRs, trunk CI
+scripts/fleet resources                    # memory, swap, CPU and disk on any OS, the biggest processes, the fixes
 scripts/fleet pick --role engineer --kind api --cwd <repo>
 scripts/fleet cost --since 2026-10-01      # real spend and time per merged ticket
 scripts/fleet cost --ticket PROJ-12        # one ticket's sessions in order
