@@ -11,6 +11,8 @@
 #   fleet apply  [--dry-run]           fleet seed       fleet models
 #   fleet free-models [list|refresh]    the free models opencode serves today
 #   fleet status [--json]               budget, slots, lanes, open PRs and CI in one call
+#   fleet resources [--json] [--gate heavy|light] [--wait [--max-wait S]]
+#                                       the machine's memory, swap, CPU and disk gate (any OS)
 #   fleet antigravity-setup             register Plane and the read-only rules with agy, once
 #   fleet mcp-exec <name>               start an MCP server from ~/.claude.json (agy runs this)
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
@@ -25,6 +27,7 @@ if ! command -v node >/dev/null 2>&1 || ! command -v opencode >/dev/null 2>&1 ||
   export PATH
 fi
 case "${1:-}" in
+  resources) shift; exec python3 "$here/fleetres.py" "$@" ;;
   pick|budget|log|stats|report|cost|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

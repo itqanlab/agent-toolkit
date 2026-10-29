@@ -8,7 +8,7 @@
 //   fleet <codex|opencode|antigravity|claude-ollama> --model <m> --role <role> --ticket <ID> --cwd <dir>
 //               --brief <file> --out <dir> [--sandbox restricted|full|read-only]
 //               [--timeout <sec>] [--effort <level>] [--dry-run]
-//               [--ignore-budget]
+//               [--ignore-budget] [--ignore-resources]
 //   fleet models [codex|opencode|antigravity|claude-ollama]
 //   fleet antigravity-setup    register the fleet's MCP servers (plane) with agy, once
 //   fleet mcp-exec <name>      start an MCP server from its ~/.claude.json entry (agy runs this)
@@ -16,7 +16,8 @@
 //   After a lane: fleet log add --from-result <out>/result.json --outcome O [--kind K] takes
 //   ticket, role, executor, model, durationMs and usage from result.json.
 //
-// Exit codes: 0 completed · 2 usage error (no result.json) · 75 deferred (no budget; see
+// Exit codes: 0 completed · 2 usage error (no result.json) · 75 deferred (no budget, or the
+// machine's resource gate is closed: see fleetres.py; budget deferrals carry
 // resumeAt) · 124 timeout · 127 executor missing · 130 aborted · otherwise the executor's
 // own non-zero exit (or 1).
 // Registry: core/references/executors.json, overridden by
@@ -114,7 +115,7 @@ function freeModelRefusal(registry, executor, model, role, sandbox) {
 // ---------- args ----------
 function parseArgs(argv) {
   const opts = { positional: [] };
-  const flags = new Set(["dry-run", "ignore-budget"]);
+  const flags = new Set(["dry-run", "ignore-budget", "ignore-resources"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) { opts.positional.push(a); continue; }
@@ -414,6 +415,23 @@ async function run(opts) {
     return result;
   };
 
+  // Resource gate (fleetres.py): a lane is not launched on a machine that is already short of
+  // memory, swap, CPU or disk. Engineers and testers are heavy unless read-only; a heavy lane
+  // also needs room for one more. 2026-10-29: four sessions plus an 11 GB watchman took a
+  // 32 GB Mac to 900 MB of swap left; the old gate was prose the PM skipped.
+  if (!opts["ignore-resources"]) {
+    // keep file watchers off the worktrees in whatever repo this lane works in (.watchmanconfig)
+    spawnSync("python3", [join(dirname(FLEETCTL), "fleetres.py"), "--fix-watchers", "--cwd", cwd], { encoding: "utf8", timeout: 30000 });
+    const heavy = ["engineer", "tester"].includes(opts.role) && opts.sandbox !== "read-only";
+    const r = spawnSync("python3", [join(dirname(FLEETCTL), "fleetres.py"), "--gate", heavy ? "heavy" : "light", "--json", "--cwd", cwd],
+                        { encoding: "utf8", timeout: 60000 });
+    let gate = null; try { gate = JSON.parse((r.stdout || "").trim()); } catch {}
+    if (gate && !gate.admit) {
+      finish({ status: "deferred", exitCode: 75, signal: null, lastMessage: "", resources: gate, resumeAt: null,
+               error: `resources ${gate.level}: ${gate.summary}` });
+      return 75;
+    }
+  }
   // Budget gate (fleetctl budget check): a held executor is not launched. The PM sleeps until
   // resumeAt on a background timer and re-runs, or picks again (selection skips held executors).
   if (!opts["ignore-budget"]) {

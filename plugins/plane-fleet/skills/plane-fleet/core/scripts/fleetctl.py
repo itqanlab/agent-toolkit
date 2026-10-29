@@ -19,6 +19,7 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py config  [--get a.b.c] [--cwd DIR]   .plane/config.json + the per-user project override
   fleetctl.py free-models [list|refresh] [--json]   the free models opencode serves today (freemodels.py)
   fleetctl.py status  [--cwd DIR] [--json]   budget, slots, lanes, open PRs and CI in one call (fleetstatus.py)
+  fleet resources     [--cwd DIR] [--json] [--gate heavy|light] [--wait]   the machine gate (fleetres.py)
 
 Layers, later wins: <this dir>/../executors.json  <  user override (log.user_override)
   <  user override projects.<project>  <  <repo>/.plane/config.json fleet.executors
@@ -1209,6 +1210,8 @@ def selftest():
         freemodels.selftest(check)
         import fleetstatus
         fleetstatus.selftest(check)
+        import fleetres
+        fleetres.selftest(check)
     finally:
         STATE_HOME = old_home
         if old_env is None:

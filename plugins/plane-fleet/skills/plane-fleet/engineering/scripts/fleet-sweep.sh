@@ -21,10 +21,10 @@
 #      belongs to a slot not in --live, or older than --max-browser-hours (default 3)
 #
 # Slots come from the MERGED config (fleet config), so per-user extra slots count.
-# It also prints the gate. The PM holds spawns when free memory (kern.memorystatus_level,
-# the % macOS itself reports) is under --min-free-mem-pct (default 25) or the system disk
-# has less than --min-disk-gb (default 6). Swap is shown but not gated on: macOS keeps swap
-# allocated long after the memory is free again, so it reads high on a healthy machine.
+# It also prints the machine gate from core/scripts/fleetres.py (memory, swap against RAM,
+# CPU and disk on macOS, Linux or Windows, with the biggest processes and their fixes). The
+# PM holds spawns while it is closed or critical. --min-free-mem-pct and --min-disk-gb are
+# still read and override the config's closed limits for one run.
 #
 # It never touches processes outside the repo's worktrees and slot dirs (other projects'
 # servers are listed under "not ours" so the owner can decide). Exit code: 0 clean,
@@ -32,7 +32,7 @@
 
 set -uo pipefail
 
-REPO="" LIVE="" KILL=0 MAX_BROWSER_H=3 MIN_FREE_MEM=25 MIN_DISK=6
+REPO="" LIVE="" KILL=0 MAX_BROWSER_H=3 MIN_FREE_MEM=0 MIN_DISK=0   # 0: the machine gate decides
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) REPO="$2"; shift 2 ;;
@@ -137,11 +137,13 @@ lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1 && ($1 ~ /node|chrome|vite|p
 done
 
 # gate
-free_mem=$(sysctl -n kern.memorystatus_level 2>/dev/null || echo 100)
-swap_used=$(sysctl -n vm.swapusage | sed -n 's/.*used = \([0-9.]*\)M.*/\1/p')
-disk_gb=$(df -g /System/Volumes/Data 2>/dev/null | awk 'NR==2{print $4}'); disk_gb=${disk_gb:-$(df -g / | awk 'NR==2{print $4}')}
-echo "gate: free memory ${free_mem}% (min ${MIN_FREE_MEM}), disk ${disk_gb} GB free (min ${MIN_DISK}), swap in use ${swap_used%.*} MB (info only)"
-if [ "$free_mem" -lt "$MIN_FREE_MEM" ] || [ "$disk_gb" -lt "$MIN_DISK" ]; then echo "gate: CLOSED, spawn nothing new"; exit 2; fi
+here_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python3 "$here_dir/../../core/scripts/fleetres.py" --cwd "$REPO" | sed 's/^/gate /'
+gate=${PIPESTATUS[0]}
+free_mem=$(python3 "$here_dir/../../core/scripts/fleetres.py" --cwd "$REPO" --json --top 0 2>/dev/null \
+  | python3 -c 'import json,sys;s=json.load(sys.stdin)["sample"];print(int(100*(s.get("mem_avail") or s["ram"])/s["ram"]), min([d["free"]//1073741824 for d in s["disks"]] or [999]))' 2>/dev/null)
+read -r mem_pct disk_gb <<<"${free_mem:-100 999}"
+if [ "$gate" -ge 2 ] || [ "$mem_pct" -lt "$MIN_FREE_MEM" ] || [ "$disk_gb" -lt "$MIN_DISK" ]; then echo "gate: CLOSED, spawn nothing new"; exit 2; fi
 echo "gate: open"
 [ ${#LEFT[@]} -gt 0 ] && exit 1
 exit 0

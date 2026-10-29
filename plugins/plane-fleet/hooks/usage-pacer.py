@@ -14,6 +14,10 @@ the harness's rate_limits.five_hour block). No meter configured -> no judgement.
 Blocking = exit 2 with the reason on stderr. Decisions go to pacer-log.jsonl in
 PLANE_FLEET_HOME (default ~/.config/plane-fleet), or budget.executors.claude.pacer_log.
 
+It also holds a spawn the machine cannot carry (fleetres.py, any OS): an engineer or tester
+needs the resource gate ok or tight with room for one more heavy session; other fleet roles are
+held only when it is critical. Switch file: resources-off.
+
 Switch files in PLANE_FLEET_HOME: pacer-off / pacer-off-claude (no gate), pace-off /
 pace-off-claude (hard stop only). Thresholds: the registry's budget block, overridden in
 PLANE_FLEET_HOME/budget.json.
@@ -49,6 +53,29 @@ def log(path, row):
         pass
 
 
+def resources_hold(role):
+    """A reason to hold this spawn on machine resources, or None."""
+    if os.path.exists(os.path.join(STATE_HOME, "resources-off")):
+        return None
+    try:
+        sys.path[:0] = LANES_DIRS
+        import fleetres  # noqa
+        cfg, paths, wdirs = fleetres.context(os.getcwd())
+        sample = fleetres.probe(paths, top_n=8)
+        gate = fleetres.judge(sample, cfg, wdirs)
+    except Exception:
+        return None  # no probe available: the PM's own sweep still runs
+    heavy = role in ("team-engineer", "team-tester")
+    if fleetres.admit(gate, heavy):
+        return None
+    hogs = "; ".join(f"{h['name']} {h['mem_gb']} GB ({h.get('fix', 'find its owner')})" for h in gate["hogs"] if not h["fleet"])
+    return (f"resource gate: machine is {gate['level'].upper()} ({fleetres.summary_line(sample, gate)}). Do not start a new "
+            f"{role} session. " + ("; ".join(gate["reasons"]) + ". ") +
+            (f"Biggest non-fleet processes: {hogs}. " if hogs else "") +
+            "Run `fleet resources`, apply the safe fixes, sweep leftovers, and let running sessions finish. "
+            f"Override once only on the owner's word: touch {STATE_HOME}/resources-off.")
+
+
 def main():
     try:
         event = json.load(sys.stdin)
@@ -61,6 +88,10 @@ def main():
         or next((v for k, v in FLEET.items() if k in prompt), None)
     if not role:
         return 0
+    held = resources_hold(role)
+    if held:
+        print(held, file=sys.stderr)
+        return 2
     now = time.time()
     try:
         sys.path[:0] = LANES_DIRS
