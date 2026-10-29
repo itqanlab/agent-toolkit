@@ -211,11 +211,9 @@ def collect(fleetctl, cwd):
     trees, orphan = worktrees_view(repo, {p["branch"] for p in prs or []})
     import fleetres
     fcfg, fpaths, wdirs = fleetres.context(cwd)
-    watchers = fleetres.ensure_watch_ignores(fpaths[0], wdirs)   # any project the PM runs: watchers stay off worktrees
     sample = fleetres.probe(fpaths, top_n=8)
     gate = fleetres.judge(sample, fcfg, wdirs)
     machine = {"summary": fleetres.summary_line(sample, gate), **gate}
-    machine["warnings"] = [f"fixed: {w}" for w in watchers] + machine["warnings"]
     return {"machine": machine, "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),
             "slots": slots_view(cfg, repo), "lanes_running": running, "lanes_ended": ended,
             "prs": prs, "prs_error": pr_err, "trunk_runs": runs, "trunk_error": run_err,
@@ -229,7 +227,7 @@ def render(s):
     L += [f"  {r}" for r in m["reasons"] if not r.startswith("tight")]
     L += [f"  hog pid {h['pid']} {h['name']} {h['mem_gb']} GB: {h.get('what', '?')}, fix: {h.get('fix', 'find its owner')}"
           for h in m["hogs"] if not h["fleet"] and h.get("safe")]
-    L += [f"  {w}" if w.startswith("fixed:") else f"  warning: {w}" for w in m["warnings"]]
+    L += [f"  warning: {w}" for w in m["warnings"]]
     L += [f"budget: {s['budget']}", "slots: " + (" · ".join(s["slots"]) or "none configured")]
     L.append(f"lanes running ({len(s['lanes_running'])}): " + (" | ".join(s["lanes_running"]) or "none"))
     if s["lanes_ended"]:

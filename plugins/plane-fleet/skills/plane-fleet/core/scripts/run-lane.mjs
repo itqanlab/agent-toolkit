@@ -420,8 +420,6 @@ async function run(opts) {
   // also needs room for one more. 2026-10-29: four sessions plus an 11 GB watchman took a
   // 32 GB Mac to 900 MB of swap left; the old gate was prose the PM skipped.
   if (!opts["ignore-resources"]) {
-    // keep file watchers off the worktrees in whatever repo this lane works in (.watchmanconfig)
-    spawnSync("python3", [join(dirname(FLEETCTL), "fleetres.py"), "--fix-watchers", "--cwd", cwd], { encoding: "utf8", timeout: 30000 });
     const heavy = ["engineer", "tester"].includes(opts.role) && opts.sandbox !== "read-only";
     const r = spawnSync("python3", [join(dirname(FLEETCTL), "fleetres.py"), "--gate", heavy ? "heavy" : "light", "--json", "--cwd", cwd],
                         { encoding: "utf8", timeout: 60000 });

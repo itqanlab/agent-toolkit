@@ -50,7 +50,7 @@ GB = 1024 ** 3
 KNOWN = [
     (r"\bwatchman\b", "file watcher (Jest, Metro, Buck). A watch rooted at the repo covers every worktree "
      "inside it, with its node_modules", "watchman shutdown-server", True,
-     "add a .watchmanconfig at the repo root with ignore_dirs for the worktree and package-store dirs"),
+     "turn watchman off for Jest (watchman: false) or keep worktrees outside the repo; never ignore_dirs the worktrees"),
     (r"nx/src/daemon|nx[/\\]bin[/\\]daemon", "Nx daemon", "nx daemon --stop (or kill it)", True,
      "run fleet sessions with NX_DAEMON=false"),
     (r"chrome-headless-shell|headless_shell|--headless", "headless browser (Playwright, Puppeteer)",
@@ -208,58 +208,6 @@ def watchman_roots():
         return []
 
 
-PACKAGE_STORES = [".pnpm-store", ".yarn/cache", ".turbo", ".nx/cache", "node_modules/.cache"]
-
-
-def ensure_watch_ignores(repo, worktree_dirs, apply=True):
-    """Keep file watchers off the fleet's worktrees, in any project.
-
-    watchman reads ignore_dirs from <root>/.watchmanconfig when a watch starts. A worktree folder
-    inside the repo is otherwise crawled with every node_modules in it. So: merge the worktree
-    folders (and package stores) into that file, keep an untracked file out of the checkout
-    through .git/info/exclude, and drop a live watch on the repo so it restarts with the ignores.
-    Returns what it did, one line each."""
-    rel = sorted({os.path.relpath(w, repo) for w in worktree_dirs
-                  if w and (w + os.sep).startswith(repo.rstrip(os.sep) + os.sep)})
-    rel += [d for d in PACKAGE_STORES if os.path.isdir(os.path.join(repo, d)) and d not in rel]
-    if not rel:
-        return []
-    path = os.path.join(repo, ".watchmanconfig")
-    try:
-        cfg = json.load(open(path)) if os.path.exists(path) else {}
-    except (OSError, ValueError):
-        return [f"{path} is not valid JSON; add ignore_dirs {rel} by hand"]
-    have = list(cfg.get("ignore_dirs") or [])
-    missing = [d.replace(os.sep, "/") for d in rel if d.replace(os.sep, "/") not in have]
-    done = []
-    if missing and apply:
-        cfg["ignore_dirs"] = have + missing
-        with open(path, "w") as f:
-            json.dump(cfg, f, indent=2); f.write("\n")
-        done.append(f"{path}: ignore_dirs += {missing}")
-        tracked = subprocess.run(["git", "-C", repo, "ls-files", "--error-unmatch", ".watchmanconfig"],
-                                 capture_output=True).returncode == 0
-        if not tracked:
-            excl = os.path.join(repo, ".git", "info", "exclude")
-            try:
-                lines = open(excl).read().splitlines() if os.path.exists(excl) else []
-                if "/.watchmanconfig" not in lines:
-                    os.makedirs(os.path.dirname(excl), exist_ok=True)
-                    with open(excl, "a") as f:
-                        f.write("/.watchmanconfig\n")
-                    done.append("kept it out of the checkout (.git/info/exclude); commit it to share it")
-            except OSError:
-                pass
-    elif missing:
-        done.append(f"{path} lacks ignore_dirs {missing}")
-    if apply and missing:
-        for root in watchman_roots():
-            if os.path.realpath(root) == os.path.realpath(repo):
-                subprocess.run(["watchman", "--no-spawn", "watch-del", root], capture_output=True, timeout=10)
-                done.append(f"dropped the live watch on {root}; it restarts with the ignores on next use")
-    return done
-
-
 # ---------------------------------------------------------------- judgement (pure, tested)
 def limits(cfg):
     out = dict(DEFAULTS)
@@ -330,8 +278,12 @@ def judge(s, cfg=None, worktree_dirs=()):
     for root in s.get("watch_roots") or []:
         inside = [w for w in worktree_dirs if w and (w + os.sep).startswith(root.rstrip(os.sep) + os.sep)]
         if inside:
+            # Never "fix" this with ignore_dirs in an untracked root .watchmanconfig: watchman then
+            # roots every worktree at the repo, the worktrees are ignored, and Jest finds no tests,
+            # so a pre-push hook passes green with failing tests (2026-10-29).
             warnings.append(f"watchman watches {root}, which holds the worktrees ({inside[0]}): every lane's file churn "
-                            f"lands on it. Add ignore_dirs to {root}/.watchmanconfig, or `watchman watch-del {root}`.")
+                            f"lands on it. `watchman watch-del {root}` now; to stop it coming back, turn watchman off "
+                            f"for Jest (watchman: false in the Jest config) or keep worktrees outside the repo.")
     return {"level": LEVELS[lvl], "code": lvl, "reasons": reasons, "room_heavy": room, "hogs": hogs, "warnings": warnings}
 
 
@@ -401,17 +353,11 @@ def main(argv):
     ap.add_argument("--cwd"); ap.add_argument("--json", action="store_true"); ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--wait", action="store_true"); ap.add_argument("--max-wait", type=int, default=240)
     ap.add_argument("--gate", choices=["heavy", "light"], help="exit 0 when a new session of this weight may start, 2 when not")
-    ap.add_argument("--fix-watchers", action="store_true", help="keep file watchers off the worktrees (writes .watchmanconfig)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
     cfg, paths, wdirs = context(a.cwd or os.getcwd())
-    if a.fix_watchers:
-        for line in ensure_watch_ignores(paths[0], wdirs):
-            print(f"watchers: {line}")
-        if not (a.wait or a.gate or a.json):
-            return 0
     if a.wait:
         # light samples (no process list) until the gate opens or the wait runs out; at most
         # 240 s by default so a Claude session's prompt cache survives the call
@@ -475,16 +421,7 @@ def selftest(check=None):
     check("res: closed still admits a light one", admit({"code": 2, "room_heavy": 0}, False), True)
     check("res: critical holds everything", admit({"code": 3, "room_heavy": 0}, False), False)
     check("res: size parser", (_size("11G"), _size("512K"), _size("123,456 K")), (11 * GB, 512 * 1024, 123456 * 1024))
-    import tempfile as _t
-    with _t.TemporaryDirectory() as repo:
-        subprocess.run(["git", "init", "-q", repo], capture_output=True)
-        os.makedirs(os.path.join(repo, ".claude", "worktrees", "T-1")); os.makedirs(os.path.join(repo, ".pnpm-store"))
-        json.dump({"ignore_dirs": ["dist"]}, open(os.path.join(repo, ".watchmanconfig"), "w"))
-        ensure_watch_ignores(repo, [os.path.join(repo, ".claude", "worktrees"), "/elsewhere/trees"])
-        got = json.load(open(os.path.join(repo, ".watchmanconfig")))["ignore_dirs"]
-        check("res: watcher ignores merged, outside dirs skipped", got, ["dist", ".claude/worktrees", ".pnpm-store"])
-        check("res: second run changes nothing", ensure_watch_ignores(repo, [os.path.join(repo, ".claude", "worktrees")]), [])
-        check("res: untracked config kept out of the checkout", "/.watchmanconfig" in open(os.path.join(repo, ".git", "info", "exclude")).read(), True)
+    check("res: the watcher warning never advises ignore_dirs", "ignore_dirs" in judge(mac_bad, {}, ["/r/.claude/worktrees"])["warnings"][0], False)
     s = probe([os.getcwd()], top_n=3)
     check("res: probe reads this machine", bool(s.get("ram")) and s.get("cores", 0) >= 1, True)
     return 1 if fails else 0

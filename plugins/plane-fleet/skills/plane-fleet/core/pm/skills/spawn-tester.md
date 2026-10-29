@@ -93,9 +93,13 @@ tell the owner once), and prints the machine gate from `fleet resources`.
     node_modules; lane churn made it re-crawl the tree 5,863 times. The old gate read one macOS
     number and was prose the PM skipped: four sessions were spawned at load 26 on 12 cores.)
   - **Keep watchers off the worktrees.** A `warning:` line means a file watcher (watchman,
-    an indexer) is rooted over the worktree folder. Fix it once per repo: ignore the worktree and
-    package-store dirs in the watcher's config (for watchman, `ignore_dirs` in the repo-root
-    `.watchmanconfig`) or keep worktrees outside the repo.
+    an indexer) is rooted over the worktree folder. Drop that watch now (`watchman watch-del
+    <root>`). To stop it coming back, turn watchman off for Jest (`watchman: false` in the Jest
+    config; briefs already pass `--no-watchman`) or keep worktrees outside the repo; that is a
+    ticket for the repo, not a PM edit. **Never add the worktrees to `ignore_dirs` in a repo-root
+    `.watchmanconfig`.** watchman then treats the repo root as the project for every worktree,
+    ignores the worktrees, and Jest finds no tests: a pre-push hook passed green with three
+    failing tests that way (2026-10-29).
 - Size the fleet to the machine, not to the slot list: "room for N heavy" already counts what
   is running. A small laptop may run one heavy session; that is the gate working.
 - **Put the load rules in every brief:** Jest at `--maxWorkers=2 --no-watchman`, server e2e at the worker
