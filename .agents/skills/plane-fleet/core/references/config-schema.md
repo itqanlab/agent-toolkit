@@ -98,6 +98,14 @@ by key; lists and plain values replace.
       "B": { "api": 3020, "client": 4220, "db": "app_slot_b", "nx_cache": "$HOME/.cache/plane-fleet/slot-b/nx-cache" }
       // add redis / bucket keys per slot if the app uses them
     },
+    "resources": {                       // OPTIONAL. The machine gate (core/scripts/fleetres.py); every key optional.
+      "mem_avail_pct": [25, 15, 8],      // tight, closed, critical: memory the OS can still hand out
+      "swap_of_ram_pct": [25, 40, 60],   // swap in use as a share of RAM
+      "load_per_core": [1.5, 2.0, 4.0],  // 1-minute load per core (Windows: "cpu_busy_pct": [85, 92, 98])
+      "disk_free_gb": [15, 6, 2],        // where the repo and the temp dir live
+      "per_heavy_gb": 3,                 // what one engineer or tester with a server, Jest or a browser takes
+      "max_heavy": 4                     // never more heavy sessions than this, however big the machine
+    },
     "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
     "cost": {                            // OPTIONAL, for `fleet cost`
       "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved

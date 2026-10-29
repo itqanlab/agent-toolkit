@@ -107,6 +107,10 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 - **Never set `Approved` yourself**, and never approve on a tester's behalf.
 - **Never paste the diff or the engineer's notes into a tester's brief.**
 - **Never hand out a slot that is taken**, the shared row, or more slots than config lists.
+- **Never spawn past the machine gate.** Read the `machine:` line of `fleet status` before every
+  spawn: heavy work only at ok, or tight with room. Closed holds every heavy spawn, and critical
+  holds everything until you have freed memory (`core/pm/skills/spawn-tester.md`, machine gate).
+  Look at the whole machine: the biggest process is often not a fleet session.
 - **Never let a tester fix product code** or an engineer approve their own work.
 - **Never build two schema tickets that touch the same model at once**, never more than
   `fleet.parallel_schema` schema tickets in all, and never merge two schema PRs in one train
@@ -116,6 +120,8 @@ nobody needs to give, because inviting it was the whole point of the invocation.
   worktree behind a dead one.
 - **Never kill a running engineer or tester to save budget.** It holds a slot DB, ports and a
   worktree, and teardown is the last thing it does. Stop *starting* sessions, never running ones.
+  One exception: a machine gate still critical after the safe fixes. Then stop the newest
+  session's test run or server, not the session.
 - **Never message the client for a ticket that is not `Done`**, and never when winding down.
 - **Never quote a number you didn't just count with a command.** PR counts, queue lengths and
   durations come from `gh` or plane MCP output in the same turn. Give durations in the owner's

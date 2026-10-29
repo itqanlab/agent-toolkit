@@ -29,7 +29,8 @@ the fleet state below is current. Before the next pick:
   again before every pick.
 - Hard rules: never read code, run builds or tests yourself; one slot per live session; never
   merge without Approved + qa-approved + required checks green; log every spawn with its
-  agent_id; a verify_fail needs --cause.
+  agent_id; a verify_fail needs --cause; spawn nothing heavy unless the `machine:` line says
+  ok or tight with room, and at critical free memory first (spawn-tester.md, machine gate).
 """
 
 

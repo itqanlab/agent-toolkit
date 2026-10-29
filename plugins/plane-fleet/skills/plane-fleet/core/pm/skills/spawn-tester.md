@@ -62,23 +62,47 @@ registry or a project override names a lane, start it with `fleet --role tester`
 - The tester stopped because the ticket text changed after the build → scope is your call.
   Decide, comment the decision on the ticket, then either re-test or send to Rework.
 
-**Sweep and memory gate, before every spawn and after every report.** Run
+**Sweep and machine gate, before every spawn and after every report.** Run
 `engineering/scripts/fleet-sweep.sh --repo <repo> --live <slots in use, e.g. A,C,F>`. It lists what dead
 or finished sessions left running (servers on slot ports of slots not in use, processes in
 removed worktrees or other slots' scratch dirs, Nx daemons, headless Chromium older than 3
 hours or tied to a free slot), lists other projects' servers under "not ours" (never touched;
-tell the owner once), and prints the gate: swap % and free disk.
+tell the owner once), and prints the machine gate from `fleet resources`.
 - Leftovers → rerun with `--kill`, and say in one line what was stopped.
-- Gate CLOSED (exit 2: free memory under 25% or under 6 GB free disk; swap is shown but not gated, macOS keeps it allocated) → spawn nothing new, not even
-  a tester; let running sessions finish and re-check after each report. Lower the slot count
-  you fill (start at 4 on a 32 GB machine) until the gate stays open with every slot busy.
-- **CPU load is a gate too.** Read `uptime` before every spawn. A 1-minute load above twice the
-  core count (`sysctl -n hw.ncpu` on macOS, `nproc` on Linux) → spawn nothing heavy until it
-  drops. Allow at most 4 heavy sessions at once: an engineer or tester running the gate, Jest,
-  e2e or a server. A focused review in a review worktree isn't heavy.
-- **Put the load rules in every brief:** Jest at `--maxWorkers=2`, server e2e at the worker
-  count its config sets, and wait (a `Monitor` until-loop, not `sleep`) while the 1-minute load
-  is over the gate before starting Jest, Playwright or a server. A pre-push hook runs its own
+- **The machine gate** (`fleet resources`, also the `machine:` line of `fleet status`) measures
+  memory the OS can still hand out, swap against RAM, load per core (CPU busy on Windows) and
+  free disk, on macOS, Linux or Windows, against limits scaled to this machine (config
+  `fleet.resources`). It names the biggest processes, says whose they are (`fleet` = inside a
+  worktree) and what is safe to do about each. Levels:
+  - **ok** → spawn as the slot rules allow, up to "room for N heavy".
+  - **tight** → a heavy spawn (engineer or tester with a server, Jest or a browser) only while
+    "room for N heavy" is at least 1; light work (scans, plans, reviews with no server) goes on.
+  - **closed** → spawn nothing heavy, not even a tester. Let running sessions finish; re-check
+    after each report.
+  - **critical** → spawn nothing, and free memory now, in this order: sweep `--kill`; run every
+    fix marked "(safe)" on a machine hog (they free memory without losing anyone's work, for
+    example `watchman shutdown-server`); then tell the owner in one message what is still big and
+    whose call it is (browsers, a VM's memory limit). If it is still critical after that, stop
+    the newest heavy session's test run or server (not its worktree) and say so.
+  - `run-lane` and the usage-pacer hook enforce the same gate: a lane is `deferred` and a Claude
+    spawn is held. Don't route around it; the owner can switch it off with
+    `~/.config/plane-fleet/resources-off`.
+  - **Read the whole machine, not only the fleet.** The worst hog is often not a fleet session.
+    (2026-10-29: load 72 and 900 MB of swap left on a 32 GB Mac. watchman, the file watcher
+    Jest uses, held 11 GB because its watch on the repo root covered every worktree's
+    node_modules; lane churn made it re-crawl the tree 5,863 times. The old gate read one macOS
+    number and was prose the PM skipped: four sessions were spawned at load 26 on 12 cores.)
+  - **Keep watchers off the worktrees.** A `warning:` line means a file watcher (watchman,
+    an indexer) is rooted over the worktree folder. Fix it once per repo: ignore the worktree and
+    package-store dirs in the watcher's config (for watchman, `ignore_dirs` in the repo-root
+    `.watchmanconfig`) or keep worktrees outside the repo.
+- Size the fleet to the machine, not to the slot list: "room for N heavy" already counts what
+  is running. A small laptop may run one heavy session; that is the gate working.
+- **Put the load rules in every brief:** Jest at `--maxWorkers=2 --no-watchman`, server e2e at the worker
+  count its config sets, and `<fleet> resources --wait` (give the full path of the fleet
+  command) before starting Jest, Playwright or a server. It returns when the gate opens or
+  after 4 minutes; a nonzero exit means wait again or report. No `uptime` arithmetic in
+  briefs: core counts and OS differ. A pre-push hook runs its own
   Jest workers, so two sessions pushing at once is the usual spike.
   (2026-10-27/28: four heavy lanes plus two pre-push hooks drove a 12-core Mac to a load of 108.
   A group-fix engineer's local runs timed out and crashed at loads of 36 to 61, which cost hours.)

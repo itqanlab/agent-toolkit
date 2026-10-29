@@ -159,7 +159,10 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    ticket reaches **Done**: `$L log add --ticket … --role pm --executor claude --model <yours>
    --outcome done --set client_visible=true|false` (true = the client can see the change).
 7. The usage pacer hook gates Claude spawns; `run-lane` gates lanes with the same rules
-   (`core/pm/skills/preflight.md` §0.6). A rate-limit in a lane records a back-off and is a lane failure.
+   (`core/pm/skills/preflight.md` §0.6). Both also hold a spawn the machine can't carry
+   (`fleet resources`, see spawn-tester.md "Sweep and machine gate"): a lane comes back
+   `deferred` with `resources <level>` in its error, and a held Claude spawn names the level
+   and the biggest processes. Free memory first; never pass `--ignore-resources` on your own. A rate-limit in a lane records a back-off and is a lane failure.
 
 ### Record every spawn so the defaults can be checked later
 

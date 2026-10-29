@@ -45,9 +45,13 @@ decisions) comes in the brief itself.
     `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "<your slot scratch dir>"`, and
     `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
     anything else you find instead of killing it.
-- **Share the CPU.** Run Jest with `--maxWorkers=2`, and server e2e at the worker count its
-  config sets, never more. Before you start Jest, Playwright or a server, check `uptime`. If the
-  1-minute load is over twice the core count, wait with a `Monitor` until-loop until it drops.
+- **Share the machine.** Run Jest with `--maxWorkers=2 --no-watchman` (a watchman watch on your
+  worktree outlives you and holds memory for every file in it), and server e2e at the worker count its
+  config sets, never more. Before you start Jest, Playwright or a server, run
+  `<fleet folder>/scripts/fleet resources --wait`. It works on any OS, returns as soon as memory,
+  swap, CPU and disk allow, and gives up after 4 minutes: on a nonzero exit run it again, and
+  after three tries report the `machine:` line instead of starting. Never start a file watcher
+  (watchman, `--watch` modes, an Nx daemon) in a worktree: its memory outlives you.
   A run started on an overloaded machine times out and gets misread as a failing test.
 - **No wait longer than 4 minutes in one call.** Your prompt cache lives 5 minutes. A call
   that blocks longer makes your next call write your whole context again, and those rewrites
