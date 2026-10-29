@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.4.1] - 2026-10-29
+
+### Fixed
+
+- 2.4.0 wrote the worktree folders into an untracked `.watchmanconfig` `ignore_dirs` at the repo root. watchman then treats the repo root as the project for every worktree, so Jest inside a worktree found no tests and a pre-push hook passed green with three failing tests. `fleet status` and `run-lane` no longer write any watcher config. The warning now says to drop the watch and turn watchman off for Jest, and the PM docs forbid the `ignore_dirs` fix. If 2.4.0 wrote the file in a repo, delete `<repo>/.watchmanconfig` and the `/.watchmanconfig` line in `.git/info/exclude`.
+
 ## [2.4.0] - 2026-10-29
 
 A machine gate that works on any OS and is enforced in code. On 2026-10-29 a 12-core, 32 GB Mac reached a load of 72 with 900 MB of swap left, running only a terminal, Docker and four fleet sessions. The biggest process wasn't a fleet session. watchman, the file watcher Jest uses, held 11 GB: its watch on the repo root covered every worktree's node_modules, and lane churn made it re-crawl the tree 5,863 times. The old gate read one macOS number, ignored swap, and was prose the PM skipped: four sessions were spawned at load 26.
@@ -14,7 +20,7 @@ A machine gate that works on any OS and is enforced in code. On 2026-10-29 a 12-
 - "Room for N heavy": how many more engineers or testers with a server, Jest or a browser the machine can take, from free memory less a reserve, capped by cores and `max_heavy`.
 - `fleet resources --wait`: blocks until the gate opens, at most 4 minutes. Briefs use it before Jest, Playwright or a server, in place of `uptime` arithmetic.
 - `--gate heavy|light` for scripts.
-- Watchers stay off the worktrees in every project. `fleet status` and every lane merge the worktree folders and package stores into the repo's `.watchmanconfig` `ignore_dirs`, keep an untracked one out of the checkout through `.git/info/exclude`, and drop a live watch on the repo so it restarts with the ignores. Briefs run Jest with `--no-watchman`.
+- Briefs run Jest with `--no-watchman`.
 
 ### Changed
 
