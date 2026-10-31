@@ -31,6 +31,10 @@
      at the sites you remember. Write the grep/AST search that finds every instance, run it
      after your change, and paste the command and its (empty or allowlisted) output into the
      handoff.
+   - **a rework fixes the class, not the reported case.** For each finding, search for every
+     other path, state or call site with the same shape, fix them all, and list each one in the
+     handoff as `class checked: <where> (fixed | already fine)`. A rework that fixes only the
+     named line comes back.
    - the empty state, the error path, the other role, the default locale (`i18n.default`;
      right-to-left if it is one)
    - no raw i18n keys on screen, no console errors, no 4xx/5xx you did not expect

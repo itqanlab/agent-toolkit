@@ -41,7 +41,9 @@ the PM, which puts it through the queue.
 
 1. Ticket → `Rework` (priority preserved). Comment, written for an engineer who has never met
    you: each failure numbered, as which role, steps, expected vs actual, artifact, and the failing
-   test you pushed (file + name) if any. Code findings cite `file:line`.
+   test you pushed (file + name) if any. Code findings cite `file:line`. For each finding, name
+   its class too: the other paths, states or call sites with the same shape, as far as you can
+   see them. The engineer fixes the class, and your retest tries each one.
 2. `gh pr edit <n> --add-label qa-changes-requested` and `gh pr review <n> --comment` with the
    same list.
 3. Do not fix it. Do not suggest you could.

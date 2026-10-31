@@ -56,6 +56,17 @@ run, so testers no longer run them per ticket (the tester role). To make sure th
   (2026-10-14: the full browser suite was skipped on group 1, and 3 reds surfaced on develop).
 - check the run's scope step printed the label as present (`HAS_LABEL: true` on this repo)
   and that the browser job reads SUCCESS, not SKIPPED, before merging.
+- **When the group PR doesn't run the full suites** (some projects save them for the release
+  to production), the builder still runs every test file that covers code the group changed,
+  not only the specs the tickets name. Find them by what imports the changed modules (the
+  project's affected-test command, or a grep for the module names in the test folders). A
+  group that breaks a test nobody ran surfaces a day later on the release.
+- **No release waits on one ticket by default.** When the owner wants to release and one
+  ticket is still in rework, say plainly what holding costs: whether users can see the change
+  at all, how many rounds it has had, and a rough wait. Let the owner choose. A ticket with no
+  user-visible change doesn't hold a release unless the owner says so.
+  (2026-10-30, one project: a group broke a server test no group run covered, and a release
+  waited about 3 hours on a server-only ticket that users couldn't see yet.)
 - a red group PR: match the failing spec to its PR (`gh pr view --json files`), drop that
   branch from the group, rebuild, and send its ticket to Rework.
 - a red group PR you fix in place instead: split the failures by effort. The easy ones (a

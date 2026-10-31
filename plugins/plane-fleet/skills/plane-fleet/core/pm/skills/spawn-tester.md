@@ -28,6 +28,17 @@ background. It takes about 5 minutes and needs no slot.
   and put it in the same verdict. Don't send the engineer a second Rework later for it.
 - Wait for both the tester's verdict and your review before you route a Rework, so the engineer
   gets every known finding in one round.
+- **An APPROVED on these kinds does not count until your review is back clean.** Don't queue it
+  for a group while the review is still running. A tester approval followed by a reviewer P1 at
+  group time costs a dropped branch, a rebuild and a full extra round.
+- Run it on a different executor from the engineer's. Two passes by the same model miss the
+  same things.
+- **Read the engineer's own open notes first.** Its handoff often lists "minor" or P3 notes.
+  On these kinds, any note that touches totals, balances, permissions or data written is a
+  must-fix before the tester starts, not a later follow-up.
+(2026-10-30, one project: a price-confirm ticket took four test rounds. The tester approved
+round 1, the group review then found a P1, and that P1 and the next two were all in the
+engineer's own round-1 notes.)
 (2026-10-27/28, one project: this review found a P1 or P2 the tester's blind pass had not
 reached on 993, 1006, 1011 and 1035, among them a double refund, a commit with no carrier
 request, and customer data in the logs.)
@@ -59,6 +70,32 @@ registry or a project override names a lane, start it with `fleet --role tester`
 - `REWORK` → ticket is `Rework`. You route it: it goes back through `core/pm/skills/pick.md` §2 like any pick, at its
   priority, to a **fresh engineer** on the same branch. Free the slot. A ticket sent to Rework
   twice → say so in the pick announcement and escalate the engineer to `opus`.
+  - **Every rework brief asks for the class, not the case.** Name the failure, then say: find
+    every path, call site, state and entry point with the same shape, fix them all, and list
+    each one checked in the handoff. The retest brief hands that list to the tester to try.
+  - **Switch executor after one miss.** If a rework comes back and the same class fails again,
+    the next round goes to a different, stronger executor. Don't give the same lane a third try.
+  - **Cap at two reworks, and treat hitting it as a fleet defect.** A third failure means one of
+    our steps let it through: the ticket, the build, the test, the review or the PM's own briefs.
+    Before anything else:
+    1. Find the step. Read the ticket against the findings: was each finding in the ticket, or
+       added later? Compare the rework brief with the retest brief: did they name the same cases?
+       Check which executors built and tested each round.
+    2. Write it in the rework ledger: the step, what it missed, and the change to its template,
+       brief or rule so it can't happen the same way again. Apply changes inside the PM routine
+       at once. Propose the rest to the owner.
+    3. Put round 3 to the owner with that cause: redesign, ship with a follow-up ticket, or drop
+       it. Don't start round 3 on your own. When it goes ahead, it fixes the design, not one more
+       guard (for example, one check computed from everything the result depends on, instead of
+       a check per case), and it runs on a different, stronger executor.
+  - **A tester finding outside the ticket is a scope decision, not a Rework.** If the ticket
+    never asked for the behaviour, decide it yourself in a `PM SCOPE DECISION:` comment: add it
+    to this ticket with a written rule for the whole class, or file a follow-up. Never send it
+    back as one case to fix.
+  - **The rework brief and the retest brief use the same written list of cases.** Write the
+    list once, on the ticket, and point both briefs at it.
+  (2026-10-30, one project: three tickets went 2 to 4 rounds. Each round fixed only the one call
+  site or state the tester named, and one lane missed the same class three times.)
 - The tester stopped because the ticket text changed after the build → scope is your call.
   Decide, comment the decision on the ticket, then either re-test or send to Rework.
 
