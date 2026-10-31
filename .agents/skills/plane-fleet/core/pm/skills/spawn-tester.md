@@ -105,12 +105,16 @@ or finished sessions left running (servers on slot ports of slots not in use, pr
 removed worktrees or other slots' scratch dirs, Nx daemons, headless Chromium older than 3
 hours or tied to a free slot), lists other projects' servers under "not ours" (never touched;
 tell the owner once), and prints the machine gate from `fleet resources`.
-- Leftovers → rerun with `--kill`, and say in one line what was stopped.
+- Leftovers → rerun with `--kill`, and say in one line what was stopped. Duplicate waits (the
+  same `until`/`while` loop running more than once) are leftovers too; the newest copy is kept.
 - **The machine gate** (`fleet resources`, also the `machine:` line of `fleet status`) measures
   memory the OS can still hand out, swap against RAM, load per core (CPU busy on Windows) and
   free disk, on macOS, Linux or Windows, against limits scaled to this machine (config
   `fleet.resources`). It names the biggest processes, says whose they are (`fleet` = inside a
-  worktree) and what is safe to do about each. Levels:
+  worktree) and what is safe to do about each. On macOS swap in use counts as tight at most:
+  macOS grows swap files on demand and keeps old pages from apps open for days, so the kernel's
+  memory-pressure level and the swap-out rate decide instead. (2026-10-31: a "swap nearly full"
+  rule held every spawn for 3 hours while RAM was 58% free and nothing was paging out.) Levels:
   - **ok** → spawn as the slot rules allow, up to "room for N heavy".
   - **tight** → a heavy spawn (engineer or tester with a server, Jest or a browser) only while
     "room for N heavy" is at least 1; light work (scans, plans, reviews with no server) goes on.

@@ -100,7 +100,8 @@ by key; lists and plain values replace.
     },
     "resources": {                       // OPTIONAL. The machine gate (core/scripts/fleetres.py); every key optional.
       "mem_avail_pct": [25, 15, 8],      // tight, closed, critical: memory the OS can still hand out
-      "swap_of_ram_pct": [25, 40, 60],   // swap in use as a share of RAM
+      "swap_of_ram_pct": [25, 40, 60],   // swap in use as a share of RAM (macOS: tight at most; pressure decides)
+      "swapout_mb_s": [5, 25, 100],      // macOS: MB/s swapped out since the last probe
       "load_per_core": [1.5, 2.0, 4.0],  // 1-minute load per core (Windows: "cpu_busy_pct": [85, 92, 98])
       "disk_free_gb": [15, 6, 2],        // where the repo and the temp dir live
       "per_heavy_gb": 3,                 // what one engineer or tester with a server, Jest or a browser takes

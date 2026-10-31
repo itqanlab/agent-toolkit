@@ -24,7 +24,12 @@ Limits come from fleet.resources in the merged project config; every key is opti
   {"mem_avail_pct": [25, 15, 8],        tight, closed, critical: memory the OS can hand out
    "swap_of_ram_pct": [25, 40, 60],     swap in use, as a share of RAM (macOS grows swap
                                         files on demand, so "% of swap" reads high when
-                                        healthy; swap against RAM does not)
+                                        healthy; swap against RAM does not). On macOS,
+                                        where the kernel reports its memory pressure, this
+                                        only ever reads tight: the pressure level (warn
+                                        closes, critical is critical) and the swap-out rate
+                                        decide, and "swap nearly full" is not checked
+   "swapout_mb_s": [5, 25, 100],        macOS: MB/s swapped out since the last probe
    "commit_pct": [80, 88, 95],          Windows: committed memory against the commit limit
    "load_per_core": [1.5, 2.0, 4.0],    1-minute load per core (Linux, macOS)
    "cpu_busy_pct": [85, 92, 98],        Windows: CPU busy over one second
@@ -49,7 +54,8 @@ import glob, json, os, platform, re, shutil, subprocess, sys, tempfile, time
 LEVELS = ["ok", "tight", "closed", "critical"]
 DEFAULTS = {"mem_avail_pct": [25, 15, 8], "swap_of_ram_pct": [25, 40, 60], "commit_pct": [80, 88, 95],
             "load_per_core": [1.5, 2.0, 4.0], "cpu_busy_pct": [85, 92, 98], "disk_free_gb": [15, 6, 2],
-            "per_heavy_gb": 3, "reserve_gb": None, "max_heavy": 4, "hog_gb": None}
+            "per_heavy_gb": 3, "reserve_gb": None, "max_heavy": 4, "hog_gb": None,
+            "swapout_mb_s": [5, 25, 100]}
 GB = 1024 ** 3
 
 # What a big process usually is, and what is safe to do about it. "safe" fixes free memory
@@ -95,6 +101,35 @@ def _size(s):
     return int(float(m.group(1)) * {"": 1, "K": 1024, "M": 1024 ** 2, "G": GB, "T": 1024 ** 4}[m.group(2)])
 
 
+def _state_home():
+    return os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
+
+
+def _swapout_rate(vmstat, now=None, memo_path=None):
+    """Bytes swapped out per second since the last probe (memoed on disk, so no probe sleeps).
+    None on the first probe, or when the last one is over 15 minutes old."""
+    pg = re.search(r"page size of (\d+) bytes", vmstat)
+    so = re.search(r"Swapouts:\s+(\d+)", vmstat)
+    if not (pg and so):
+        return None
+    now = time.time() if now is None else now
+    out_b = int(so.group(1)) * int(pg.group(1))
+    memo_path = memo_path or os.path.join(_state_home(), "swapout-sample.json")
+    try:
+        last = json.load(open(memo_path))
+    except (OSError, ValueError):
+        last = None
+    try:
+        os.makedirs(os.path.dirname(memo_path), exist_ok=True)
+        if not last or now - last["at"] >= 30:         # the rate covers the last 5 to 30+ seconds
+            json.dump({"at": now, "bytes": out_b}, open(memo_path, "w"))
+    except OSError:
+        pass
+    if not last or not 5 <= now - last["at"] <= 900 or out_b < last["bytes"]:
+        return None
+    return (out_b - last["bytes"]) / (now - last["at"])
+
+
 def probe_mac(top_n):
     s = {"os": "macos", "cores": os.cpu_count() or 1, "load1": os.getloadavg()[0]}
     s["ram"] = int(run(["sysctl", "-n", "hw.memsize"]) or 0)
@@ -103,6 +138,12 @@ def probe_mac(top_n):
     sw = run(["sysctl", "-n", "vm.swapusage"])
     m = re.search(r"total = ([\d.]+)M\s+used = ([\d.]+)M", sw)
     s["swap_total"], s["swap_used"] = (int(float(m.group(1)) * 1024 ** 2), int(float(m.group(2)) * 1024 ** 2)) if m else (0, 0)
+    # macOS adds 1 GB swap files as it needs them, so "swap left" is nearly always under 1 GB
+    # once any swap is in use, and old pages from apps open for days sit there at no cost.
+    # The kernel's own pressure level and the swap-out rate right now say whether it hurts.
+    pl = run(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"]).strip()
+    s["pressure"] = {"1": 0, "2": 1, "4": 2}.get(pl)        # 0 normal, 1 warn, 2 critical
+    s["swapout_bps"] = _swapout_rate(run(["vm_stat"]))
     procs = []
     if top_n:
         # top's MEM is the footprint, compressed pages included; ps RSS misses what macOS compressed
@@ -301,11 +342,21 @@ def judge(s, cfg=None, worktree_dirs=()):
     if s.get("mem_avail") is not None:
         pct = 100.0 * s["mem_avail"] / ram
         hit(_grade(pct, L["mem_avail_pct"], higher_is_worse=False), f"memory available {pct:.0f}% ({s['mem_avail'] / GB:.1f} of {ram / GB:.0f} GB)")
+    # macOS with the kernel's pressure level: swap in use is a hint (tight at most), and the
+    # pressure level and the swap-out rate decide. Stale swap from apps open for days read as
+    # critical for 3 hours on 2026-10-31 while RAM was 58% free and nothing was paging out.
+    mac_live = s.get("os") == "macos" and s.get("pressure") is not None
     if s.get("swap_used"):
         pct = 100.0 * s["swap_used"] / ram
-        hit(_grade(pct, L["swap_of_ram_pct"]), f"swap in use {s['swap_used'] / GB:.1f} GB ({pct:.0f}% of RAM)")
-        if s.get("swap_total") and s["swap_total"] - s["swap_used"] < GB and pct >= L["swap_of_ram_pct"][0]:
+        g = _grade(pct, L["swap_of_ram_pct"])
+        hit(min(g, 1) if mac_live else g, f"swap in use {s['swap_used'] / GB:.1f} GB ({pct:.0f}% of RAM)")
+        if not mac_live and s.get("swap_total") and s["swap_total"] - s["swap_used"] < GB and pct >= L["swap_of_ram_pct"][0]:
             hit(3, f"swap nearly full ({(s['swap_total'] - s['swap_used']) / GB:.1f} GB left)")
+    if mac_live and s["pressure"]:
+        hit(s["pressure"] + 1, f"macOS memory pressure {['normal', 'warn', 'critical'][s['pressure']]}")
+    if s.get("swapout_bps") is not None:
+        mb = s["swapout_bps"] / 1024 ** 2
+        hit(_grade(mb, L["swapout_mb_s"]), f"swapping out {mb:.0f} MB/s")
     if s.get("commit_limit"):
         pct = 100.0 * s["commit_used"] / s["commit_limit"]
         hit(_grade(pct, L["commit_pct"]), f"committed memory {pct:.0f}% of the limit")
@@ -373,6 +424,10 @@ def summary_line(s, j):
         parts.append(f"mem {100 * s['mem_avail'] / (s['ram'] or 1):.0f}% free of {s['ram'] / GB:.0f} GB")
     if s.get("swap_used"):
         parts.append(f"swap {s['swap_used'] / GB:.1f} GB")
+    if s.get("pressure"):
+        parts.append(f"pressure {['normal', 'warn', 'critical'][s['pressure']]}")
+    if s.get("swapout_bps"):
+        parts.append(f"swap-out {s['swapout_bps'] / 1024 ** 2:.0f} MB/s")
     if s.get("load1") is not None:
         parts.append(f"load {s['load1']:.0f}/{s['cores']} cores")
     if s.get("cpu_busy") is not None:
@@ -502,6 +557,25 @@ def selftest(check=None):
     check("res: an oversized cache does not close the gate", jb["level"], "ok")
     check("res: the limit is configurable", judge(big, {"tool_caches": {"jest_cache_max_gb": 40}})["warnings"], [])
     check("res: a small cache is quiet", judge(dict(mac_ok, tool_caches=[{"path": "/t/j", "bytes": GB}]), {})["warnings"], [])
+    # 2026-10-31: 8.1 of 9.2 GB swap used, RAM 58% free, pressure normal, nothing paging out
+    stale = dict(mac_ok, load1=3.0, mem_avail=int(0.58 * 32 * GB), swap_used=int(8.1 * GB), swap_total=int(9.2 * GB),
+                 pressure=0, swapout_bps=0.0)
+    js = judge(stale, {})
+    check("res: stale swap with normal pressure is not critical", js["level"], "tight")
+    check("res: stale swap still leaves room", js["room_heavy"] >= 1, True)
+    check("res: no 'swap nearly full' on a Mac that reports pressure", any("nearly full" in r for r in js["reasons"]), False)
+    check("res: pressure warn closes", judge(dict(stale, pressure=1), {})["level"], "closed")
+    check("res: pressure critical is critical", judge(dict(stale, pressure=2), {})["level"], "critical")
+    check("res: heavy swap-out is critical", judge(dict(stale, swapout_bps=150 * 1024 ** 2), {})["level"], "critical")
+    check("res: light swap-out is tight", judge(dict(stale, swapout_bps=6 * 1024 ** 2), {})["level"], "tight")
+    check("res: 2026-10-29 Mac with critical pressure is critical", judge(dict(mac_bad, pressure=2, swapout_bps=0.0), {})["level"], "critical")
+    check("res: no pressure reading keeps the old swap rule", any("nearly full" in r for r in judge(dict(stale, pressure=None, swap_total=int(8.6 * GB)), {})["reasons"]), True)
+    import tempfile as _tf
+    memo = os.path.join(_tf.mkdtemp(), "so.json")
+    vs = lambda n: f"Mach Virtual Memory Statistics: (page size of 16384 bytes)\nSwapouts: {n}.\n"
+    check("res: first swap-out sample has no rate", _swapout_rate(vs(1000), 100.0, memo), None)
+    check("res: swap-out rate per second", _swapout_rate(vs(1000 + 640), 110.0, memo), 640 * 16384 / 10)
+    check("res: a sample under 5 s has no rate", _swapout_rate(vs(1000), 102.0, memo), None)
     s = probe([os.getcwd()], top_n=3)
     check("res: probe reads this machine", bool(s.get("ram")) and s.get("cores", 0) >= 1, True)
     return 1 if fails else 0
