@@ -60,6 +60,12 @@ decisions) comes in the brief itself.
   you check its output or its port with waits of at most 240 s each until it is done; a
   `Monitor` gets `timeout_ms` of at most 270000. Do not end your turn to wait for a
   background job: check it. A hook refuses longer waits in fleet agents.
+- **Temp files go where the config says.** If `fleet config --get fleet.tool_caches.tmpdir`
+  prints a path, `export TMPDIR=<that path>` (create it) in every shell before you run Jest,
+  Nx, a build or a gate, and keep scratch under it instead of `/tmp`. Jest, Nx and `tmp-*`
+  files follow `TMPDIR`; on a Mac whose repo sits on an external disk they otherwise fill the
+  internal one (a Jest cache reached 26 GB). Never put a ticket's temp files in `/tmp` when a
+  tmpdir is set. If it prints `null`, change nothing.
 - Run `git config core.bare` before and after any test run. It must print `false`. If it prints
   `true`, run `git config core.bare false` and say so in your report.
 - Report what you could NOT demonstrate as plainly as what you could.

@@ -7,6 +7,13 @@
 #
 #   engineering/scripts/fleet-sweep.sh --repo <repo-root> --live A,C,F          # report only
 #   engineering/scripts/fleet-sweep.sh --repo <repo-root> --live A,C,F --kill   # stop the leftovers
+#   engineering/scripts/fleet-sweep.sh --repo <repo-root> --caches              # DRY RUN: list old temp/cache folders
+#   engineering/scripts/fleet-sweep.sh --repo <repo-root> --caches --apply      # delete what the dry run listed
+#
+# --caches is the weekly disk sweep (engineering/scripts/cache-sweep.py, config fleet.tool_caches):
+# fleet temp folders and Nx temp folders untouched for 7 days, Jest caches over their size limit,
+# Docker's build cache. It never touches processes and never runs without --caches. Schedule it with
+# engineering/scripts/fleet-cache-sweep.plist.template (launchd) or cron. Dry run unless --apply.
 #
 # What counts as a leftover:
 #   1. a process listening on the api or client port of a slot that is NOT in --live
@@ -32,22 +39,28 @@
 
 set -uo pipefail
 
-REPO="" LIVE="" KILL=0 MAX_BROWSER_H=3 MIN_FREE_MEM=0 MIN_DISK=0   # 0: the machine gate decides
+REPO="" LIVE="" KILL=0 CACHES=0 APPLY=0 MAX_BROWSER_H=3 MIN_FREE_MEM=0 MIN_DISK=0   # 0: the machine gate decides
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) REPO="$2"; shift 2 ;;
     --live) LIVE="$2"; shift 2 ;;
     --kill) KILL=1; shift ;;
+    --caches) CACHES=1; shift ;;
+    --apply) APPLY=1; shift ;;
     --max-browser-hours) MAX_BROWSER_H="$2"; shift 2 ;;
     --min-free-mem-pct) MIN_FREE_MEM="$2"; shift 2 ;;
     --min-disk-gb) MIN_DISK="$2"; shift 2 ;;
-    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 3 ;;
   esac
 done
 [ -n "$REPO" ] && [ -f "$REPO/.plane/config.json" ] || { echo "need --repo <root with .plane/config.json>" >&2; exit 3; }
 
 REPO="$(cd "$REPO" && pwd -P)"
+if [ $CACHES -eq 1 ]; then
+  exec python3 "$(dirname "$0")/cache-sweep.py" --repo "$REPO" $([ $APPLY -eq 1 ] && echo --apply)
+fi
+[ $APPLY -eq 1 ] && { echo "--apply only goes with --caches" >&2; exit 3; }
 WT="$REPO/.claude/worktrees"
 # merged config (repo .plane/config.json plus the per-user override, which may add slots)
 CFG="$("$(dirname "$0")/../../core/scripts/fleet" config --cwd "$REPO" 2>/dev/null)"
@@ -113,6 +126,7 @@ while read -r pid; do
   others="$(pgrep -f "$tgt" 2>/dev/null | while read -r q; do ps -o command= -p "$q" 2>/dev/null | grep -q "pgrep -f" || echo "$q"; done)"
   [ -z "$others" ] && note "$pid" "wait loop for '$tgt' up $((a/3600))h, nothing left to wait for"
 done < <(ps -axo pid=,command= | grep "while pgrep -f" | grep -v grep | awk '{print $1}')
+
 
 # report
 seen=" "

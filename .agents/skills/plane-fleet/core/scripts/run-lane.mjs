@@ -368,6 +368,17 @@ async function run(opts) {
   }
   // Fleet hygiene for anything the lane runs (standing brief): no shared Nx daemon.
   env.NX_DAEMON = "false";
+  // Temp files off the internal disk: fleet.tool_caches.tmpdir (config) becomes the lane's TMPDIR, so
+  // Jest, Nx and tmp-* files land there. Keep the path short: Nx opens unix sockets under it.
+  if (cwd) {
+    const t = fleetctl(["config", "--cwd", cwd, "--get", "fleet.tool_caches.tmpdir"]);
+    const dir = t.code === 0 && t.out && t.out !== "null" ? resolve(expand(t.out.replace(/^"|"$/g, ""))) : "";
+    if (dir) {
+      if (dir.length > 55) process.stderr.write(`run-lane: fleet.tool_caches.tmpdir is ${dir.length} chars (max 55 for Nx sockets); TMPDIR left alone\n`);
+      else try { mkdirSync(dir, { recursive: true }); env.TMPDIR = dir; }
+      catch (e) { process.stderr.write(`run-lane: cannot use tmpdir ${dir} (${e.code}); TMPDIR left alone\n`); }
+    }
+  }
 
   if (opts["dry-run"]) {
     process.stdout.write(JSON.stringify({ bin, argv, cwd, sandbox, timeoutSec, prompt: paths.prompt, registry: source, modelWarning,

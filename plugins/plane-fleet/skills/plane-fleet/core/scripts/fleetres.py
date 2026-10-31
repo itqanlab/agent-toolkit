@@ -35,9 +35,16 @@ Limits come from fleet.resources in the merged project config; every key is opti
    "max_heavy": 4,                      never more heavy sessions than this
    "hog_gb": null}                      a process this big is named; default max(1.5, 5% RAM)
 
+Tool caches (optional): fleet.tool_caches names where Jest and temp files land and how big the
+Jest cache may grow before the gate names it (a Jest cache once reached 26 GB on a Mac whose
+repo lived on an external disk):
+  {"tmpdir": "$HOME/fleet-tmp",         TMPDIR for lanes; default the OS temp dir
+   "jest_cache_globs": [],              default ["<tmpdir>/jest_*"]
+   "jest_cache_max_gb": 5}              over this, `fleet status` and `fleet resources` name it
+
 Standard library only. Python 3.9.
 """
-import json, os, platform, re, shutil, subprocess, sys, tempfile, time
+import glob, json, os, platform, re, shutil, subprocess, sys, tempfile, time
 
 LEVELS = ["ok", "tight", "closed", "critical"]
 DEFAULTS = {"mem_avail_pct": [25, 15, 8], "swap_of_ram_pct": [25, 40, 60], "commit_pct": [80, 88, 95],
@@ -208,6 +215,63 @@ def watchman_roots():
         return []
 
 
+# ---------------------------------------------------------------- tool caches
+def expand_path(p):
+    return os.path.expanduser(os.path.expandvars(p)) if isinstance(p, str) else p
+
+
+def tool_cache_tmpdir(cfg):
+    """The temp dir lanes and tools use: fleet.tool_caches.tmpdir, else the OS default."""
+    t = expand_path(((cfg or {}).get("tool_caches") or {}).get("tmpdir"))
+    return os.path.realpath(t) if t else tempfile.gettempdir()
+
+
+def jest_cache_dirs(cfg):
+    tc = (cfg or {}).get("tool_caches") or {}
+    pats = [expand_path(g) for g in tc.get("jest_cache_globs") or []] or [os.path.join(tool_cache_tmpdir(cfg), "jest_*")]
+    return sorted({d for g in pats for d in glob.glob(g) if os.path.isdir(d) and not os.path.islink(d)})
+
+
+def _size_cache_path():
+    home = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
+    return os.path.join(home, "tool-cache-sizes.json")
+
+
+def dir_bytes(path, ttl=600):
+    """du -sk with a 10 minute memo: a big cache is slow to walk and this runs on every gate check."""
+    memo_path = _size_cache_path()
+    try:
+        memo = json.load(open(memo_path))
+    except (OSError, ValueError):
+        memo = {}
+    hit = memo.get(path)
+    if hit and time.time() - hit["at"] < ttl:
+        return hit["bytes"]
+    r = run(["du", "-sk", path], timeout=20)
+    try:
+        size = int(r.split()[0]) * 1024
+    except (ValueError, IndexError):
+        return None
+    memo[path] = {"at": time.time(), "bytes": size}
+    try:
+        os.makedirs(os.path.dirname(memo_path), exist_ok=True)
+        json.dump(memo, open(memo_path, "w"))
+    except OSError:
+        pass
+    return size
+
+
+def attach_tool_caches(s, cfg):
+    """Add the Jest cache sizes to a probe sample (kept out of probe() so a plain probe stays fast)."""
+    out = []
+    for d in jest_cache_dirs(cfg):
+        b = dir_bytes(d)
+        if b is not None:
+            out.append({"path": d, "bytes": b})
+    s["tool_caches"] = out
+    return s
+
+
 # ---------------------------------------------------------------- judgement (pure, tested)
 def limits(cfg):
     out = dict(DEFAULTS)
@@ -284,6 +348,12 @@ def judge(s, cfg=None, worktree_dirs=()):
             warnings.append(f"watchman watches {root}, which holds the worktrees ({inside[0]}): every lane's file churn "
                             f"lands on it. `watchman watch-del {root}` now; to stop it coming back, turn watchman off "
                             f"for Jest (watchman: false in the Jest config) or keep worktrees outside the repo.")
+    max_gb = ((cfg or {}).get("tool_caches") or {}).get("jest_cache_max_gb", 5)
+    for c in s.get("tool_caches") or []:
+        if c["bytes"] > max_gb * GB:
+            warnings.append(f"Jest cache {c['bytes'] / GB:.{0 if c['bytes'] >= 10 * GB else 1}f} GB at {c['path']} (limit {max_gb} GB): it fills the disk and "
+                            f"slows every run; sweep it with `engineering/scripts/fleet-sweep.sh --repo <repo> --caches` "
+                            f"(dry run) and move TMPDIR to a bigger disk (fleet.tool_caches.tmpdir).")
     return {"level": LEVELS[lvl], "code": lvl, "reasons": reasons, "room_heavy": room, "hogs": hogs, "warnings": warnings}
 
 
@@ -310,6 +380,9 @@ def summary_line(s, j):
     if s.get("disks"):
         parts.append(f"disk {min(d['free'] for d in s['disks']) / GB:.0f} GB free")
     parts.append(f"room for {j['room_heavy']} heavy")
+    big = max((c["bytes"] for c in s.get("tool_caches") or []), default=0)
+    if any("Jest cache" in w for w in j.get("warnings", [])):
+        parts.append(f"Jest cache {big / GB:.0f} GB")
     top = [h for h in j["hogs"] if not h["fleet"]][:2]
     if top:
         parts.append("hogs " + ", ".join(f"{h['name']} {h['mem_gb']} GB" for h in top))
@@ -369,7 +442,7 @@ def main(argv):
             time.sleep(min(20, max(1, end - time.time())))
         print(f"machine: {summary_line(s, j)}" + ("" if j["code"] <= 1 else " · still closed, wait again or report"))
         return j["code"]
-    s = probe(paths, top_n=a.top); j = judge(s, cfg, wdirs)
+    s = attach_tool_caches(probe(paths, top_n=a.top), cfg); j = judge(s, cfg, wdirs)
     if a.gate:
         ok = admit(j, a.gate == "heavy")
         if a.json:
@@ -422,6 +495,13 @@ def selftest(check=None):
     check("res: critical holds everything", admit({"code": 3, "room_heavy": 0}, False), False)
     check("res: size parser", (_size("11G"), _size("512K"), _size("123,456 K")), (11 * GB, 512 * 1024, 123456 * 1024))
     check("res: the watcher warning never advises ignore_dirs", "ignore_dirs" in judge(mac_bad, {}, ["/r/.claude/worktrees"])["warnings"][0], False)
+    big = dict(mac_ok, tool_caches=[{"path": "/t/jest_x", "bytes": 26 * GB}])
+    jb = judge(big, {})
+    check("res: a 26 GB Jest cache is named", any("Jest cache 26 GB at /t/jest_x" in w for w in jb["warnings"]), True)
+    check("res: the summary names it", "Jest cache 26 GB" in summary_line(big, jb), True)
+    check("res: an oversized cache does not close the gate", jb["level"], "ok")
+    check("res: the limit is configurable", judge(big, {"tool_caches": {"jest_cache_max_gb": 40}})["warnings"], [])
+    check("res: a small cache is quiet", judge(dict(mac_ok, tool_caches=[{"path": "/t/j", "bytes": GB}]), {})["warnings"], [])
     s = probe([os.getcwd()], top_n=3)
     check("res: probe reads this machine", bool(s.get("ram")) and s.get("cores", 0) >= 1, True)
     return 1 if fails else 0

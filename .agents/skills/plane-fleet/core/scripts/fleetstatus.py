@@ -211,7 +211,7 @@ def collect(fleetctl, cwd):
     trees, orphan = worktrees_view(repo, {p["branch"] for p in prs or []})
     import fleetres
     fcfg, fpaths, wdirs = fleetres.context(cwd)
-    sample = fleetres.probe(fpaths, top_n=8)
+    sample = fleetres.attach_tool_caches(fleetres.probe(fpaths, top_n=8), fcfg)
     gate = fleetres.judge(sample, fcfg, wdirs)
     machine = {"summary": fleetres.summary_line(sample, gate), **gate}
     return {"machine": machine, "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),

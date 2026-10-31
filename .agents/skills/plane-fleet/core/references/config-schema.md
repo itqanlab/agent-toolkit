@@ -106,6 +106,14 @@ by key; lists and plain values replace.
       "per_heavy_gb": 3,                 // what one engineer or tester with a server, Jest or a browser takes
       "max_heavy": 4                     // never more heavy sessions than this, however big the machine
     },
+    "tool_caches": {                     // OPTIONAL. Keep tool caches off a small internal disk (fleetres.py, cache-sweep.py, run-lane.mjs)
+      "tmpdir": "/Volumes/Big/proj-tmp", // TMPDIR for lanes and gates; keep it SHORT (55 chars max): Nx opens unix sockets under it
+      "jest_cache_globs": [],            // default ["<tmpdir>/jest_*"]
+      "jest_cache_max_gb": 5,            // over this, `fleet status` names the cache and the sweep removes it
+      "temp_globs": [],                  // default ["<tmpdir>/tmp-*", "/tmp/<plane.identifier>-*"]; swept when untouched for 7 days
+      "nx_temp_regex": "^[0-9a-f]{20}$", // Nx socket folders directly under tmpdir
+      "docker_build_cache": true         // sweep prunes Docker's build cache (never images or volumes)
+    },
     "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
     "cost": {                            // OPTIONAL, for `fleet cost`
       "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved

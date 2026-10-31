@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Weekly disk sweep for fleet temp and cache folders (macOS launchd). Sundays 04:00 local time.
+
+  It runs `fleet-sweep.sh --caches --apply`: deletes fleet temp and Nx temp folders untouched for
+  7 days, Jest caches over their size limit, and Docker's build cache. See cache-sweep.py for the
+  safety checks. Look at what it would do first:
+      <FLEET_ROOT>/engineering/scripts/fleet-sweep.sh --repo <REPO> --caches
+
+  Install (does nothing until you run it; replace the two values):
+      FLEET_ROOT=/path/to/plane-fleet; REPO=/path/to/your/repo; \
+      sed -e "s#__FLEET_ROOT__#$FLEET_ROOT#g" -e "s#__REPO__#$REPO#g" -e "s#__HOME__#$HOME#g" \
+        "$FLEET_ROOT/engineering/scripts/fleet-cache-sweep.plist.template" \
+        > ~/Library/LaunchAgents/com.plane-fleet.cache-sweep.plist \
+      && launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.plane-fleet.cache-sweep.plist
+
+  Remove:
+      launchctl bootout "gui/$(id -u)/com.plane-fleet.cache-sweep" && rm ~/Library/LaunchAgents/com.plane-fleet.cache-sweep.plist
+
+  One agent per repo: copy it with another Label for a second repo. Linux: use cron instead:
+      0 4 * * 0  /path/to/plane-fleet/engineering/scripts/fleet-sweep.sh --repo /path/to/repo --caches --apply
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.plane-fleet.cache-sweep</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__FLEET_ROOT__/engineering/scripts/fleet-sweep.sh</string>
+    <string>--repo</string>
+    <string>__REPO__</string>
+    <string>--caches</string>
+    <string>--apply</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>0</integer>
+    <key>Hour</key>
+    <integer>4</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/plane-fleet-cache-sweep.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/plane-fleet-cache-sweep.log</string>
+</dict>
+</plist>
