@@ -60,6 +60,15 @@ decisions) comes in the brief itself.
   you check its output or its port with waits of at most 240 s each until it is done; a
   `Monitor` gets `timeout_ms` of at most 270000. Do not end your turn to wait for a
   background job: check it. A hook refuses longer waits in fleet agents.
+- **One watcher per thing you wait on, by name.** A background wait (`until …; do sleep`, a
+  CI poller, a push you are waiting to finish) goes through
+  `<fleet folder>/scripts/fleet watch <TICKET>-<thing> --until '<test>'` or
+  `… watch <TICKET>-<thing> -- <command>`, with `run_in_background: true`. To check on it later,
+  run `fleet watch --show <name>`; never start the same wait again. A second start under a live
+  name starts nothing and exits 75, so a slip costs nothing. Stop what you no longer need
+  (`fleet watch --stop <name>`) before you report. (2026-10-31: one engineer started a new
+  wait each time it checked back on a slow push. 22 copies of that wait and 6 copies of a CI
+  poller ran at once, and the pollers made about one GitHub API call a second.)
 - **Temp files go where the config says.** If `fleet config --get fleet.tool_caches.tmpdir`
   prints a path, `export TMPDIR=<that path>` (create it) in every shell before you run Jest,
   Nx, a build or a gate, and keep scratch under it instead of `/tmp`. Jest, Nx and `tmp-*`

@@ -1212,6 +1212,9 @@ def selftest():
         fleetstatus.selftest(check)
         import fleetres
         fleetres.selftest(check)
+        w = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fleetwatch.py"), "--selftest"],
+                           capture_output=True, text=True, env={**os.environ, "PLANE_FLEET_HOME": tempfile.mkdtemp()})
+        check("watch: fleetwatch selftest", (w.returncode, [l for l in w.stdout.splitlines() if l.startswith("FAIL")]), (0, []))
     finally:
         STATE_HOME = old_home
         if old_env is None:
