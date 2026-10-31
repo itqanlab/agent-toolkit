@@ -4,6 +4,25 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.5.0] - 2026-10-30
+
+Fewer rework rounds. In one run, three tickets took 2 to 4 test rounds each. Every round fixed only the one case the tester named, a tester approval was overturned by the group review, and the bugs it found were already in the engineer's own notes.
+
+### Added
+
+- `fleet.tool_caches` config: a short `tmpdir` for Jest, Nx and temp files, so a repo on an external disk stops filling the internal one. Lanes and gates get `TMPDIR` from it, `fleet status` names a Jest cache over its limit, and `fleet-sweep.sh --caches` (or the launchd job from `fleet-cache-sweep.plist.template`) clears old caches, temp folders and Docker's build cache. A Jest cache had reached 26 GB.
+
+### Changed
+
+- High-risk PRs (money, schema, API, auth, privacy, audit): a tester APPROVED does not count until the PM's focused review is back clean. That review runs on a different executor from the engineer's. The PM reads the engineer's open notes first, and any note touching totals, balances, permissions or written data is a must-fix before the tester starts.
+- Rework briefs ask for the whole class: every path, state and call site with the same shape, listed in the handoff as `class checked:`. Testers name the class with each finding, and the retest tries each one.
+- A rework that misses the same class twice moves to a different, stronger executor.
+- Two reworks is the cap, and hitting it counts as a fleet defect. Before a third round, the PM finds which step let it through (ticket, build, test, review or the PM's own briefs), logs it with a change to that step, and puts round 3 to the owner. Round 3 fixes the design, on a stronger executor.
+- A tester finding the ticket never asked for is a PM scope decision with a rule for the whole class, never a one-case Rework.
+- Rework and retest briefs point at one written case list on the ticket.
+- When group PRs skip the full suites, the group builder runs every test file that covers changed code, not only the specs the tickets name.
+- No release waits on one ticket by default. The PM tells the owner what holding costs, and a ticket with no user-visible change doesn't hold a release unless the owner says so.
+
 ## [2.4.1] - 2026-10-29
 
 ### Fixed
