@@ -26,6 +26,8 @@
 #      matches its own command line and never exits)
 #   4. a headless Chromium (Playwright's chrome-headless-shell) whose user-data-dir or cwd
 #      belongs to a slot not in --live, or older than --max-browser-hours (default 3)
+#   6. a duplicate wait: the same `until`/`while ... sleep` loop running more than once from
+#      this repo (the newest copy is kept)
 #
 # Slots come from the MERGED config (fleet config), so per-user extra slots count.
 # It also prints the machine gate from core/scripts/fleetres.py (memory, swap against RAM,
@@ -127,6 +129,35 @@ while read -r pid; do
   [ -z "$others" ] && note "$pid" "wait loop for '$tgt' up $((a/3600))h, nothing left to wait for"
 done < <(ps -axo pid=,command= | grep "while pgrep -f" | grep -v grep | awk '{print $1}')
 
+# 6. duplicate waits: the same `until`/`while` loop running more than once. A session that
+#    starts a new wait each time it checks back piles them up (2026-10-31: 22 copies of one
+#    push wait and 6 of one CI poller under one session). Shells differ only in the
+#    per-call cwd file a harness appends, so that part is stripped before comparing. The
+#    newest copy of each is kept; the rest are leftovers. Only shells whose working
+#    directory is in this repo count. `fleet watch` prevents this.
+while IFS=$'\t' read -r keep dups; do
+  for pid in $dups; do note "$pid" "duplicate wait (newest copy $keep kept)"; done
+done < <(ps -axo pid=,etime=,command= | grep -E "(until|while) .*sleep" | grep -v -E "grep|fleet-sweep" \
+  | while read -r pid et cmd; do
+      cwd="$(cwd_of "$pid")"
+      case "$cwd" in ("$REPO"*|"$SCRATCH"*|/private"$SCRATCH"*) printf '%s\t%s\t%s\n' "$pid" "$et" "$cmd" ;; esac
+    done | python3 -c '
+import re, sys
+def secs(et):
+    d, _, hms = et.rpartition("-")
+    p = [int(x) for x in hms.split(":")]
+    while len(p) < 3: p.insert(0, 0)
+    return int(d or 0) * 86400 + p[0] * 3600 + p[1] * 60 + p[2]
+groups = {}
+for line in sys.stdin:
+    pid, et, cmd = line.rstrip("\n").split("\t", 2)
+    key = re.sub(r"(&&|;)\s*pwd -P >\| \S+", "", cmd).strip()
+    groups.setdefault(key, []).append((secs(et), int(pid)))
+for rows in groups.values():
+    if len(rows) > 1:
+        rows.sort()                      # youngest first
+        print(f"{rows[0][1]}\t" + " ".join(str(p) for _, p in rows[1:]))
+')
 
 # report
 seen=" "
