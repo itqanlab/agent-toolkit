@@ -4,6 +4,19 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.6.0] - 2026-11-01
+
+Two fixes from one night's run: the machine gate held every spawn for 3 hours on a Mac that had plenty of free memory, and one engineer left 28 copies of the same wait running.
+
+### Added
+
+- `fleet watch <name> --until '<test>'` and `fleet watch <name> -- <command>` run a background wait under a name. A second start under a name that is still running starts nothing and exits 75, with the holder's pid and output file. `--show`, `--list` and `--stop` read and end them. Engineers and testers wait only through it (standing brief), and the PM waits for CI with `fleet watch <TICKET>-ci -- gh run watch <id>`.
+- The sweep flags duplicate waits: the same `until` or `while ... sleep` loop running more than once from the repo. `--kill` keeps the newest copy.
+
+### Fixed
+
+- On macOS the gate no longer reads "swap nearly full" as critical. macOS adds 1 GB swap files as it needs them, so less than 1 GB left is normal once any swap is in use, and pages from apps open for days sit there at no cost. Swap in use now counts as tight at most. The kernel's memory-pressure level (warn closes, critical is critical) and the swap-out rate since the last probe (`fleet.resources.swapout_mb_s`, default 5, 25 and 100 MB/s) decide. Linux, Windows and a Mac that gives no pressure reading keep the old rule.
+
 ## [2.5.0] - 2026-10-30
 
 Fewer rework rounds. In one run, three tickets took 2 to 4 test rounds each. Every round fixed only the one case the tester named, a tester approval was overturned by the group review, and the bugs it found were already in the engineer's own notes.
