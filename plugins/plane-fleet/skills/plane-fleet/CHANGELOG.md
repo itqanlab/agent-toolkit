@@ -4,6 +4,33 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.7.0] - 2026-11-01
+
+The fleet now checks itself while it runs. In one night's run the PM spent more than every agent together, mostly by carrying big outputs in its context. One engineer ran 576 tool calls on one UI ticket, a finished agent kept sending its report, and two tickets went to rework because of the ticket text.
+
+### Added
+
+- `fleet retro [--since ISO | --hours N] [--cwd repo] [--json]`: per ticket rounds, spend, tool calls, time and outcome, totals, the PM's share and context per call, rework and its causes, lanes and the Codex burn rate, then numbered findings, each with a cause, a fix and who owns it (pm, toolkit, owner). Exit 3 on an alert. A finding seen in the previous window is marked REPEAT. Thresholds and levels are set under `fleet.retro` in config.
+- The PM's `retro` skill: one watcher runs the retro every 30 minutes, and again after each group merge and at the end of a run. The PM says each finding to the owner in one line, applies `pm` fixes at once and logs them as `retro_fix`, and proposes the rest with evidence.
+- `fleet findings <file>`: the final findings block of a `codex review` or `codex exec` transcript, deduplicated, with one count line. Exit 3 on an open P1 or P2, 4 when the review did not finish.
+- `fleet watch --stop-prefix <prefix>` stops every live watcher whose name starts with it.
+
+### Changed
+
+- The PM runs with auto-compact near 150k. Its state lives in Plane, the resume note and `fleet status`.
+- Every review transcript (the engineer's passes, the PM's focused review, the group review) goes to a file and is read only through `fleet findings`.
+- Engineers stop at a soft cap, 3 self-review passes or about 300 tool calls, and report `CAP` with what is done, what is open and the findings left. Testers stop at about 300 tool calls. The PM decides the next step.
+- Engineers and testers stop every background job they started before the final report. Watch names start with the ticket id.
+- An out-of-scope P1 is never pushed silently: the engineer comments the P1 and its scope argument and reports `In Review · needs PM scope call`. The PM decides before a tester starts.
+- Tickets with screenshots, visual baselines or e2e checks on counts and dates must say how each shot gets fresh data, a test clock and no leftovers, and ask for N unchanged reruns green.
+- Pre-pick triage: a missing cited path, or a named file, setting, preset or config that does not exist, sends the ticket to the planner to fix the text before anyone claims it. The planner checks each named thing exists before filing.
+- Merge groups stay small (about 5) when they carry a shared UI or dependency change, since per-PR CI skips most jobs on drafts.
+
+### Fixed
+
+- `fleet log add` refuses a row that repeats one already in the log (same agent id and outcome, or same project, ticket, role, executor and outcome within 10 minutes). `--force` logs a real second session.
+- Backfilled usage rows keep the failure cause and task kind of the row they copy, so a test failure no longer looks like a second failure without a cause.
+
 ## [2.6.0] - 2026-11-01
 
 Two fixes from one night's run: the machine gate held every spawn for 3 hours on a Mac that had plenty of free memory, and one engineer left 28 copies of the same wait running.
