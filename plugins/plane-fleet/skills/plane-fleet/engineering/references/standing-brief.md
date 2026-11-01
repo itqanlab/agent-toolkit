@@ -18,12 +18,22 @@ decisions) comes in the brief itself.
 - Run your app/API/DB ONLY on your assigned slot (ports, DB, Nx cache given in your brief).
   Never use the shared row. Slot occupied → stop and report. Tear it all down before you report.
   No slot in your brief → skip the app/browser steps and say so.
-- Before any nx command: NX_DAEMON=false and your slot's NX_CACHE_DIRECTORY.
+- Before any nx command: NX_DAEMON=false, your slot's NX_CACHE_DIRECTORY, and
+  `eval "$(<fleet folder>/scripts/fleet cache-server env --cwd <repo>)"` in the same shell
+  (the pre-push hook inherits it). That points Nx at the project's shared cache server, so a
+  lint, typecheck, test or build another worktree already ran on the same inputs comes back as
+  `[remote cache]` instead of running again. It prints nothing when the project has it off.
+  If an nx command or the hook ends with `Failed to send request ... /v1/cache/...`, the
+  server stopped: run `fleet cache-server start --cwd <repo>` and run it again. That error is
+  never a code failure, and never a reason to unset the variables or skip the hook.
 - After starting your API, confirm it listens on YOUR slot's api port (`lsof -iTCP:<api>
   -sTCP:LISTEN`). If it bound the shared row's port instead, the port env wasn't exported: kill
   it at once. Stop processes only by your own ports, never `pkill -f`/`killall`.
-- `nx affected` can serve results from another session's cache — re-run with `--skipNxCache`
-  before trusting a green.
+- A cached result is keyed on the inputs Nx tracks, so it is a real result for lint, unit tests
+  and build. Re-run with `--skipNxCache` only when a result looks wrong for the change (a
+  typecheck green after you changed a shared contract another lib reads, a red you cannot
+  reproduce), and say so in your report. Untracked leftovers (`dist`, `out-tsc`) once produced
+  a false typecheck green from cache.
 - Never bypass a hook: no `--no-verify`, no `HUSKY=0`, no `-n`. A hook failure you believe is not
   yours is a report with the failing output, never a skip. In a fresh worktree, run `npx husky`
   first (hooks silently don't run until you do).
@@ -59,6 +69,26 @@ decisions) comes in the brief itself.
   after three tries report the `machine:` line instead of starting. Never start a file watcher
   (watchman, `--watch` modes, an Nx daemon) in a worktree: its memory outlives you.
   A run started on an overloaded machine times out and gets misread as a failing test.
+- **Run each check once per commit, and push once.** Every `git push` runs the whole pre-push
+  gate (format over the repo, guards, then lint, typecheck, unit tests and build on everything
+  affected) and starts the PR's CI on the shared runner. One gate takes 6 to 10 cores for minutes.
+  So:
+  - Commit as often as you like, but push once, after your last review pass is clean. Review
+    fixes are new local commits, not new pushes. Push again only when the hook fails, or when a
+    rework or tester round adds commits.
+  - While you work, run the spec files you touched (`--testPathPatterns <file>`, or the e2e
+    spec files), not a whole project and never a whole suite. Don't run a test by hand right
+    before a push: the hook runs it.
+  - Never run the same tests twice on the same commit. A pass on HEAD stays a pass until HEAD
+    changes. While you fix a failure, re-run only the failing spec; run the full set you need
+    once, after the last code change.
+  - A rework or tester round starts from what the previous round proved. Re-run what the new
+    commits touch, not everything the last session already ran.
+  - Put the counts in your report: pushes, and full server or browser spec-set runs.
+  (2026-11-01, one project: one rework engineer pushed 4 times and ran the server e2e set 4
+  times, another engineer ran it 5 times, and the machine sat at load 60 to 78 on 12 cores while
+  three agents pushed at once. Nx cannot share its cache between worktrees, since each
+  worktree's database only trusts entries it wrote, so every repeat run is paid in full.)
 - **No wait longer than 4 minutes in one call.** Your prompt cache lives 5 minutes. A call
   that blocks longer makes your next call write your whole context again, and those rewrites
   were 12% of agent spend (measured 2026-10-25). So: a foreground Bash `timeout` of at most

@@ -8,8 +8,9 @@
 1. **Local gate — run it once, through the push.** The repo's pre-push hook runs exactly
    `quality.pre_push`. Don't run the gate by hand and then push, which runs it again. On
    2026-09-29 that double run cost about 8 minutes between commit and PR. While iterating, run
-   only the narrow targets you touched (`nx test <project>`, `nx lint <project>`). The full gate
-   runs once, when you push (step 4). First make sure the hook is installed in your worktree:
+   only the spec files you touched (`nx test <project> --testPathPatterns <file>`), and lint or
+   typecheck only the project you changed. The full gate runs once, when you push (step 4), and
+   you push once, after the last review pass (standing brief, "Run each check once per commit"). First make sure the hook is installed in your worktree:
    `ls .husky/_` and, if it's missing, run `npx husky` (hooks silently skip in a fresh worktree).
    If the hook is missing and can't be installed, run the gate by hand once instead. Never
    bypass hooks (`--no-verify`); if a hook is wrong, fix the hook. Set `NX_DAEMON=false` and your
@@ -105,7 +106,8 @@
    audit event was missing on one path, then on a second, then written twice on a third
    (9 rounds). Two P2s left open "on purpose" came back as blockers.
 
-4. Push (the hook runs the full gate here; a failure means fix and push again) and open the PR:
+4. Push once, after the last clean review pass. Review fixes stay local commits until then. The
+   hook runs the full gate here; a failure means fix and push again. Then open the PR:
    ```bash
    git push -u origin <branch>
    gh pr create --draft --base <trunk> --title "<type>(<scope>): <what> (<TICKET>)" \

@@ -23,7 +23,8 @@ browser spec in the e2e folder (`test.e2e_dir`) for a user flow. Rules:
 - Small logical commits, conventional style: `test(orders): cover zero-quantity line (PROJ-57)`.
 - Run only the specs you wrote while iterating (`--skipNxCache`, `NX_DAEMON=false`). The full
   gate runs once, through the pre-push hook, when you push. Don't also run it by hand first.
-  Check `ls .husky/_` first and run `npx husky` if it's missing.
+  Check `ls .husky/_` first and run `npx husky` if it's missing. Push your test commits once,
+  together, at the end; each push runs the whole gate again.
 - **Push them to the PR branch** (`git push origin test/<...>:<branch>`), including a test that
   fails because it exposed a bug. A failing test is the clearest spec a rework engineer can get.
   If the branch moved under you, rebase your test commits onto it; never force-push over the
