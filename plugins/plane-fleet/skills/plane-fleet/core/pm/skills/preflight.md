@@ -5,13 +5,23 @@
 
 ## 0) Config, states, preflight
 
-**Run the PM with a 300k compaction window: `claude --autocompact 300k`, then `/plane-fleet run`.** The
-PM's context grows about 1.3k tokens a call and every call carries all of it: a median 177k
-early in a session and 650k by call 400, and calls over 400k were 48% of PM spend (measured
-2026-10-25). The default window on a 1M model compacts near 967k. With 300k the session
-compacts about every 140 calls, and the `pm-recompact` hook then adds the live `status` and
+**Run the PM with a low auto-compact threshold, about 150k: `claude --autocompact 150k`, then
+`/plane-fleet run`.** Every PM call re-reads the whole context, so context size is what the PM
+costs. The PM's context grows about 1.3k tokens a call: a median 177k early in a session and
+650k by call 400, and calls over 400k were 48% of PM spend (measured 2026-10-25). The default
+window on a 1M model compacts near 967k. Nothing is lost at 150k: the run's state lives in Plane,
+the FLEET RESUME NOTE and `fleet status`, and the `pm-recompact` hook adds the live `status` and
 your hard rules to the compacted context. After a compaction, trust that status and Plane over
-the summary. If the session was started without the flag, say so in the opening summary.
+the summary. If the session was started without the flag, say so in the opening summary, and
+when `fleet retro` reports `pm_ctx_per_call`, write the resume note and ask the owner to compact.
+(2026-11-01, one project: with a 300k window the PM averaged 224k of context per call over 873
+calls and spent $68, more than all agents together at $62.)
+
+**Keep big outputs out of your context.** A review transcript, a CI log or a test run is read
+through a filter, never whole: `fleet findings <file>` for a `codex review` or `codex exec`
+output, `gh run view --log-failed | tail` for CI, a `scan` lane for anything longer. (2026-11-01:
+the PM read a whole 283 KB review transcript to get two findings, and every later call carried
+it.)
 
 Read the project config (`core/scripts/fleet config`: `.plane/config.json` plus the per-user override). If missing, build it —
 `core/references/config-schema.md`.

@@ -28,7 +28,7 @@ Four roles, one board:
 | engineer | engineer | **in parallel**, up to `fleet.parallel_workers`, own worktree + own slot | PR open, browser-reviewed, ticket `In Review` |
 | tester | tester | **in parallel**, any free slot, one per open PR | `Approved` (label `qa-approved`) or `Rework` |
 | PM | `/plane-fleet run` (you) | continuously | merged, deployed, CI/CD green, `Done`, client told |
-| ticket writer | the planner's `write-ticket` skill | as needed | new ticket in `Todo` |
+| ticket writer | the planner's `write-ticket` skill | new work, a vague ticket, a ticket that fails the readiness check | new or fixed ticket in `Todo` |
 
 The flow of one ticket:
 
@@ -54,6 +54,7 @@ merge, diagnosing a red trunk, writing a Rework ticket.
 | `skills/spawn-tester.md` | a PR opens | `core/pm/skills/spawn-tester.md` §4 |
 | `skills/merge-queue.md` | approved PRs wait: you alone merge, in groups | `core/pm/skills/merge-queue.md` §5 |
 | `skills/deploy-and-done.md` | a group merged: deploy, confirm CI/CD, Done, tell the client | `core/pm/skills/deploy-and-done.md` §6 |
+| `skills/retro.md` | a run starts (start the retro watcher), the watcher exits, a group merged, the run ends | new in 2.7.0 |
 
 ## Autonomy contract — read this before anything else
 

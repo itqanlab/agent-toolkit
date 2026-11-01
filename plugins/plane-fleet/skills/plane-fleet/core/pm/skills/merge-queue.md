@@ -48,8 +48,11 @@ re-stamp is a mechanical step and yours. A conflict inside the schema file is an
 **Draft-only fleets: one group PR, and it is the full check** (owner, 2026-10-13 and
 2026-10-15). When engineers open drafts and testers leave them draft, the PM builds
 `release/group-<date>-<n>` from about 10 approved branches, runs the pre-push gate and a Codex
-review (`codex review "<instructions naming the base>"`; `--base` cannot be combined with a
-prompt), and opens ONE PR into the trunk. That PR is where the whole server and browser suites
+review (`codex review "<instructions naming the base>" > <tmp>/group-<n>-review.md 2>&1`;
+`--base` cannot be combined with a prompt), reads it only through `fleet findings <that file>`,
+and opens ONE PR into the trunk. Per-PR CI skips most jobs on drafts, so the group PR carries
+all the risk: keep a group small (about 5) when it includes a shared UI change or a dependency
+change. That PR is where the whole server and browser suites
 run, so testers no longer run them per ticket (the tester role). To make sure they really run:
 - open the group PR **as a draft**, add the e2e label, and only then `gh pr ready`. A label
   passed to `gh pr create --label` is applied after the opened event, so CI never sees it

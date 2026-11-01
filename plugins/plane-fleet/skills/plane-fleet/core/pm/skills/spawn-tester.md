@@ -13,6 +13,9 @@ pushing (`engineering/engineer/skills/open-pr.md` §4.3b) and reports it in the 
 that one line of the handoff:
 - no review line, or the last pass has an open P1 → back to the same engineer lane (resume it
   or start a new one with the finding). No tester yet.
+- the report says `needs PM scope call` → read the P1 and the engineer's scope argument in its
+  ticket comment, and decide in a `PM SCOPE DECISION:` comment: fix it in this PR (back to the
+  engineer), or file it as a follow-up with a reason. No tester until you have decided.
 - a P2 marked "not applicable" with a reason you disagree with → post a `PM SCOPE DECISION:`
   saying it must be fixed, and send it back.
 - the handoff shows no pass count for the brief's focused prompt, or a P2 left open without
@@ -22,8 +25,12 @@ that one line of the handoff:
 **Run the focused review yourself, while the tester works.** On every PR of kind
 `money-concurrency`, `schema` or `api`, and on any ticket touching privacy, auth or audit: check out
 the pushed branch in a review worktree (`.claude/worktrees/pm-review-<pr>`, `git checkout
---detach origin/<branch>`) and run the brief's focused prompt with `codex review "…"` in the
-background. It takes about 5 minutes and needs no slot.
+--detach origin/<branch>`) and run the brief's focused prompt in the background, with its
+output going to a file: `codex review "…" > <tmp>/<TICKET>-pm-review.md 2>&1`. It takes about 5
+minutes and needs no slot. **Read it only through `fleet findings <tmp>/<TICKET>-pm-review.md`**:
+one count line and the findings, deduplicated. Never `cat`, `tail` or Read the file itself; it
+holds every file the reviewer read. Exit 4 means the review did not finish (an error or a usage
+limit): run it again or on another executor, it is not a clean pass.
 - A finding → send it to the running tester at once: reproduce it, write the failing test,
   and put it in the same verdict. Don't send the engineer a second Rework later for it.
 - Wait for both the tester's verdict and your review before you route a Rework, so the engineer
@@ -83,7 +90,9 @@ registry or a project override names a lane, start it with `fleet --role tester`
        Check which executors built and tested each round.
     2. Write it in the rework ledger: the step, what it missed, and the change to its template,
        brief or rule so it can't happen the same way again. Apply changes inside the PM routine
-       at once. Propose the rest to the owner.
+       at once. Propose the rest to the owner. `fleet retro` names these tickets too
+       (`rework_rounds`, `ticket_cause_failures`); its findings go in the same ledger
+       (`core/pm/skills/retro.md`).
     3. Put round 3 to the owner with that cause: redesign, ship with a follow-up ticket, or drop
        it. Don't start round 3 on your own. When it goes ahead, it fixes the design, not one more
        guard (for example, one check computed from everything the result depends on, instead of
