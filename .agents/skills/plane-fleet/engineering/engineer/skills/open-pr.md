@@ -55,7 +55,7 @@
    **3b. Independent code review, before you push.** Commit, then run a fresh review of your
    whole diff against the trunk:
    ```bash
-   codex review --base origin/<trunk> > /tmp/<TICKET>-review.md 2>&1
+   codex review --base origin/<trunk> > /tmp/<TICKET>-review.md 2>&1   # or your TMPDIR
    ```
    It runs in a new process with none of your reasoning, so it is not you marking your own
    work. Start it in the background as soon as you commit, next to your narrow tests, so it
@@ -66,14 +66,29 @@
    names the ticket's invariants and the findings already deferred elsewhere, and it is the
    review the PM runs after you. A generic pass calls a PR clean far more often than a focused
    one does.
+   - **Read each pass through `<fleet>/scripts/fleet findings <file>`**, never the whole file.
+     It prints one count line and the findings; the file holds every file the reviewer read.
+     Exit 4 means the review did not finish, which is not a clean pass.
    - **Every P1 and every P2: fix it, commit, and run both reviews again.** Repeat until one
      full pass of each reports no P1 and no P2. Report how many passes it took.
+   - **Soft cap: 3 passes, or about 300 tool calls in the session.** If the third self-review
+     pass still has findings, or the session nears 300 tool calls, stop looping. Commit and push
+     what you have, post a ticket comment with what is done, what is open and every finding
+     left, and report `CAP` (`engineering/engineer/role.md` §6). The PM decides the next step:
+     another round, a split, a scope call or a stronger executor. (2026-11-01, one project: one
+     UI ticket took 576 tool calls, 7 self-review passes and $20 in one engineer session.)
    - **Fix the class, not the line.** For every finding, find its siblings before you fix it:
      every writer of that field, every path that books that money, every caller of that
      function (grep the whole repo, not the files you touched). Fix all of them, and put the
      list of sites you checked in the handoff.
    - **A P2 you believe does not apply: stop and ask the PM before you push.** Never leave one
      open with a note. On money, privacy, auth and audit tickets a P2 blocks.
+   - **A P1 you judge out of scope is never pushed silently.** Push the branch and open the
+     draft PR as usual, then comment on the ticket: the P1 as the review wrote it, and your
+     scope argument (which ticket owns it, or why the ticket never asked for it). Move the
+     ticket to `In Review` and report `In Review · needs PM scope call`. The PM decides before
+     any tester starts. (2026-11-01, one project: an engineer pushed a PR with two P1 findings it
+     judged out of scope without asking, and the rule says an open P1 goes back before a tester.)
    - P3 and style notes: your call.
    - A finding that is real but outside the ticket goes through `engineering/engineer/skills/follow-ups.md` §5 (file it, don't work it).
    - The review being unavailable (CLI missing, auth error) is a blocker to report (`engineering/engineer/role.md` §7), not a

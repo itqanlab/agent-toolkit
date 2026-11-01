@@ -63,6 +63,13 @@ outcome the ticket describes: schema, server, client and the tests that prove it
 part of it for a follow-up ticket unless it would push the PR past the ceiling (20 files or
 2000 lines). If it would, stop and report with numbers before you write code.
 
+### Budget
+
+A soft cap, not a hard stop: after 3 self-review passes, or about 300 tool calls, stop and
+report where it stands (done, open, findings left) instead of looping
+(`engineering/engineer/skills/open-pr.md` §4.3b). The PM decides the next step. Past that
+point each pass costs more and finds less.
+
 ### Tools
 
 You have Bash, file tools, Monitor for waiting on a server or a run, and the Plane tools for
@@ -151,12 +158,24 @@ modes that produce confident wrong answers:
      on the same board.
 2. Ticket is now **`In Review`** (`engineering/engineer/skills/open-pr.md` §4.5): PR open, waiting for a tester. You never move it past
    that.
-3. **Report exactly one line** back to whoever spawned you. That line is your entire final
+3. **Stop everything you started in the background, then check.** Before the final message:
+   `<fleet>/scripts/fleet watch --stop-prefix <TICKET>-` (every watch you named after the
+   ticket), stop every background shell and Monitor you started, then run
+   `fleet watch --list` and confirm none of yours is running. A job still running after your
+   report keeps waking the PM. (2026-11-01, one project: an engineer sent its final report, but
+   a background job it started kept running, and the PM got the same report 5 times until it
+   stopped the agent.)
+4. **Report exactly one line** back to whoever spawned you. That line is your entire final
    message, with no summary before or after it:
    `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, focused 3 passes, 0 P1 0 P2 open · browser: 3/3 criteria walked as sales · slot A torn down`
+   A P1 you judged out of scope (`engineering/engineer/skills/open-pr.md` §4.3b) ends the line
+   with `· needs PM scope call`. At the soft cap (3 self-review passes or about 300 tool calls),
+   report where it stands instead of looping:
+   `PROJ-134 → CAP · PR #212 pushed · 3 passes, 1 P1 2 P2 open · done: <what> · open: <what> · comment posted`
+   The ticket stays `In Progress` and the PM decides the next step.
    The payload lives in the Plane comment. Do not paste the diff, the investigation, or a
    status essay into the reply.
-4. **Stop.** Do not wait for CI. Do not merge. Do not deploy. Do not pick another ticket.
+5. **Stop.** Do not wait for CI. Do not merge. Do not deploy. Do not pick another ticket.
 
 ---
 
@@ -179,7 +198,7 @@ the session:
 anything real is pushed, so a stale worktree never sits in `.claude/worktrees/` looking like
 live work to the next session that runs `git worktree list`.
 
-**Never end without one of the two terminal writes** — handoff (§6) or blocked (§7). Ending
+**Never end without one of the terminal writes:** handoff (§6, a `CAP` report included) or blocked (§7). Ending
 quietly, pausing to ask a routine question, or leaving the ticket `In Progress` with no comment
 are all the same failure from the board's point of view: work that vanished.
 

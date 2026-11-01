@@ -66,7 +66,10 @@ workers (`test.e2e_workers`). Two specs that passed locally on one worker broke 
 
 Tear down the slot (`engineering/tester/role.md` §0) and say so. That includes the local `test/<IDENTIFIER>-<n>` branch:
 `git branch -D test/<IDENTIFIER>-<n>` once your test commits are pushed to the PR branch.
-Never leave a `verify/*` or `test/*` branch behind in the main checkout. Then **one block** to the PM. That block is your
+Never leave a `verify/*` or `test/*` branch behind in the main checkout. Stop every background
+job you started: `<fleet>/scripts/fleet watch --stop-prefix <TICKET>-`, each background shell and
+Monitor, then `fleet watch --list` must show none of yours (`engineering/references/standing-brief.md`,
+"Leave nothing running"). Then **one block** to the PM. That block is your
 entire final message. No bullets, no "things you should know", no summary: details belong in
 the Plane comment.
 

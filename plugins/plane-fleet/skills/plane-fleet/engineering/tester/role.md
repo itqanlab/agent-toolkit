@@ -54,6 +54,13 @@ Phase B is where you write the tests that should exist and don't: unit and spec 
 the code, and browser (e2e) specs for user flows, following `engineering/tester/skills/review-and-test.md` §2. Test files only.
 If making a test pass needs a product-code change, that is a Rework finding, not a fix.
 
+### Budget
+
+A soft cap: at about 300 tool calls, stop and report where you stand (each criterion walked or
+not, tests written, findings so far) instead of starting another pass. The PM decides the next
+step. (2026-11-01, one project: one engineer session on a UI ticket ran 576 tool calls; the same
+loop can happen in a test pass.)
+
 ### Tools
 
 You have Bash, file tools, Monitor, and the Plane tools for this ticket: state, the verdict

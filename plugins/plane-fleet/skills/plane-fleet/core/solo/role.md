@@ -402,7 +402,8 @@ Run the repo's own pre-push gate (from config). It must pass **locally** before 
 task is not done until it passes locally AND CI is green. Never bypass hooks
 (`--no-verify`); if a hook is wrong, fix the hook.
 
-Then run an independent review of the committed diff, `codex review --base origin/<trunk>`, the
+Then run an independent review of the committed diff, `codex review --base origin/<trunk>` with
+its output in a file, read through `fleet findings <file>`, the
 same way as `engineering/engineer/skills/open-pr.md` §4.3b. Fix every P1 and review again. Fix each P2 or note why it
 doesn't apply. Put the result in the PR body. Solo-ship has no tester after it, so this review
 is the only second pair of eyes on the code.

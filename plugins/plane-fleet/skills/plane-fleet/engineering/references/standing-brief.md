@@ -45,6 +45,12 @@ decisions) comes in the brief itself.
     `lsof -iTCP:<client> -sTCP:LISTEN`, `pgrep -f "<your slot scratch dir>"`, and
     `pgrep -f nx/src/daemon` filtered to your worktree path. Kill what is yours; report
     anything else you find instead of killing it.
+  - **No job of yours runs after your report.** Before your final message, stop every
+    background job you started: `<fleet folder>/scripts/fleet watch --stop-prefix <TICKET>-`
+    for your watches, then each background shell and Monitor. `fleet watch --list` must show
+    none of yours. A job that outlives you keeps notifying the PM with your report.
+    (2026-11-01, one project: a background job kept running after an engineer's final report,
+    and the PM got the same report 5 times until it stopped the agent.)
 - **Share the machine.** Run Jest with `--maxWorkers=2 --no-watchman` (a watchman watch on your
   worktree outlives you and holds memory for every file in it), and server e2e at the worker count its
   config sets, never more. Before you start Jest, Playwright or a server, run
@@ -60,13 +66,14 @@ decisions) comes in the brief itself.
   you check its output or its port with waits of at most 240 s each until it is done; a
   `Monitor` gets `timeout_ms` of at most 270000. Do not end your turn to wait for a
   background job: check it. A hook refuses longer waits in fleet agents.
-- **One watcher per thing you wait on, by name.** A background wait (`until …; do sleep`, a
-  CI poller, a push you are waiting to finish) goes through
+- **One watcher per thing you wait on, by name, and the name starts with the ticket id.** A
+  background wait (`until …; do sleep`, a CI poller, a push you are waiting to finish) goes through
   `<fleet folder>/scripts/fleet watch <TICKET>-<thing> --until '<test>'` or
   `… watch <TICKET>-<thing> -- <command>`, with `run_in_background: true`. To check on it later,
   run `fleet watch --show <name>`; never start the same wait again. A second start under a live
   name starts nothing and exits 75, so a slip costs nothing. Stop what you no longer need
-  (`fleet watch --stop <name>`) before you report. (2026-10-31: one engineer started a new
+  (`fleet watch --stop <name>`), and before you report stop them all with
+  `fleet watch --stop-prefix <TICKET>-` (the trailing dash keeps PROJ-12 from matching PROJ-120). (2026-10-31: one engineer started a new
   wait each time it checked back on a slow push. 22 copies of that wait and 6 copies of a CI
   poller ran at once, and the pollers made about one GitHub API call a second.)
 - **Temp files go where the config says.** If `fleet config --get fleet.tool_caches.tmpdir`
@@ -111,5 +118,7 @@ edits there even though another open PR also touches them:
   already covers it, and comment there instead.
 - A PR that adds or changes a browser/e2e spec: add the repo's full-e2e label (e.g. `run-e2e`)
   BEFORE your last push. A label added after the push does not re-run CI.
+- **Soft cap.** After 3 self-review passes, or about 300 tool calls, stop and report where you
+  stand (done, open, findings left) instead of looping. The PM decides the next step.
 - Your FINAL message is ONLY the report line/block your skill specifies. No summary, no bullets,
   no "things you should know". Everything else goes in the Plane comment.
