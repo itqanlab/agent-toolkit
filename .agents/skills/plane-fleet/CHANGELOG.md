@@ -4,6 +4,22 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.9.0] - 2026-11-01
+
+Two waits that bought nothing. On one project every engineer or tester session built its slot from zero (worktree, install, database, migrate, seed, servers): 8 to 10 minutes of a 20 to 45 minute session. Then each group PR waited about 15 minutes for a CI job that re-ran the lint, typecheck, test and build the PM's own pre-push gate had just passed on the same commit.
+
+### Added
+
+- `fleet slot-template build|clone|status`: one migrated, seeded Postgres template per schema state. `build` makes `<prefix>_<key12>` from `origin/<trunk>` in a throwaway worktree with the configured commands. The key hashes the migration and seed files and the build commands, not the commit, so a template is reused until they change. A lock stops two builds at once, and only `keep` templates stay. `clone <slot> [--test]` drops the slot's DB (and its test DB) and copies the template in seconds. It touches only slot DBs named in `fleet.slots`, never the shared row's, and exits 3 when no ready template matches so the session runs its recipe. Off unless `fleet.slot_db_template.enabled`.
+- `fleet gate-stamp post|check`: `post` puts a `local-gate` commit status on a SHA, only when HEAD is that SHA, the tracked tree is clean and the gate log shows success for it. `check --pr N` exits 0 when the PR head has the stamp and every check outside `ci.covered_by_local_gate` passed or skipped. A skip after a covered job was cancelled does not count as passed. Off while that list is empty.
+
+### Changed
+
+- Engineers and testers clone their slot DB with `fleet slot-template clone` and skip migrate and seed when it works. Otherwise they run the recipe.
+- Before any migrate, seed, reset or e2e command, echo `DATABASE_URL` and every test URL, check each names your slot DB, and export each in its own statement. On one project a combined export left the test URL on its old value, and the test harness migrated the owner's shared DB.
+- The PM rebuilds the template in the background after a group that changed migrations or seed.
+- A group PR into the trunk may merge when `fleet gate-stamp check` passes, even while a covered job still runs. Never the release PR to production, and never when the head moved after the stamp. Trunk CI still runs everything and stays the deploy gate.
+
 ## [2.8.0] - 2026-11-01
 
 Engineers and testers were paying for the same checks over and over. In one run a rework engineer pushed 4 times and ran the server e2e set 4 times, another engineer ran it 5 times, and three agents pushing at once held a 12-core machine at load 60 to 78.
