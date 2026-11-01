@@ -15,6 +15,8 @@ not start anything: it says who holds the name and where its output is, and exit
   fleet watch --show <name>                status and the last lines of its output
   fleet watch --list                       every watcher, live or finished in the last day
   fleet watch --stop <name>                stop it and what it started
+  fleet watch --stop-prefix <prefix>       stop every live watcher whose name starts with it
+                                           (a ticket id: run it before you report)
 
 Run the start form with run_in_background; it prints the output as it goes and exits with the
 command's exit code (124 on timeout). Name it after the ticket and the thing:
@@ -215,12 +217,45 @@ def stop_named(name):
     return 0
 
 
+def stop_prefix(prefix):
+    """Stop every live watcher whose name starts with prefix. 0 when none is left running."""
+    d = home()
+    stopped, left = [], []
+    for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        if not f.endswith(".json") or not f.startswith(prefix):
+            continue
+        rec = read(f[:-5])
+        if not alive(rec):
+            continue
+        try:
+            os.kill(rec["pid"], signal.SIGTERM)
+            stopped.append(rec)
+        except OSError:
+            left.append(rec)
+    deadline = time.time() + 5
+    while time.time() < deadline and any(alive(read(r["name"])) for r in stopped):
+        time.sleep(0.2)
+    left += [r for r in stopped if alive(read(r["name"]))]
+    for r in stopped:
+        if r not in left:
+            print(f"stopped '{r['name']}' (pid {r['pid']})")
+    for r in left:
+        print(f"still running '{r['name']}' (pid {r['pid']})")
+    if not stopped and not left:
+        print(f"no live watcher starts with '{prefix}'")
+    return 1 if left else 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.split("\n\n", 2)[2].split("Exit codes")[0].rstrip())
         return 0 if argv else 2
     if argv[0] == "--list":
         return listing()
+    if argv[0] == "--stop-prefix":
+        if len(argv) < 2 or not argv[1].strip():
+            print("need a prefix", file=sys.stderr); return 2
+        return stop_prefix(argv[1])
     if argv[0] in ("--show", "--stop", "--selftest"):
         if argv[0] == "--selftest":
             return selftest()
@@ -276,6 +311,22 @@ def selftest():
     to = subprocess.run(me + ["t-3", "--until", "false", "--every", "2", "--timeout", "1"], capture_output=True, text=True)
     check("watch: a timeout exits 124", to.returncode, 124)
     check("watch: bad names are refused", subprocess.run(me + ["../x", "--", "true"], capture_output=True).returncode, 2)
+    w = [subprocess.Popen(me + [n, "--until", "false", "--every", "2"], stdout=subprocess.DEVNULL)
+         for n in ("T-9-ci", "T-9-push", "T-90-ci")]
+    time.sleep(1.0)
+    sp = subprocess.run(me + ["--stop-prefix", "T-9-"], capture_output=True, text=True)
+    check("watch: --stop-prefix exits 0", sp.returncode, 0)
+    check("watch: --stop-prefix stops each match", sorted(l.split("'")[1] for l in sp.stdout.splitlines() if l.startswith("stopped")),
+          ["T-9-ci", "T-9-push"])
+    check("watch: --stop-prefix leaves other names running", alive(read("T-90-ci")), True)
+    check("watch: --stop-prefix with nothing live", subprocess.run(me + ["--stop-prefix", "T-9-"], capture_output=True).returncode, 0)
+    check("watch: --stop-prefix needs a prefix", subprocess.run(me + ["--stop-prefix"], capture_output=True).returncode, 2)
+    subprocess.run(me + ["--stop", "T-90-ci"], capture_output=True)
+    for p in w:
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            p.kill()
     return 1 if fails else 0
 
 
