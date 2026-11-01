@@ -14,7 +14,9 @@
 #   fleet resources [--json] [--gate heavy|light] [--wait [--max-wait S]]
 #                                       the machine's memory, swap, CPU and disk gate (any OS)
 #   fleet watch <name> --until '<test>' | -- <command>    one background watcher per name
-#   fleet watch --show <name> | --list | --stop <name>
+#   fleet watch --show <name> | --list | --stop <name> | --stop-prefix <prefix>
+#   fleet retro [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself: rounds, spend, findings
+#   fleet findings <file> [--titles]    only the findings of a codex review/exec output file
 #   fleet antigravity-setup             register Plane and the read-only rules with agy, once
 #   fleet mcp-exec <name>               start an MCP server from ~/.claude.json (agy runs this)
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
@@ -31,6 +33,7 @@ fi
 case "${1:-}" in
   resources) shift; exec python3 "$here/fleetres.py" "$@" ;;
   watch) shift; exec python3 "$here/fleetwatch.py" "$@" ;;
-  pick|budget|log|stats|report|cost|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
+  findings) shift; exec python3 "$here/fleetfindings.py" "$@" ;;
+  pick|budget|log|stats|report|cost|retro|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

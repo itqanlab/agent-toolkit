@@ -799,7 +799,9 @@ def backfill_rows(agents, rows, prices, project):
                     "executor": "claude", "model": r.get("model"), "outcome": r.get("outcome"),
                     "input_tokens": tot[0] + tot[1] + tot[2] + tot[3], "cached_input_tokens": tot[3],
                     "output_tokens": tot[4], "usd": round(cost, 4), "agent_id": a["agent_id"],
-                    "usage_source": "transcript"})
+                    "usage_source": "transcript",
+                    # a raw read of the log must not see a second verify_fail without its cause
+                    **{k: r[k] for k in ("fail_cause", "task_kind") if r.get(k)}})
     return out
 
 
@@ -951,6 +953,8 @@ def selftest(check):
     bf = backfill_rows(agents, rows, prices, "st")
     check("backfill matches the agent", [r["agent_id"] for r in bf], ["abc"])
     check("backfill input counts cache reads", bf[0]["input_tokens"], 10 + 100000 + 100000 + 101000)
+    bf2 = backfill_rows(agents, [dict(rows[0], outcome="verify_fail", fail_cause="missed", role="engineer")], prices, "st")
+    check("backfill row keeps the fail cause", bf2[0].get("fail_cause"), "missed")
     check("text report renders", "Merged tickets: 1" in render(res, "st", prices), True)
     check("ticket view renders", "ST-7" in render_ticket(x), True)
     import shutil

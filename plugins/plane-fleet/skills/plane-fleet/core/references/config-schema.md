@@ -119,6 +119,22 @@ by key; lists and plain values replace.
     "cost": {                            // OPTIONAL, for `fleet cost`
       "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved
     },
+    "retro": {                           // OPTIONAL, for `fleet retro`. Every number has a default; set only what differs
+      "tool_calls_per_session": 300,     // one engineer or tester session (the soft cap)
+      "usd_per_ticket": 15,              // all sessions on one ticket in the window
+      "pm_share": 0.45,                  // PM spend over all spend, same whole UTC days
+      "pm_ctx_per_call": 150000,         // average PM context per call, in tokens
+      "rework_rounds": 2,                // rework rounds on one ticket
+      "rework_rate": 0.4,                // reworked over tested tickets, checked from 3 tested
+      "ticket_cause_failures": 0,        // test failures logged with --cause ticket
+      "duplicate_rows": 0,               // outcome rows written twice
+      "missing_agent_id": 0,             // Claude spawn rows without agent_id
+      "lane_failures": 1,                // other-CLI lanes failed, timed out or stopped
+      "rewrite_share": 0.10,             // share of agent spend on cache rewrites after long waits
+      "lane_minutes": 75,                // longest lane
+      "codex_pts_per_hour": 4.0,         // Codex weekly meter points per hour
+      "levels": { "lane_minutes": "off" }  // per key: alert (exit 3), warn, or off. Defaults in fleetretro.py
+    },
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []
     },

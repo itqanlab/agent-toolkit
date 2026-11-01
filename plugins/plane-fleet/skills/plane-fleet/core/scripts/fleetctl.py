@@ -8,11 +8,13 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
                       [--pair-with exe:model [--pair-experiment]] [--cwd DIR] [--seed N]
   fleetctl.py budget  [status|line|check EXE [--model M]|backoff EXE [--minutes M] [--reason TEXT]|lane-start EXE] [--json]
   fleetctl.py log     add --ticket T --role R --executor E --model M --outcome O [--kind K]
-                      [--set k=v ...] [k=v ...] [--from-result <lane>/result.json]
+                      [--set k=v ...] [k=v ...] [--from-result <lane>/result.json] [--force]
+                      (a row matching one already logged is refused without --force)
   fleetctl.py log     backfill --ticket T --role R --set k=v [k=v ...]
   fleetctl.py stats   [--role R] [--kind K] [--project P] [--json]
   fleetctl.py report  --project P --since ISO [--until ISO]   Done, approvals, tokens, hours (see report -h)
   fleetctl.py cost    [--since ISO] [--until ISO] [--ticket T] [--json] [--backfill]   real spend and time, from the sessions
+  fleetctl.py retro   [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself (fleetretro.py)
   fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
@@ -31,7 +33,10 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet root>/core/scripts/
 BASE_REGISTRY = os.path.join(FLEET_ROOT, "core", "references", "executors.json")
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred")
+OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix")
+# Rows that mark something the PM did, not a session: never scored, never counted as spend.
+MARKER_OUTCOMES = ("done", "retro_fix")
+DUPLICATE_WINDOW_S = 600
 # Why a tester failed a PR (`core/pm/skills/spawn.md` §3 "Read a low pass rate correctly"); only "missed" counts against the model.
 FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
 def X(p):
@@ -567,6 +572,36 @@ def derive_quality(rows):
         r["quality"] = q
 
 
+def duplicate_of(reg, row, now=None):
+    """The logged row this new one repeats, or None. A repeat is the same project, ticket, role,
+    executor and outcome within DUPLICATE_WINDOW_S, or the same agent_id with the same outcome.
+    A retro_fix row is never a repeat: two fixes for two findings can land in one minute."""
+    if row.get("outcome") in ("retro_fix",):
+        return None
+    now = now or time.time()
+    key = (row.get("project"), row.get("ticket"), row.get("role"), row.get("executor"), row.get("outcome"))
+    hit = None
+    try:
+        with open(P(reg, "path")) as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("type", "spawn") != "spawn" or r.get("usage_only"):
+                    continue
+                if row.get("agent_id") and r.get("agent_id") == row.get("agent_id") and r.get("outcome") == row.get("outcome"):
+                    hit = r
+                    continue
+                if (r.get("project"), r.get("ticket"), r.get("role"), r.get("executor"), r.get("outcome")) == key:
+                    t = parse_ts(r.get("ts"))
+                    if t and 0 <= now - t.timestamp() <= DUPLICATE_WINDOW_S:
+                        hit = r
+    except OSError:
+        return None
+    return hit
+
+
 def append_row(reg, row):
     path = P(reg, "path")
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -680,7 +715,7 @@ def scoreboard(reg, rows, role=None, kind=None, project=None):
     for r in rows:
         if r.get("type", "spawn") != "spawn" or r.get("outcome") in ("deferred",) or r.get("usage_only"):
             continue
-        if r.get("role") == "pm" and r.get("outcome") == "done":  # ticket-state marker, not a session
+        if r.get("role") == "pm" and r.get("outcome") in MARKER_OUTCOMES:  # a PM marker, not a session
             continue
         if role and r.get("role") != role:
             continue
@@ -1046,7 +1081,7 @@ def report(reg, project, since, until=None):
             continue
         rows.append(r)
     rows.sort(key=lambda r: r.get("ts") or "")
-    is_marker = lambda r: r.get("role") == "pm" and r.get("outcome") == "done"
+    is_marker = lambda r: r.get("role") == "pm" and r.get("outcome") in MARKER_OUTCOMES
     done = {}
     for r in rows:
         if r.get("outcome") == "done":
@@ -1190,6 +1225,21 @@ def selftest():
         main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"], quiet=True)
         r4 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-4", {})
         check("--cause stored", r4.get("fail_cause"), "ticket")
+        st4 = base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"]
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            code = main(st4, quiet=True)
+        check("log add: a repeat within 10 minutes is refused", (code, "repeats a row" in err.getvalue()), (5, True))
+        check("log add: --force logs it anyway", main(st4 + ["--force"], quiet=True), 0)
+        check("log add: another executor is not a repeat",
+              main(base[:5] + ["ST-4"] + base[6:7] + ["codex"] + base[8:-1] + ["verify_fail", "--cause", "ticket"], quiet=True), 0)
+        main(base[:5] + ["ST-5"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
+        with contextlib.redirect_stderr(io.StringIO()):
+            code = main(base[:5] + ["ST-6"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
+        check("log add: the same agent_id and outcome is refused", code, 5)
+        fix = ["log", "add", "--project", "st", "--ticket", "ST-1", "--role", "pm", "--executor", "claude", "--model", "opus",
+               "--outcome", "retro_fix"]
+        check("log add: two retro fixes in a row both log", (main(fix + ["--reason", "a"], quiet=True), main(fix + ["--reason", "b"], quiet=True)), (0, 0))
+        check("retro_fix is not scored", any(k[0] == "pm" for k in scoreboard(reg, load_rows(reg))), False)
         pools = {"gemini": ["g-wk"], "gemini-4-argon": ["argon-wk"], "claude": ["3p-wk", "3p-5h"]}
         check("pool: longest prefix", pool_of({"pools": pools}, "gemini-4-argon"), "gemini-4-argon")
         check("pool: plain prefix", pool_of({"pools": pools}, "gemini-3.8-flash"), "gemini")
@@ -1207,6 +1257,10 @@ def selftest():
         check("antigravity: other pools still run", budget_check(reg, "antigravity", model="gemini-3.8-flash")["state"], "ok")
         import fleetcost
         fleetcost.selftest(check)
+        import fleetretro
+        fleetretro.selftest(check, sys.modules[__name__])
+        import fleetfindings
+        fleetfindings.selftest(check)
         freemodels.selftest(check)
         import fleetstatus
         fleetstatus.selftest(check)
@@ -1257,12 +1311,18 @@ def main(argv=None, quiet=False):
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
     lg.add_argument("--cause", choices=FAIL_CAUSES, help="why the tester failed it; required with --outcome verify_fail")
+    lg.add_argument("--force", action="store_true", help="log it even when a matching row is already logged")
     co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
     co.add_argument("--ticket"); co.add_argument("--json", action="store_true")
     co.add_argument("--backfill", action="store_true", help="write the real usage onto the log's Claude spawn rows")
     co.add_argument("--dry-run", action="store_true", help="with --backfill: show what would be written")
     co.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
+    rt = sub.add_parser("retro", description="The fleet reviews itself: rounds, spend, tool calls and findings (fleetretro.py).")
+    rt.add_argument("--cwd"); rt.add_argument("--project"); rt.add_argument("--since"); rt.add_argument("--until")
+    rt.add_argument("--hours", type=float); rt.add_argument("--json", action="store_true")
+    rt.add_argument("--no-record", action="store_true", help="don't save this run's findings for repeat detection")
+    rt.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
     rp = sub.add_parser("report", description=REPORT_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     rp.add_argument("--project"); rp.add_argument("--since", required=True); rp.add_argument("--until"); rp.add_argument("--cwd")
     sub.add_parser("selftest")
@@ -1331,6 +1391,14 @@ def main(argv=None, quiet=False):
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
             if row["outcome"] == "verify_fail" and row.get("fail_cause") not in FAIL_CAUSES:
                 ap.error(f"verify_fail needs --cause {'|'.join(FAIL_CAUSES)}: only 'missed' counts against the model")
+            dup = None if args.force else duplicate_of(reg, row)
+            if dup is not None:
+                print(f"fleetctl: not logged, it repeats a row already in the log: {dup.get('ts')} {dup.get('ticket')} "
+                      f"{dup.get('role')} {dup.get('executor')}:{dup.get('model')} {dup.get('outcome')}"
+                      + (f" agent {dup['agent_id']}" if dup.get("agent_id") else "")
+                      + (f" cause {dup['fail_cause']}" if dup.get("fail_cause") else "")
+                      + ". Fix that row with `log backfill`, or pass --force for a real second session.", file=sys.stderr)
+                return 5
             append_row(reg, row)
             if not quiet:
                 extra = " ".join(f"{k}={v}" for k, v in fields.items() if k != "result_path")
@@ -1348,6 +1416,9 @@ def main(argv=None, quiet=False):
     elif args.cmd == "cost":
         import fleetcost
         return fleetcost.run(sys.modules[__name__], args)
+    elif args.cmd == "retro":
+        import fleetretro
+        return fleetretro.run(sys.modules[__name__], args)
     elif args.cmd == "stats":
         board = scoreboard(reg, load_rows(reg), args.role, args.kind, args.project)
         if args.json:
