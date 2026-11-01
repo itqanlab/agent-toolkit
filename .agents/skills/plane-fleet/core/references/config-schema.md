@@ -35,6 +35,10 @@ by key; lists and plain values replace.
 
   "quality": {
     "pre_push": "npm run quality:pre-push",   // MUST pass locally before the PR
+    "pre_push_success_regex": "(?m)^pre-push exit 0 at <sha>\\s*$",   // OPTIONAL, `fleet gate-stamp post`: what a passed
+                                         // gate log shows; <sha> is the full commit. This default matches the wrapper
+                                         // `{ <pre_push>; echo "pre-push exit $? at $(git rev-parse HEAD)"; } > <log> 2>&1`
+    "pre_push_skip_regex": "\\[pre-push\\] skipped",   // OPTIONAL: a log matching this is a gate that checked nothing
     "commit_style": "conventional"
   },
 
@@ -44,7 +48,10 @@ by key; lists and plain values replace.
     "required_jobs": ["lint", "unit", "api-e2e", "browser-e2e", "deploy-dev"],  // a watcher waits for these by name
     "e2e_label": "run-e2e",              // label that makes PR CI run the full browser suite
     "runner": "a single self-hosted runner",   // say so when one runner serves every job
-    "runner_cache": "/path/to/runner/build-cache"   // persistent build cache to move aside when it serves stale output
+    "runner_cache": "/path/to/runner/build-cache",  // persistent build cache to move aside when it serves stale output
+    "covered_by_local_gate": ["lint-typecheck-test-build"]   // OPTIONAL, `fleet gate-stamp`. CI check names the
+                                         // pre-push gate fully covers. A group PR into the trunk may merge once the
+                                         // PM's gate stamp is on its head, without waiting for these. Empty = off
   },
 
   "test": {
@@ -121,6 +128,21 @@ by key; lists and plain values replace.
       "dir": "/Volumes/Big/nx-remote",   // default <tool_caches.tmpdir or ~/.cache/plane-fleet>/nx-remote-cache/<project>
       "max_gb": 20                       // oldest-read entries go once the folder passes this
     },                                   // e2e targets must stay uncached in nx.json: the server cannot tell targets apart
+    "slot_db_template": {                // OPTIONAL. Postgres only (fleettemplate.py, `fleet slot-template`)
+      "enabled": true,                   // default false; clone then exits 3 and sessions run the recipe
+      "name_prefix": "app_dev_tpl",      // default <shared slot db, or the project>_tpl; templates are <prefix>_<key12>
+      "build": [                         // run with bash in a throwaway worktree at the ref, DATABASE_URL=<url>.
+        "npm ci",                        // placeholders: <db> <url> <repo> (the --cwd checkout) <dir> (the worktree) <sha>
+        "npx prisma migrate deploy",
+        "npm run db:seed"
+      ],
+      "admin_url_env": "FLEET_PG_ADMIN_URL",   // or "admin_url": a URL that may CREATE DATABASE, as psql sees it
+      "psql": ["psql"],                  // e.g. ["docker", "exec", "<container>", "psql"] when psql is not on the host
+      "url_template": "postgresql://app:app@localhost:5432/<db>",   // default: admin_url with the db swapped
+      "key_paths": ["prisma/"],          // default fleet.schema_paths. Include the seed files: the key hashes these and
+                                         // the build list, so a template is reused until they change
+      "keep": 2                          // ready templates kept; older ones are dropped after a build
+    },
     "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
     "cost": {                            // OPTIONAL, for `fleet cost`
       "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved

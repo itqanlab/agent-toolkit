@@ -18,6 +18,10 @@
 #   fleet retro [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself: rounds, spend, findings
 #   fleet findings <file> [--titles]    only the findings of a codex review/exec output file
 #   fleet cache-server start|stop|status|env [--cwd DIR]   one Nx cache shared by every worktree
+#   fleet slot-template build [--cwd DIR] [--ref origin/<trunk>] | clone <slot> [--test] | status
+#                                       one migrated, seeded DB template; a slot clones it in seconds
+#   fleet gate-stamp post --cwd DIR --sha SHA --log FILE | check --pr N
+#                                       stamp a commit the local pre-push gate passed; check a group PR
 #   fleet antigravity-setup             register Plane and the read-only rules with agy, once
 #   fleet mcp-exec <name>               start an MCP server from ~/.claude.json (agy runs this)
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
@@ -36,6 +40,8 @@ case "${1:-}" in
   watch) shift; exec python3 "$here/fleetwatch.py" "$@" ;;
   findings) shift; exec python3 "$here/fleetfindings.py" "$@" ;;
   cache-server) shift; exec python3 "$here/fleetcache.py" "$@" ;;
+  slot-template) shift; exec python3 "$here/fleettemplate.py" "$@" ;;
+  gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
   pick|budget|log|stats|report|cost|retro|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"
