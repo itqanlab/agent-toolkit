@@ -116,7 +116,8 @@ git worktree add .claude/worktrees/test-<IDENTIFIER>-<n> origin/<branch>
 cd .claude/worktrees/test-<IDENTIFIER>-<n>
 git checkout -B test/<IDENTIFIER>-<n> origin/<branch>     # local branch tracking the PR
 pnpm install --frozen-lockfile                              # real node_modules, never a symlink
-# then the repo's slot recipe: env vars for ports + DB, create slot DB, migrate, seed, serve
+# then the repo's slot recipe: env vars for ports + DB, create slot DB, migrate, seed, serve.
+# If `fleet slot-template clone <slot> --cwd .` succeeds, skip create, migrate and seed.
 ```
 
 **Test the branch as the engineer left it, rebased onto current trunk only in your head.** If

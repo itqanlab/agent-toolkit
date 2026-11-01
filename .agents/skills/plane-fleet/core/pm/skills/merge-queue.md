@@ -70,6 +70,28 @@ run, so testers no longer run them per ticket (the tester role). To make sure th
   user-visible change doesn't hold a release unless the owner says so.
   (2026-10-30, one project: a group broke a server test no group run covered, and a release
   waited about 3 hours on a server-only ticket that users couldn't see yet.)
+- **Merge a group PR on the local gate stamp, not on a CI rerun of it.** When
+  `ci.covered_by_local_gate` names CI jobs your pre-push gate already runs (lint, typecheck,
+  unit tests, build on what is affected), waiting for them repeats the same work on the same
+  commit. So:
+  1. Run the gate on the group branch with its result in a log:
+     `{ <quality.pre_push>; echo "pre-push exit $? at $(git rev-parse HEAD)"; } > <tmp>/group-<n>-gate.log 2>&1`
+     (or capture the `git push` whose hook ran it, ending with the same line). Push that commit.
+  2. `fleet gate-stamp post --cwd <group worktree> --sha <head> --log <that log>`. It refuses
+     unless HEAD is that commit, the tracked tree is clean and the log shows the gate passed
+     on it. It posts the `local-gate` commit status with the machine and the duration.
+  3. `fleet gate-stamp check --pr <n>`. Exit 0 means the stamp is on the PR head and every
+     check that is not covered passed or skipped. Merge then, even while a covered job still
+     runs. Cancel a covered job only when no other job of that run still waits on it: a job
+     that `needs` it gets skipped, and the check counts that skip as not passed.
+  - Never for the release PR to the production branch: that one waits for its full CI.
+  - Never when the head moved after the stamp (a new commit, a rebase, an update-branch). The
+    stamp belongs to one SHA; gate and stamp again.
+  - Trunk CI after the merge still runs everything and stays the deploy gate. A red trunk is
+    handled as always (`core/pm/skills/stop-the-line.md` §1).
+  (2026-11-01, one project: each group PR waited about 15 minutes for a CI job that re-ran the
+  lint, typecheck, test and build the PM's gate had just passed on the same commit, and trunk CI
+  ran them a third time after the merge.)
 - a red group PR: match the failing spec to its PR (`gh pr view --json files`), drop that
   branch from the group, rebuild, and send its ticket to Rework.
 - a red group PR you fix in place instead: split the failures by effort. The easy ones (a

@@ -61,6 +61,13 @@ The engineer looked at it and the tester looked at it. What is left is making su
    tidied, and the checkout reached 96 local branches, 186 commits behind, and 3 stashes up to
    4 months old.)
 
+   **Rebuild the slot database template when the group changed migrations or seed.** If
+   `fleet.slot_db_template.enabled` is on and any merged PR touched its `key_paths`, run
+   `fleet watch tpl-build -- <fleet folder>/scripts/fleet slot-template build --cwd <repo-root>`
+   in the background. It builds from `origin/<trunk>` in a throwaway worktree and never touches a
+   slot DB. Sessions that start before it is ready get exit 3 from `clone` and run the recipe, so
+   nothing waits on it. A failed build is a line in your next report, not a stop.
+
    **Close parents whose children are all done.** After each `Done` write, check the ticket's
    `parent`. If every child of that parent is `Done` or `Cancelled`, set the parent `Done` with a
    comment listing the children. (2026-10-01: a parent sat `In Progress` with every child done.)

@@ -105,6 +105,12 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 - **Never smoke-test the deployed app.** Your post-deploy check is CI/CD + health + commit +
   migrations. The browser work already happened, twice.
 - **Never merge a PR without `Approved` + `qa-approved` + green CI**, and never onto a red trunk.
+  For a group PR into the trunk, a passing `fleet gate-stamp check` stands in for the CI jobs
+  listed in `ci.covered_by_local_gate` (`core/pm/skills/merge-queue.md`); never for the release
+  PR to production.
+- **Rebuild the slot DB template after a trunk merge that changes migrations or seed**, in the
+  background (`fleet slot-template build`, `core/pm/skills/deploy-and-done.md`). Engineers and
+  testers clone their slot DB from it in seconds instead of migrating and seeding.
 - **Never set `Approved` yourself**, and never approve on a tester's behalf.
 - **Never paste the diff or the engineer's notes into a tester's brief.**
 - **Never hand out a slot that is taken**, the shared row, or more slots than config lists.

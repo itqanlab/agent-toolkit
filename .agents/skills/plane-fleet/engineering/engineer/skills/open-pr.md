@@ -18,7 +18,8 @@
 
 2. **Run it in your slot and look at it.** Bring up your slot with the repo's recipe
    (`fleet.slot_recipe` in config): your ports, your slot DB, migrated and seeded, server and
-   client from your worktree. Check the slot is free first; if a port or the DB is taken, stop
+   client from your worktree. If `fleet slot-template clone <slot>` succeeds, skip migrate and
+   seed; otherwise run the recipe (standing brief). Check the slot is free first; if a port or the DB is taken, stop
    and report — never fall back to the shared ports.
 
    Then review your own change in a browser (your own Playwright/Chromium, never the owner's

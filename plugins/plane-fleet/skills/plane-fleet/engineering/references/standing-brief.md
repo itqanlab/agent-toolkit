@@ -18,6 +18,17 @@ decisions) comes in the brief itself.
 - Run your app/API/DB ONLY on your assigned slot (ports, DB, Nx cache given in your brief).
   Never use the shared row. Slot occupied → stop and report. Tear it all down before you report.
   No slot in your brief → skip the app/browser steps and say so.
+- **Slot database: clone it, don't build it.** Run
+  `<fleet folder>/scripts/fleet slot-template clone <slot> --cwd <worktree>` (add `--test` when
+  the repo has a test DB). If it succeeds, skip migrate and seed: the template is trunk's
+  migrations and seed data already. Any nonzero exit means no ready template matches your
+  branch (your branch adds a migration, or the project has it off): run the recipe as before.
+  Never point it at the shared row; it refuses anyway.
+- **Check the database before you migrate or run e2e.** Before any migrate, seed, reset or e2e
+  command, `echo "$DATABASE_URL"` and every test URL the repo uses, and confirm each names your
+  slot DB. Export each one in its own statement. (2026-11-01, one project: an engineer exported
+  both URLs in one statement, the test URL kept its old value, and the test harness migrated the
+  owner's shared DB.)
 - Before any nx command: NX_DAEMON=false, your slot's NX_CACHE_DIRECTORY, and
   `eval "$(<fleet folder>/scripts/fleet cache-server env --cwd <repo>)"` in the same shell
   (the pre-push hook inherits it). That points Nx at the project's shared cache server, so a
