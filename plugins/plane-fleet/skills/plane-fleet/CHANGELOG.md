@@ -4,6 +4,25 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.8.0] - 2026-11-01
+
+Engineers and testers were paying for the same checks over and over. In one run a rework engineer pushed 4 times and ran the server e2e set 4 times, another engineer ran it 5 times, and three agents pushing at once held a 12-core machine at load 60 to 78.
+
+### Added
+
+- `fleet cache-server start|stop|status|env`: a small Nx remote cache on 127.0.0.1 (Nx 20.8+ self-hosted cache API), one per project, so every engineer, tester and group worktree reuses the others' lint, typecheck, unit-test and build results. Off unless `fleet.nx_cache_server.enabled`. `eval "$(fleet cache-server env --cwd <repo>)"` starts it and exports the two Nx variables. Oldest entries go past `max_gb` (default 20). Checked with two worktrees: the second got `[remote cache]`.
+
+### Changed
+
+- Push once per session, after the last clean review pass. Review fixes stay local commits. Every push runs the whole pre-push gate and starts PR CI.
+- While working, run only the spec files you touched, never a whole project or suite, and nothing by hand right before a push.
+- Never run the same tests twice on one commit. While fixing a failure, re-run only the failing spec; run the full needed set once, after the last change. A rework or tester round re-runs only what its new commits touch.
+- Reports carry the push count and the number of full server or browser spec-set runs.
+- Testers push their test commits once, together.
+- Sharing one Nx cache folder across worktrees does not help on Nx 22 (each worktree's database ignores entries it did not write), which is why the cache server exists.
+- `--skipNxCache` is for a result that looks wrong for the change, not for every green: cached lint, unit tests and build are real results.
+- If the cache server is down, Nx runs the task and still exits 1 (`Failed to send request ... /v1/cache`). The brief says to restart the server and run again, never to skip the hook.
+
 ## [2.7.0] - 2026-11-01
 
 The fleet now checks itself while it runs. In one night's run the PM spent more than every agent together, mostly by carrying big outputs in its context. One engineer ran 576 tool calls on one UI ticket, a finished agent kept sending its report, and two tickets went to rework because of the ticket text.
