@@ -115,6 +115,12 @@ by key; lists and plain values replace.
       "nx_temp_regex": "^[0-9a-f]{20}$", // Nx socket folders directly under tmpdir
       "docker_build_cache": true         // sweep prunes Docker's build cache (never images or volumes)
     },
+    "nx_cache_server": {                 // OPTIONAL, Nx 20.8+. One cache for every worktree (fleetcache.py, `fleet cache-server`)
+      "enabled": true,                   // default false; `fleet cache-server env` prints nothing while off
+      "port": 4590,                      // 127.0.0.1 only; one server per project
+      "dir": "/Volumes/Big/nx-remote",   // default <tool_caches.tmpdir or ~/.cache/plane-fleet>/nx-remote-cache/<project>
+      "max_gb": 20                       // oldest-read entries go once the folder passes this
+    },                                   // e2e targets must stay uncached in nx.json: the server cannot tell targets apart
     "slot_scratch_prefix": "/tmp/proj-slot-",  // OPTIONAL. Scratch dir is <prefix><slot>; default /tmp/<plane.identifier lowercased>-slot-
     "cost": {                            // OPTIONAL, for `fleet cost`
       "claude_project_dirs": ["-old-path-to-repo"]   // extra Claude Code project folders (names or globs), for a repo that moved
