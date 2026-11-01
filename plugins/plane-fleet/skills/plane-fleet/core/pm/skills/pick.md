@@ -75,13 +75,19 @@ It prints one line: `trunk-commits:` (commits on `origin/<trunk>` whose subject 
 ticket), `prs:` (PRs whose title or branch names it exactly) and `missing-paths:` (cited paths
 gone from the trunk). It makes no Plane call.
 
+The scan only checks things written as paths. A ticket can also name a thing without a path:
+"the shared Jest preset", "the retry setting", "the base config". Read the ticket's "What to
+change" (§3) yourself and check each named file, setting, preset or config exists before you
+claim (`git ls-files | grep`, `git grep`). (2026-11-01, one project: a ticket asked to change
+a shared Jest preset that did not exist. The engineer found that out a full session later.)
+
 Each hit is a **candidate**, not a verdict:
 
 | Hit | What it suggests | Do |
 |---|---|---|
 | `trunk-commits:N>0` or a `MERGED` PR | work already landed | read the commit subject. Clearly the same fix → comment the evidence, close the ticket yourself (`Done` if shipped, `Cancelled` if superseded), no engineer. Unclear → spawn the engineer and name the commit in the brief. |
 | an `OPEN` PR you didn't spawn | someone else is on it | don't claim. Tell the owner. |
-| `missing-paths:` | the cited code moved or was deleted | the ticket's §0 gate starts from "find where this lives now". Say so in the brief. |
+| `missing-paths:`, or a named file, setting, preset or config that does not exist | the ticket was written against code that moved, or against a guess | **don't claim it yet.** Spawn the planner (`fleet-planner`, sonnet) with its `write-ticket` skill to fix the text: the real path, or "new" for a thing the ticket creates. A one-line fix you can see at once can be a PM comment instead. Then pick it. |
 | `vague_scope` not empty | "everywhere", "all screens", "the whole app" with no list | **don't claim it yet.** Spawn the planner (`fleet-planner`) to write it with its `write-ticket` skill (sonnet) to replace each vague word with the enumerated list (`file:line` each) in the description, then pick it. An engineer building against "everywhere" is the most reliable way to get a Rework (393 failed twice). |
 | `decision_words` not empty | the ticket asks a question | read the body. A real open question goes to the owner **before** claiming. |
 | `decision_comments` > 0 | a decision may live in a comment, not the description | read those comments. If a decision changed the scope, **write it into the description now, before claiming.** The text-freeze rule (`core/pm/skills/preflight.md` §0) only starts at claim. |

@@ -16,6 +16,16 @@ You decide what the tickets are. You do not file them; `fleet-board` does, from 
 Your job is to make fewer, better tickets: each one a whole outcome that one engineer finishes
 in one session and one tester checks in one pass.
 
+## When the planner runs
+
+The PM spawns you for three things:
+- **New work**: a request, a bug list, meeting notes, a client message.
+- **A vague ticket**: the triage found "everywhere" or "all screens" with no list.
+- **A ticket that fails the readiness check**: a cited path is gone, or it names a file,
+  setting, preset or config that does not exist (`core/pm/skills/pick.md`, pre-pick triage).
+  Fix the text with the `write-ticket` skill: the real path, or "new" for a thing the ticket
+  creates. The ticket keeps its id.
+
 ## Read first
 
 The fleet folder is the absolute path in your brief. If the brief has none, use

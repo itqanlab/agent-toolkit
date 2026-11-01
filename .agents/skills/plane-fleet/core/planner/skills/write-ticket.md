@@ -56,6 +56,11 @@ worker's whole run.
 - Reproduce or locate the actual behaviour in the codebase.
 - Get **real `file:line` citations** for the cause and every touch point. Never invent a path
   or guess a line — grep it.
+- **Check every named file, setting, preset and config exists before you file.** Use
+  `git ls-files | grep <name>` or `git grep <name>` on the trunk. A thing the ticket creates is
+  written as "new" (`new: libs/testing/jest.preset.js`), so nobody goes looking for it.
+  (2026-11-01, one project: a ticket asked to change a "shared Jest preset" that did not exist.
+  The engineer spent a session finding that out.)
 - Enumerate the full surface (all call sites / routes / roles / inputs), because that
   enumeration becomes the worker's fix list.
 - If it turns out to be already fixed, or the reported cause is wrong, say so and file the
@@ -215,8 +220,21 @@ decided here, not during review.</li></ul>
   <li>Local quality gate passes, CI green, deployment verified live.</li>
   <li>No hard-coded user-facing strings; every i18n key resolves (no raw keys).</li>
   <li>Evidence attached to this ticket.</li>
+  <li>Visual baseline or e2e on counts, dates or relative times only: the new tests pass
+      N unchanged reruns in a row (say N, 3 is a good default).</li>
 </ul>
 ```
+
+**A screenshot, a visual baseline, or an e2e assertion on a count, a date or a relative time
+must be deterministic, and the ticket says how.** In §3, for each shot or assertion, write:
+- the data it shows, seeded fresh for that shot or masked in the shot, never data a previous
+  test or a previous run left behind;
+- a clock the test controls (a frozen date, a fixed timezone), never the real one;
+- no leftovers: drafts, autosaves, open sessions, cached lists cleared before the shot.
+
+§5 then asks for N unchanged reruns green. (2026-11-01, one project: a visual-baseline ticket
+went to rework because its shots used leftover data and the real clock, so a badge read 1 on
+one run and 2 on the next.)
 
 §3's enumerated list is **never boilerplate** — it is the single highest-value part of the
 ticket. Do the search now; don't defer it to §0.3, which is a re-check, not first discovery.
