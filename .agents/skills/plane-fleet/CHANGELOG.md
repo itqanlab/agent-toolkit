@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.9.1] - 2026-11-02
+
+### Fixed
+
+- `fleet gate-stamp check` read a stale re-run. `gh pr checks` keeps one row per check name. After a PR title edit it kept a re-run attempt of the old workflow run, which still carried the old title and failed, over the newer run that passed. The check said NOT READY while GitHub showed the PR as clean. It now also reads the PR's `statusCheckRollup` and, for each check name, uses the run with the highest workflow run id. An older passing run never hides a newer failure.
+
 ## [2.9.0] - 2026-11-01
 
 Two waits that bought nothing. On one project every engineer or tester session built its slot from zero (worktree, install, database, migrate, seed, servers): 8 to 10 minutes of a 20 to 45 minute session. Then each group PR waited about 15 minutes for a CI job that re-ran the lint, typecheck, test and build the PM's own pre-push gate had just passed on the same commit.
