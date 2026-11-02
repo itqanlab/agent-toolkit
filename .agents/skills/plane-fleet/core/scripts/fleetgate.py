@@ -109,14 +109,60 @@ def gh_json(s, argv):
         raise Fail(f"gate-stamp: gh {' '.join(argv[:3])} failed: {(r.stderr or r.stdout).strip()}", 2)
 
 
+RUN_ID = re.compile(r"/actions/runs/(\d+)")
+FAIL_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"}
+
+
+def run_id(url):
+    m = RUN_ID.search(url or "")
+    return int(m.group(1)) if m else None
+
+
+def bucket_of(item):
+    """Bucket for a statusCheckRollup CheckRun, in `gh pr checks` terms."""
+    if (item.get("status") or "").upper() != "COMPLETED":
+        return "pending", (item.get("status") or "PENDING").upper()
+    c = (item.get("conclusion") or "").upper()
+    if c == "SUCCESS":
+        return PASS, c
+    if c in ("SKIPPED", "NEUTRAL"):
+        return SKIP, c
+    if c == "CANCELLED":
+        return CANCEL, c
+    return FAILB, c or "FAILURE"
+
+
+def newest_runs(checks, rollup):
+    """`gh pr checks` keeps one row per check name, and it can keep a re-run attempt of an
+    old workflow run (whose event still carries the old PR title, say) over a newer run of
+    the same workflow. GitHub's merge state uses the newest run, so do the same: for each
+    name, the CheckRun from the highest workflow run id wins."""
+    best = {}
+    for it in rollup or []:
+        rid = run_id(it.get("detailsUrl"))
+        if it.get("__typename") not in (None, "CheckRun") or not it.get("name") or rid is None:
+            continue
+        if it["name"] not in best or rid > best[it["name"]][0]:
+            best[it["name"]] = (rid, it)
+    out = []
+    for c in checks:
+        mine, top = run_id(c.get("link")), best.get(c.get("name"))
+        if top and mine is not None and top[0] > mine:
+            b, state = bucket_of(top[1])
+            c = {**c, "bucket": b, "state": state, "link": top[1].get("detailsUrl"), "superseded": mine}
+        out.append(c)
+    return out
+
+
 def check(s, pr):
     if not s["covered"]:
         raise Fail("gate-stamp: off (ci.covered_by_local_gate is empty)", 3)
-    view = gh_json(s, ["pr", "view", str(pr), "--json", "headRefOid,baseRefName,state"])
+    view = gh_json(s, ["pr", "view", str(pr), "--json", "headRefOid,baseRefName,state,statusCheckRollup"])
     sha, base = view.get("headRefOid", ""), view.get("baseRefName")
     st = gh_json(s, ["api", f"repos/{{owner}}/{{repo}}/commits/{sha}/status"])
     stamp = next((x for x in st.get("statuses") or [] if x.get("context") == CONTEXT), None)
-    checks = gh_json(s, ["pr", "checks", str(pr), "--json", "name,bucket,state"])
+    checks = newest_runs(gh_json(s, ["pr", "checks", str(pr), "--json", "name,bucket,state,link"]),
+                         view.get("statusCheckRollup"))
     covered = [c for c in checks if c.get("name") in s["covered"]]
     others = [c for c in checks if c.get("name") not in s["covered"] and c.get("name") != CONTEXT]
     covered_stopped = any(c.get("bucket") in (CANCEL, FAILB) for c in covered)
@@ -171,7 +217,7 @@ def selftest(check_):
     g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t")
     open(os.path.join(d, "a.txt"), "w").write("1\n"); g("add", "-A"); g("commit", "-qm", "one")
     sha = g("rev-parse", "HEAD").stdout.strip()
-    calls, world = [], {"checks": [], "statuses": {}, "base": "develop", "sha": sha}
+    calls, world = [], {"checks": [], "statuses": {}, "base": "develop", "sha": sha, "rollup": []}
 
     def fake(argv, cwd=None):
         if argv[0] == "git":
@@ -179,7 +225,8 @@ def selftest(check_):
         calls.append(argv)
         ok = lambda out: subprocess.CompletedProcess(argv, 0, json.dumps(out), "")
         if argv[1:3] == ["pr", "view"]:
-            return ok({"headRefOid": world["sha"], "baseRefName": world["base"], "state": "OPEN"})
+            return ok({"headRefOid": world["sha"], "baseRefName": world["base"], "state": "OPEN",
+                       "statusCheckRollup": world["rollup"]})
         if argv[1:3] == ["pr", "checks"]:
             return ok(world["checks"])
         if argv[1] == "api" and argv[-1].endswith("/status"):
@@ -234,6 +281,21 @@ def selftest(check_):
         check_("gate: a skip after a cancelled covered job is not a pass", check(s, 7)["ready"], False)
         world["checks"][2] = {"name": "client-e2e", "bucket": "pass", "state": "SUCCESS"}
         check_("gate: cancelled covered job, rest passed = ready", check(s, 7)["ready"], True)
+        u = lambda rid: f"https://github.com/o/r/actions/runs/{rid}/job/{rid}9"
+        world["checks"].append({"name": "Title", "bucket": "fail", "state": "FAILURE", "link": u(100)})
+        world["rollup"] = [
+            {"__typename": "CheckRun", "name": "Title", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": u(100)},
+            {"__typename": "CheckRun", "name": "Title", "status": "COMPLETED", "conclusion": "SUCCESS", "detailsUrl": u(101)}]
+        check_("gate: a newer run of a check beats a stale re-run attempt", check(s, 7)["ready"], True)
+        world["rollup"][1]["conclusion"] = "FAILURE"
+        check_("gate: the newer run failing still holds it", check(s, 7)["failing"], ["Title (failure)"])
+        world["rollup"][1].update(status="IN_PROGRESS", conclusion=None)
+        check_("gate: the newer run still running is pending", check(s, 7)["pending"], ["Title"])
+        world["checks"][-1] = {"name": "Title", "bucket": "fail", "state": "FAILURE", "link": u(101)}
+        world["rollup"] = [world["rollup"][0] | {"conclusion": "SUCCESS"},
+                           {"__typename": "CheckRun", "name": "Title", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": u(101)}]
+        check_("gate: an older passing run never hides a newer failure", check(s, 7)["ready"], False)
+        world["checks"].pop(); world["rollup"] = []
         world["sha"] = "e" * 40
         check_("gate: a new head without its own stamp is not ready", check(s, 7)["ready"], False)
         world["sha"], world["base"] = sha, "main"
