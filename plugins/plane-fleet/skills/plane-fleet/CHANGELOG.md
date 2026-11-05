@@ -4,6 +4,30 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.10.0] - 2026-11-05
+
+Lessons from one project's run. 9 of 16 tested tickets went to rework, and each defect class behind them had come back at least twice. The machine ran into swap while the gate still showed room, two full gates at once pushed swap past 10 GB, and the release needed three e2e runs (a stale spec, every visual baseline after a shared header change, a `[skip ci]` commit that kept checks from starting).
+
+This release changes documents only. Four script changes are still to come: `fleet gate-stamp post` accepting a push that landed (remote head equal to HEAD) in place of the log line, a `fleet gate-lock` command, `fleet status` and the spawn checks enforcing `fleet.max_heavy_sessions` with swap counted against the room figure, and `fleet watch` reporting a PR that gets no checks after a push.
+
+### Added
+
+- `engineering/references/brief-checklist.md`: the defect classes that caused repeat rework, grouped (before code, UI, money, dates and concurrency, review before handoff, testers, PRs and CI). The PM copies the items that apply into each engineer brief under `CHECKLIST:`, and the engineer names in the handoff which ones it checked.
+- `fleet.max_heavy_sessions` (default 3, read by the PM): at most that many engineers or testers with servers and a test DB at once, even when the machine gate shows room. The gate's room figure ignores swap that is already high.
+- A gate lock: one full pre-push gate at a time on the machine. Sessions and the PM's group gate take `/tmp/<identifier>-gate.lock` with `mkdir` before a push and wait while it is held.
+- A release PR section in the merge queue: regenerate visual baselines on the CI runner when a release changes something drawn on every page, and never merge a `[skip ci]` commit last before a release PR.
+
+### Changed
+
+- Test workers are capped per session: half the cores divided by `fleet.max_heavy_sessions`, at least 1, in place of a fixed 2.
+- Ticket PRs stay drafts. Nobody marks one ready or adds the e2e label to it. CI runs on the group PR, and the full e2e suite runs on the release PR. The standing brief's old "add the e2e label before your last push" rule is gone.
+- The brief states per role who sees which screen, button and field, before round 1.
+- A PR past about 40 files, or with several features, is split before its next round.
+- Group PRs are checked for mergeable before anyone waits on them. A conflicting group gets the trunk merged in, the full gate again, and a look for clashes a text merge cannot see. A watcher with no checks after N minutes reports a fault.
+- Gate-stamp proof: a plain git pre-push hook does not print the line `fleet gate-stamp post` looks for. Until the script changes, the PM proves the gate by the remote branch head matching the local HEAD after a push without `--no-verify`. Nobody writes the log line by hand.
+- Stop-the-line names the runner first: PR checks can run on another runner than trunk jobs, a checkout error means a damaged work folder there, and `pgrep` inside `sh -c` matches itself.
+- An engineer whose ticket changes what a screen shows greps every e2e spec for the old text or figure and updates them in the same PR.
+
 ## [2.9.1] - 2026-11-02
 
 ### Fixed
