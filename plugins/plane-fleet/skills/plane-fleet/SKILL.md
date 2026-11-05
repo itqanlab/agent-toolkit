@@ -68,6 +68,7 @@ In the `engineering` section's references folder:
 
 - `standing-brief.md` — the boundaries every engineer and tester keeps
 - `ticket-rules.md` — when to file a ticket, and how big one may be
+- `brief-checklist.md` — defect classes that caused repeat rework; the PM copies the ones that apply into each brief
 - `notify.md` — telling the client, with a screenshot
 
 ## The fleet command

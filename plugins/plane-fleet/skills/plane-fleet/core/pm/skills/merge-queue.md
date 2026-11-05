@@ -53,12 +53,22 @@ review (`codex review "<instructions naming the base>" > <tmp>/group-<n>-review.
 and opens ONE PR into the trunk. Per-PR CI skips most jobs on drafts, so the group PR carries
 all the risk: keep a group small (about 5) when it includes a shared UI change or a dependency
 change. That PR is where the whole server and browser suites
-run, so testers no longer run them per ticket (the tester role). To make sure they really run:
+run, so testers no longer run them per ticket (the tester role). Ticket PRs stay drafts the whole
+way: never mark one ready and never put the e2e label on one. A draft ticket PR still shows as
+merged once its commits reach the trunk through the group. To make sure the suites really run:
 - open the group PR **as a draft**, add the e2e label, and only then `gh pr ready`. A label
   passed to `gh pr create --label` is applied after the opened event, so CI never sees it
   (2026-10-14: the full browser suite was skipped on group 1, and 3 reds surfaced on develop).
 - check the run's scope step printed the label as present (`HAS_LABEL: true` on this repo)
   and that the browser job reads SUCCESS, not SKIPPED, before merging.
+- **Check the group PR is mergeable before you wait on it.** A group branch cut before an
+  earlier group merged can conflict with the trunk. GitHub then starts no pull_request checks
+  at all, and a watcher waiting for success only times out. So run
+  `gh pr view <n> --json mergeable,mergeStateStatus` first. Not mergeable: merge the trunk into
+  the group branch (a merge commit; keep both sides of changelog-style rows), rerun the full
+  local gate, and push. Then look for clashes a text merge cannot see, such as both groups
+  adding the same method to one class. A watcher treats "no checks after N minutes" as a fault
+  to report, never as pending.
 - **When the group PR doesn't run the full suites** (some projects save them for the release
   to production), the builder still runs every test file that covers code the group changed,
   not only the specs the tickets name. Find them by what imports the changed modules (the
@@ -77,6 +87,14 @@ run, so testers no longer run them per ticket (the tester role). To make sure th
   1. Run the gate on the group branch with its result in a log:
      `{ <quality.pre_push>; echo "pre-push exit $? at $(git rev-parse HEAD)"; } > <tmp>/group-<n>-gate.log 2>&1`
      (or capture the `git push` whose hook ran it, ending with the same line). Push that commit.
+     Take the gate lock first (standing brief); only one full gate runs on the machine at a time.
+     **A plain git pre-push hook does not print that line**, so a push log alone never matches.
+     Until `gate-stamp` reads the hook's exit status (CHANGELOG 2.10.0, Proposed), prove the
+     gate passed another way: after `git push` without `--no-verify`, the remote branch head
+     (`git ls-remote origin <branch>`) equals the local HEAD. The push only lands when the hook
+     passes. **Nobody writes that log line by hand.** A stamp built on a hand-written line is
+     rejected, and the gate runs again. (2026-11-04, one project: a session wrote the line itself,
+     and the PM rejected the stamp.)
   2. `fleet gate-stamp post --cwd <group worktree> --sha <head> --log <that log>`. It refuses
      unless HEAD is that commit, the tracked tree is clean and the log shows the gate passed
      on it. It posts the `local-gate` commit status with the machine and the duration.
@@ -113,14 +131,14 @@ group is where it gets checked:
   match it to the PR in the group that touched that screen (`gh pr view --json files`). Revert
   only that PR, send its ticket to `Rework`, and let the rest of the group stand. Unclear →
   revert the whole group and re-merge it in halves.
-- A PR that changed shared UI goes in a group of its own, or carries the e2e label.
+- A PR that changed shared UI goes in a group of its own, or its group PR carries the e2e label.
 - **Two PRs that change the same shared component never go in one group.** Shared means
   the paths in `fleet.shared_ui_paths` (for example the UI library, the form contract, the table
   and field components). Hold the second PR until the first group's trunk run is green.
   2026-10-05: three PRs sharing a form component each passed testing on their own, then broke
   trunk together and all three were reverted.
-- **A PR that adds or changes a browser e2e spec needs a green e2e-labelled PR run before it
-  merges.** If the suite runs on several workers, a local pass on one worker doesn't count. The
+- **A group that adds or changes a browser e2e spec needs a green e2e-labelled run on its group
+  PR before it merges.** If the suite runs on several workers, a local pass on one worker doesn't count. The
   label must be on the PR **before** the push that triggers the run: adding it afterwards
   doesn't re-run CI, and the e2e job shows `SKIPPED`. Label first, then push or
   `gh pr update-branch`. Check that the e2e job reads SUCCESS, not SKIPPED, before merging.
@@ -169,5 +187,19 @@ to the front:
 - when the priority run is done, `gh run rerun <id> --failed` for each saved one. That re-runs
   only the cancelled jobs and keeps the ones that passed.
 Never cancel a job that is running. (2026-09-30: used twice. A trunk run and an urgent fix each waited behind 6+ PR runs.)
+
+### The release PR to production
+
+The release PR from the trunk to the production branch waits for its full CI, the whole e2e
+suite included. Two things make that run fail or never start:
+
+- **A change drawn on every page fails every visual baseline.** When a release changes the
+  navigation, the header or anything else on every screen, regenerate the baselines before the
+  release e2e run: on the CI runner, never on a developer machine (fonts differ), from a branch.
+  Look at a couple of old and new images by eye, then merge that branch. A diff of a few pixels
+  inside text is anti-aliasing noise, not a change.
+- **`[skip ci]` on the newest trunk commit skips the release PR's runs too**, when the PR head is
+  that commit. Never merge a `[skip ci]` commit last before you open or update a release PR. If
+  it happened, push or merge a normal commit, or close and reopen the PR.
 
 ---

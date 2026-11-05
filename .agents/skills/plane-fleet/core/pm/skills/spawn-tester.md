@@ -152,8 +152,16 @@ tell the owner once), and prints the machine gate from `fleet resources`.
     failing tests that way (2026-10-29).
 - Size the fleet to the machine, not to the slot list: "room for N heavy" already counts what
   is running. A small laptop may run one heavy session; that is the gate working.
-- **Put the load rules in every brief:** Jest at `--maxWorkers=2 --no-watchman`, server e2e at the worker
-  count its config sets, and `<fleet> resources --wait` (give the full path of the fleet
+- **At most `fleet.max_heavy_sessions` heavy sessions at once (default 3)**, even when the gate
+  shows room for more. A heavy session is an engineer or tester with servers and a test DB. The
+  "room" figure comes from free memory and ignores swap that is already high, so it can say 2
+  more while the machine is already paging. Count the live heavy sessions in `fleet status`
+  before each heavy spawn; at the cap, wait for a report. No script enforces this yet.
+  (2026-11-04, one project: the gate showed room for more while swap was already high.)
+- **Put the load rules in every brief:** Jest at `--maxWorkers=<cap> --no-watchman`, where the
+  cap is half the cores divided by `fleet.max_heavy_sessions`, at least 1 (12 cores and 3
+  sessions give 2). An uncapped runner in every session takes all the cores each time. Server
+  e2e at the worker count its config sets, and `<fleet> resources --wait` (give the full path of the fleet
   command) before starting Jest, Playwright or a server. It returns when the gate opens or
   after 4 minutes; a nonzero exit means wait again or report. No `uptime` arithmetic in
   briefs: core counts and OS differ. A pre-push hook runs its own

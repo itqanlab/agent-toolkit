@@ -69,6 +69,10 @@ The cap stays: at most 2 new tickets per session, and the PM triages every one.
   exceptions are anything urgent and anything that unblocks the trunk.
 - **Estimate at writing time.** The ticket lists the files it expects to touch. If the list
   is past the ceiling, split it now, not after a rework.
+- **A PR that grew past about 40 files, or carries several features, is split before its next
+  round.** The PM checks the diff size (`gh pr view <n> --json files`) at every rework and has
+  the planner split the rest out by outcome. (2026-11-04,
+  one project: one ticket reached 108 files and took four rework rounds.)
 
 ### Shape: one outcome per ticket (owner, 2026-10-22)
 
@@ -99,9 +103,10 @@ The size table says how big a ticket may be. This says what goes in it.
 - Two PRs that change the same shared component (`fleet.shared_ui_paths`) never go in the
   same merge group. The second waits for the first group's trunk run. Measured: three reverts
   on one day, each PR passed testing on its own and they broke trunk together.
-- Any PR that adds or changes a browser e2e spec carries the e2e label (`ci.e2e_label`), so the
-  spec runs under the full multi-worker suite before merge. One-worker local passes are not
-  enough.
+- A group that adds or changes a browser e2e spec runs it under the full multi-worker suite
+  before production: on the group PR when the project runs the suite there, else on the release
+  PR. One-worker local passes are not enough. The e2e label (`ci.e2e_label`) never goes on a
+  ticket PR, which stays a draft (`engineering/references/standing-brief.md`).
 
 ## 4. Review rounds by priority (owner, 2026-10-15)
 

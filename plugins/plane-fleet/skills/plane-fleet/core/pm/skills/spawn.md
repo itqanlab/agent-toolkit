@@ -268,6 +268,17 @@ Then add, per spawn: the ticket id and state, **the slot letter and its values**
 number/branch (testers and rework engineers), the owned-file list from currently open PRs, and
 whatever is specific to that ticket.
 
+**Copy the checklist items that apply** from `engineering/references/brief-checklist.md` into
+every engineer brief, under `CHECKLIST:`, with their numbers. Pick by what the ticket touches
+(UI, money, dates, locks). The engineer names in its handoff which ones it checked. Edit the
+file, not the briefs, when a class keeps coming back.
+
+**State who sees what, before round 1.** When a ticket touches a screen, a button or a field
+that some roles see and others do not, the brief says per role (`roles` in config) who sees
+each one and who may use it. Put the same table on the ticket so the tester judges against it.
+(2026-11-04, one project: several tickets went back because the tester judged visibility one way
+and the engineer the other, and the ticket said neither.)
+
 **Put the focused review prompt in every engineer brief**: the exact `codex review "…"` text you
 will run on the PR yourself (`core/pm/skills/spawn-tester.md` §4). Write it once per ticket, and
 reuse and extend it each round. It names:

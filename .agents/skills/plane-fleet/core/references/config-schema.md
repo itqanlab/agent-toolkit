@@ -98,6 +98,9 @@ by key; lists and plain values replace.
     "merge_train_size": 3,
     "parallel_workers": 2,               // engineers at once
     "parallel_schema": 2,                // schema tickets building at once, on disjoint models (pick.md §2)
+    "max_heavy_sessions": 3,             // OPTIONAL, read by the PM (no script reads it yet). Heavy sessions (engineer or
+                                         // tester with servers and a test DB) at once, even when the gate shows more room.
+                                         // Also sets the test-worker cap: half the cores / this, at least 1
     "slot_policy": "one pool",           // testers take ANY free slot; no fixed tester cap
     "slots": {                           // one per running engineer/tester; never assign "shared"
       "shared": { "api": 3000, "client": 4200, "db": "app_dev" },

@@ -72,9 +72,11 @@ decisions) comes in the brief itself.
     none of yours. A job that outlives you keeps notifying the PM with your report.
     (2026-11-01, one project: a background job kept running after an engineer's final report,
     and the PM got the same report 5 times until it stopped the agent.)
-- **Share the machine.** Run Jest with `--maxWorkers=2 --no-watchman` (a watchman watch on your
-  worktree outlives you and holds memory for every file in it), and server e2e at the worker count its
-  config sets, never more. Before you start Jest, Playwright or a server, run
+- **Share the machine.** Run Jest with `--maxWorkers=<cap> --no-watchman`, where the cap is the
+  one in your brief, or half the cores divided by `fleet.max_heavy_sessions` (default 3), at
+  least 1. An uncapped runner takes every core, and three sessions doing it at once multiply.
+  (A watchman watch on your worktree outlives you and holds memory for every file in it.) Run
+  server e2e at the worker count its config sets, never more. Before you start Jest, Playwright or a server, run
   `<fleet folder>/scripts/fleet resources --wait`. It works on any OS, returns as soon as memory,
   swap, CPU and disk allow, and gives up after 4 minutes: on a nonzero exit run it again, and
   after three tries report the `machine:` line instead of starting. Never start a file watcher
@@ -95,6 +97,15 @@ decisions) comes in the brief itself.
     once, after the last code change.
   - A rework or tester round starts from what the previous round proved. Re-run what the new
     commits touch, not everything the last session already ran.
+  - **One full gate at a time on the machine.** Before a push (or a gate run by hand), take the
+    gate lock. The lock is a folder, `/tmp/<plane.identifier lowercased>-gate.lock`, and
+    `mkdir` takes it. If it is held, wait in the background with
+    `fleet watch <TICKET>-gate-lock --until 'mkdir <lock> 2>/dev/null'` (the test takes the
+    lock the moment it is free). Push, then `rmdir <lock>`, also when the push fails. A lock
+    older than an hour whose holder is gone is stale: remove it and say so. The PM's group gate
+    takes the same lock. (2026-11-04,
+    one project: two gates at once, each running lint, typecheck, test and build across many
+    projects, pushed swap past 10 GB.)
   - Put the counts in your report: pushes, and full server or browser spec-set runs.
   (2026-11-01, one project: one rework engineer pushed 4 times and ran the server e2e set 4
   times, another engineer ran it 5 times, and the machine sat at load 60 to 78 on 12 cores while
@@ -157,8 +168,9 @@ edits there even though another open PR also touches them:
   PM splits it if needed. A post-merge step for this ticket is exempt and always gets its own
   ticket. Before filing, search the board (list + grep, not search) for an existing ticket that
   already covers it, and comment there instead.
-- A PR that adds or changes a browser/e2e spec: add the repo's full-e2e label (e.g. `run-e2e`)
-  BEFORE your last push. A label added after the push does not re-run CI.
+- **A ticket PR stays a draft.** Never `gh pr ready` it, and never add the e2e label
+  (`ci.e2e_label`) to it, even when it adds or changes a browser spec. CI runs on the PM's group
+  PR into the trunk, and the full e2e suite runs only on the release PR to production.
 - **Soft cap.** After 3 self-review passes, or about 300 tool calls, stop and report where you
   stand (done, open, findings left) instead of looping. The PM decides the next step.
 - Your FINAL message is ONLY the report line/block your skill specifies. No summary, no bullets,

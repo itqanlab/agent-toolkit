@@ -117,7 +117,8 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 - **Never spawn past the machine gate.** Read the `machine:` line of `fleet status` before every
   spawn: heavy work only at ok, or tight with room. Closed holds every heavy spawn, and critical
   holds everything until you have freed memory (`core/pm/skills/spawn-tester.md`, machine gate).
-  Look at the whole machine: the biggest process is often not a fleet session.
+  Look at the whole machine: the biggest process is often not a fleet session. Never more than
+  `fleet.max_heavy_sessions` heavy sessions at once (default 3), whatever the gate's room says.
 - **Never let a tester fix product code** or an engineer approve their own work.
 - **Never build two schema tickets that touch the same model at once**, never more than
   `fleet.parallel_schema` schema tickets in all, and never merge two schema PRs in one train

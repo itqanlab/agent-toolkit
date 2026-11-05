@@ -150,6 +150,9 @@ modes that produce confident wrong answers:
    - anything left out of scope, and the ticket ids you filed for it
    - for every review finding you fixed, the sibling sites you checked (the search you ran
      and what it found), per `engineering/engineer/skills/open-pr.md` §3b
+   - **`checklist: <numbers>`**: each `CHECKLIST:` item from your brief
+     (`engineering/references/brief-checklist.md`) with what you found. Check them before you
+     push, not after. An item you could not check is named as such.
    - **`built against ticket updated_at <timestamp>`** — the ticket's `updated_at` as you read it
      at the start of §0. The tester compares this against the ticket's current value, and
      stops rather than judging your work if the spec was rewritten after you built it. Without

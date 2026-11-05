@@ -13,6 +13,10 @@
 - Frontend work: no hard-coded user-facing strings; verify every i18n key actually resolves
   (JSON nesting matches the template path) — never ship a raw key. You can check this
   statically (grep the key against the locale JSON files) without running the app.
+- **A change to what a screen shows makes old specs stale.** When the ticket removes, renames
+  or moves a text or a figure on screen, grep every end-to-end spec for it and update those
+  specs in the same PR. (2026-11-04, one project: a release e2e run failed on a spec that still
+  expected a figure the ticket had replaced on purpose.)
 
 **The board is the only place work is tracked. Never write follow-up work into a repo file.**
 File proposed follow-ups on Plane (`engineering/engineer/role.md` §6) — a markdown table of next steps in a doc is a private

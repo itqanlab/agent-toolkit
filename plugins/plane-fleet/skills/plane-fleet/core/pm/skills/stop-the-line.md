@@ -20,6 +20,12 @@ verdict is about the PR, not trunk). Engineers already running can finish.
   CI runs on a single self-hosted runner (`ci.runner` in config), a stuck job there blocks
   *everything* queued behind it, parallel workers or not. Check the runner isn't wedged before
   assuming the code is at fault.
+- **Find which runner ran the job before you blame one.** PR checks can run on a different
+  runner (a shared pool) than trunk and release jobs. The job log names the runner. A checkout
+  error such as "pack has unresolved delta" or a corrupt object means that runner's work folder
+  is damaged: move it aside (`mv` with a timestamp) while the runner is idle, and rerun. To tell
+  whether a runner is busy, read its worker log. `pgrep` run inside `sh -c` matches itself and
+  always says busy.
 - **Broken by the servers' daily security upgrade.** The signature: "The runner has received a
   shutdown signal" plus Postgres "terminating connection due to administrator command" in the
   same job. That's `needrestart` restarting host services after an OpenSSL/libc update. Its time
