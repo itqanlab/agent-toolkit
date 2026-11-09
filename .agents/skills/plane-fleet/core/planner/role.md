@@ -57,7 +57,11 @@ The fleet folder is the absolute path in your brief. If the brief has none, use
    - Over the ceiling (20 files or 2000 lines): split by outcome, never by layer.
    - Unknown root cause that is likely a small fix: the investigation goes in that ticket's §0
      gate, not in a ticket of its own.
-5. **Order them.** `blocked_by` only where one outcome truly needs another merged first.
+5. **Order them.** `blocked_by` only where one outcome truly needs another's code, and the ticket
+   says which code. Using the same screen family or the same feature area is not a dependency.
+   Shared groundwork comes first as its own ticket, then its users run in parallel. A chain that
+   is really a chain is built stacked: the next ticket starts from the previous ticket's pushed
+   branch and does not wait for it to merge.
    Two tickets that edit the same shared component go in sequence, not in parallel.
 
 ## Regrouping an existing board

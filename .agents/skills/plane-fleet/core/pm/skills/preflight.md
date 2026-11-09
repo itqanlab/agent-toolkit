@@ -17,6 +17,14 @@ when `fleet retro` reports `pm_ctx_per_call`, write the resume note and ask the 
 (2026-11-01, one project: with a 300k window the PM averaged 224k of context per call over 873
 calls and spent $68, more than all agents together at $62.)
 
+**Start the guard before the first claim: `core/scripts/fleet guard start --hours 24 --cwd <repo>`.**
+It holds off system sleep for the run, checks every 20 minutes that an agent call still works, and
+calls `fleet.alert_command` (and a desktop notification) when two checks in a row fail and again
+when it recovers. A machine on battery with its lid closed still sleeps, so say in the opening
+summary if it is not on power. `fleet guard stop` when the run ends. Lost time shows in `fleet retro`.
+(2026-11-08, one project: 3.4 hours lost to a sleeping machine and 2 to an expired login in one
+27 hour run, and neither was visible from the board.)
+
 **Keep big outputs out of your context.** A review transcript, a CI log or a test run is read
 through a filter, never whole: `fleet findings <file>` for a `codex review` or `codex exec`
 output, `gh run view --log-failed | tail` for CI, a `scan` lane for anything longer. (2026-11-01:

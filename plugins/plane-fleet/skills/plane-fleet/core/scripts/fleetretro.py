@@ -39,12 +39,14 @@ DEFAULTS = {
     "rewrite_share": 0.10,             # agent spend on whole-context cache rewrites after a long wait
     "lane_minutes": 75,                # one lane's run time
     "codex_pts_per_hour": 4.0,         # Codex weekly meter points used per hour, when readable
+    "lost_hours": 0.25,                # hours the machine slept or the agents could not run (fleet guard)
 }
 LEVELS = {
     "tool_calls_per_session": "alert", "usd_per_ticket": "alert", "pm_share": "alert",
     "pm_ctx_per_call": "alert", "rework_rounds": "alert", "rework_rate": "warn",
     "ticket_cause_failures": "alert", "duplicate_rows": "warn", "missing_agent_id": "warn",
     "lane_failures": "warn", "rewrite_share": "warn", "lane_minutes": "warn", "codex_pts_per_hour": "alert",
+    "lost_hours": "alert",
 }
 REPEAT_MIN_S, REPEAT_MAX_S = 20 * 60, 3 * 3600
 FAIL_LANE = ("timeout", "failed", "error", "aborted", "killed")
@@ -153,6 +155,35 @@ def lane_records(state_home, repo, t0, t1):
 
 
 # ---------------------------------------------------------------- the numbers
+def guard_events(state_home, t0, t1):
+    """Hours the machine slept and the agents could not run, from `fleet guard`. None without its log."""
+    try:
+        f = open(os.path.join(state_home, "guard-events.jsonl"))
+    except OSError:
+        return None
+    lost = {"asleep": 0.0, "agent_down": 0.0}
+    with f:
+        for line in f:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("kind") in lost and t0 <= (epoch(e.get("ts")) or 0) < t1:
+                lost[e["kind"]] += (e.get("seconds") or 0) / 3600
+    return lost
+
+
+def merge_wait_hours(rows, cost, project):
+    """Hours each merged ticket sat between its last tester pass and its merge."""
+    out = {}
+    for t, x in ((cost or {}).get("tickets") or {}).items():
+        passed = [epoch(r.get("ts")) or 0 for r in rows if r.get("ticket") == t and r.get("outcome") == "verify_pass"
+                  and (not project or r.get("project") == project)]
+        if x.get("merged") and passed and x["merged"] > max(passed):
+            out[t] = (x["merged"] - max(passed)) / 3600
+    return out
+
+
 def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, now=None):
     """Everything the findings read, as one dict. cost is fleetcost.analyse()'s result."""
     now = now or time.time()
@@ -277,6 +308,12 @@ def evaluate(d, th, lv):
             return
         F.append({"key": key, "level": lv.get(key, "warn"), "number": number, "shown": shown,
                   "threshold": th[key], "cause": cause, "fix": fix, "who": who, "where": where or []})
+
+    lost = d.get("lost") or {}
+    if sum(lost.values()) > th["lost_hours"]:
+        add("lost_hours", sum(lost.values()), f"{lost.get('asleep', 0):.1f}h asleep, {lost.get('agent_down', 0):.1f}h agents unable to run",
+            "the machine slept, or the agent login expired",
+            "keep the machine on power and awake, and renew the login before a long run.", "owner")
 
     over = []
     for x in d["tickets"]:
@@ -422,6 +459,14 @@ def render(d, findings, merge_error=None):
     L.append(f"Lanes: {ln['n']} in the window, {max(len(ln['failed']), ln['log_failed'])} failed"
              + (f", longest {ln['longest'][0]['minutes']} min" if ln["longest"] else "")
              + " · Codex meter: " + (f"{cr:+.1f} points/h" if cr is not None else "not readable"))
+    wait = d.get("merge_wait") or {}
+    if d.get("lost") is not None or wait:
+        parts = []
+        if d.get("lost") is not None:
+            parts.append(f"asleep {d['lost']['asleep']:.1f}h, agents down {d['lost']['agent_down']:.1f}h")
+        if wait:
+            parts.append(f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h")
+        L.append("Lost time: " + " · ".join(parts))
     alerts = [f for f in findings if f["level"] == "alert"]
     L.append("")
     if not findings:
@@ -486,6 +531,8 @@ def run(fleetctl, args):
     lanes = lane_records(fleetctl.STATE_HOME, main_repo, t0, t1)
     d = build(t0, t1, project, proj_rows, raw, cost, agents, lanes, codex, prices, now)
     d["until_is_now"] = not args.until
+    d["lost"] = guard_events(fleetctl.STATE_HOME, t0, t1)
+    d["merge_wait"] = merge_wait_hours(proj_rows, cost, project)
     findings = evaluate(d, th, lv)
     mark_repeats(findings, os.path.join(fleetctl.STATE_HOME, "retro", f"{project}.json"), now,
                  record=not args.no_record and not args.until)

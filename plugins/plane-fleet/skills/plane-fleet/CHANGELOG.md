@@ -4,6 +4,22 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.11.0] - 2026-11-09
+
+Lessons from one project's 27 hour run of 15 tickets. About 5 hours of that was agents thinking. The rest was the machine asleep, an expired login, merges in series and repeated checks.
+
+### Added
+
+- `fleet guard`: one background process per run that holds off system sleep, checks that an agent call still works, and alerts through `fleet.alert_command` and a desktop notification.
+- `fleet retro` reports lost time (asleep, agents down, tester pass to merge) and a `lost_hours` finding.
+- `ci.group_is_the_gate` and `quality.pre_push_full` config: the group PR's CI is the one full run, and the hook can check only what the branch changed.
+
+### Changed
+
+- A run lands in a few bigger groups, and a chain of dependent tickets lands as one group.
+- `blocked_by` needs a named code dependency. A real chain is built stacked on the previous branch and does not wait for its merge.
+- The PM's focused review runs before the tester starts, not alongside it.
+
 ## [2.10.0] - 2026-11-05
 
 Lessons from one project's run. 9 of 16 tested tickets went to rework, and each defect class behind them had come back at least twice. The machine ran into swap while the gate still showed room, two full gates at once pushed swap past 10 GB, and the release needed three e2e runs (a stale spec, every visual baseline after a shared header change, a `[skip ci]` commit that kept checks from starting).

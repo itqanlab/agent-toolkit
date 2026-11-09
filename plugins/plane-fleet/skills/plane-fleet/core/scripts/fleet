@@ -22,6 +22,7 @@
 #                                       one migrated, seeded DB template; a slot clones it in seconds
 #   fleet gate-stamp post --cwd DIR --sha SHA --log FILE | check --pr N
 #                                       stamp a commit the local pre-push gate passed; check a group PR
+#   fleet guard start|stop|status|check [--hours N]   holds off sleep and alerts when the agent login fails
 #   fleet antigravity-setup             register Plane and the read-only rules with agy, once
 #   fleet mcp-exec <name>               start an MCP server from ~/.claude.json (agy runs this)
 # Lanes run in run-lane.mjs (node); selection, budget and the log are fleetctl.py (python).
@@ -42,6 +43,7 @@ case "${1:-}" in
   cache-server) shift; exec python3 "$here/fleetcache.py" "$@" ;;
   slot-template) shift; exec python3 "$here/fleettemplate.py" "$@" ;;
   gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
+  guard) shift; exec python3 "$here/fleetguard.py" "$@" ;;
   pick|budget|log|stats|report|cost|retro|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

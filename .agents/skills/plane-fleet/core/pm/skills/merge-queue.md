@@ -80,7 +80,25 @@ merged once its commits reach the trunk through the group. To make sure the suit
   user-visible change doesn't hold a release unless the owner says so.
   (2026-10-30, one project: a group broke a server test no group run covered, and a release
   waited about 3 hours on a server-only ticket that users couldn't see yet.)
-- **Merge a group PR on the local gate stamp, not on a CI rerun of it.** When
+- **When `ci.group_is_the_gate` is on, the group PR's CI is the only full run.** Do not run
+  `quality.pre_push_full` on the group branch and do not use the gate stamp below. Push, let CI
+  decide, and fix on the group branch until it is green. Merge only when it is green on the
+  latest head and the trunk has not moved since that run: `gh pr view <n> --json mergeStateStatus`
+  must not read `BEHIND`. If it does, update the branch and let CI run again. Untested code
+  reaching the trunk is the one thing this rule must never allow. Platforms without branch
+  protection cannot enforce it, so you do. A project may skip trunk CI after the merge only when
+  the trunk commit holds exactly the code the PR passed on, and must run it in full otherwise.
+  (2026-11-09, one project: the same code ran on the PR and again on the trunk, on two runners
+  with separate caches, and reused almost nothing.)
+- **Land a run in a few bigger groups, not one per approval.** Each group costs a full CI cycle
+  and a deploy, in series. Build a group when `fleet.merge_train_size` tickets are approved, or
+  when nothing still building could join it within about the length of one CI cycle.
+  (2026-11-08, one project: 6 groups of 1 to 6 tickets took about 7 hours of merge and deploy.)
+- **A chain of dependent tickets lands as one group, in order.** See the planner's stacking rule.
+  A fix to an earlier ticket in the stack is merged forward into the later branches before the
+  group is built.
+- **Merge a group PR on the local gate stamp, not on a CI rerun of it.** (Not with
+  `ci.group_is_the_gate`.) When
   `ci.covered_by_local_gate` names CI jobs your pre-push gate already runs (lint, typecheck,
   unit tests, build on what is affected), waiting for them repeats the same work on the same
   commit. So:

@@ -82,10 +82,11 @@ decisions) comes in the brief itself.
   after three tries report the `machine:` line instead of starting. Never start a file watcher
   (watchman, `--watch` modes, an Nx daemon) in a worktree: its memory outlives you.
   A run started on an overloaded machine times out and gets misread as a failing test.
-- **Run each check once per commit, and push once.** Every `git push` runs the whole pre-push
-  gate (format over the repo, guards, then lint, typecheck, unit tests and build on everything
-  affected) and starts the PR's CI on the shared runner. One gate takes 6 to 10 cores for minutes.
-  So:
+- **Run each check once per commit, and push once.** Every `git push` runs the pre-push gate:
+  format over the repo, guards, then the project's checks. When the project sets
+  `quality.pre_push_full`, the hook covers only what the branch changed, and the group PR catches
+  what depends on it. Otherwise it runs lint, typecheck, unit tests and build on everything
+  affected, and one gate takes 6 to 10 cores for minutes. Either way:
   - Commit as often as you like, but push once, after your last review pass is clean. Review
     fixes are new local commits, not new pushes. Push again only when the hook fails, or when a
     rework or tester round adds commits.

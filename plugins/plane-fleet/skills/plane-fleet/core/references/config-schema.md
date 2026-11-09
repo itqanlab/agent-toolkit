@@ -35,6 +35,7 @@ by key; lists and plain values replace.
 
   "quality": {
     "pre_push": "npm run quality:pre-push",   // MUST pass locally before the PR
+    "pre_push_full": "npm run quality:pre-push:full",   // OPTIONAL: the whole gate, when `pre_push` checks only what the branch changed
     "pre_push_success_regex": "(?m)^pre-push exit 0 at <sha>\\s*$",   // OPTIONAL, `fleet gate-stamp post`: what a passed
                                          // gate log shows; <sha> is the full commit. This default matches the wrapper
                                          // `{ <pre_push>; echo "pre-push exit $? at $(git rev-parse HEAD)"; } > <log> 2>&1`
@@ -49,6 +50,7 @@ by key; lists and plain values replace.
     "e2e_label": "run-e2e",              // label that makes PR CI run the full browser suite
     "runner": "a single self-hosted runner",   // say so when one runner serves every job
     "runner_cache": "/path/to/runner/build-cache",  // persistent build cache to move aside when it serves stale output
+    "group_is_the_gate": true,           // OPTIONAL: the group PR's CI is the one full run. No full local gate, no gate stamp (merge-queue.md)
     "covered_by_local_gate": ["lint-typecheck-test-build"]   // OPTIONAL, `fleet gate-stamp`. CI check names the
                                          // pre-push gate fully covers. A group PR into the trunk may merge once the
                                          // PM's gate stamp is on its head, without waiting for these. Empty = off
@@ -96,6 +98,7 @@ by key; lists and plain values replace.
 
   "fleet": {                             // read by the PM role, the engineer role, the tester role
     "merge_train_size": 3,
+    "alert_command": "notify-me \"$FLEET_ALERT\"",   // OPTIONAL: shell command `fleet guard` runs when the agents stop or recover
     "parallel_workers": 2,               // engineers at once
     "parallel_schema": 2,                // schema tickets building at once, on disjoint models (pick.md §2)
     "max_heavy_sessions": 3,             // OPTIONAL, read by the PM (no script reads it yet). Heavy sessions (engineer or

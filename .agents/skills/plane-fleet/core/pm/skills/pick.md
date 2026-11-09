@@ -113,7 +113,9 @@ contradicted by newer tickets nobody linked to it. (2026-10-03: a priority-first
 same-day tickets while three tickets filed 2-3 weeks earlier sat untouched.)
 
 The only things that go ahead of the oldest eligible ticket:
-- its own blockers (`blocked_by` relations), and a ticket that unblocks queued work
+- its own blockers (`blocked_by` relations), and a ticket that unblocks queued work. A blocker
+  that is pushed but not merged does not hold the next ticket: start it stacked on that branch,
+  and name the branch in the brief
 - an `urgent` regression on a batch this run just shipped (stop-the-line, `core/pm/skills/stop-the-line.md` §1)
 - the migration window (below), and `Rework` on a ticket already in flight
 

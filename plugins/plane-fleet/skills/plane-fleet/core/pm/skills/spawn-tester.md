@@ -22,7 +22,7 @@ that one line of the handoff:
   your sign-off → back to the engineer. No tester yet.
 - otherwise, spawn the tester.
 
-**Run the focused review yourself, while the tester works.** On every PR of kind
+**Run the focused review yourself, before the tester starts.** On every PR of kind
 `money-concurrency`, `schema` or `api`, and on any ticket touching privacy, auth or audit: check out
 the pushed branch in a review worktree (`.claude/worktrees/pm-review-<pr>`, `git checkout
 --detach origin/<branch>`) and run the brief's focused prompt in the background, with its
@@ -31,13 +31,12 @@ minutes and needs no slot. **Read it only through `fleet findings <tmp>/<TICKET>
 one count line and the findings, deduplicated. Never `cat`, `tail` or Read the file itself; it
 holds every file the reviewer read. Exit 4 means the review did not finish (an error or a usage
 limit): run it again or on another executor, it is not a clean pass.
-- A finding → send it to the running tester at once: reproduce it, write the failing test,
-  and put it in the same verdict. Don't send the engineer a second Rework later for it.
-- Wait for both the tester's verdict and your review before you route a Rework, so the engineer
-  gets every known finding in one round.
-- **An APPROVED on these kinds does not count until your review is back clean.** Don't queue it
-  for a group while the review is still running. A tester approval followed by a reviewer P1 at
-  group time costs a dropped branch, a rebuild and a full extra round.
+- A finding → back to the engineer before any tester is spawned. A browser pass on code that is
+  about to change is wasted.
+- Clean → spawn the tester. The tester's slot is the scarce one; the review needs no slot.
+- A tester approval followed by a reviewer P1 at group time costs a dropped branch, a rebuild and
+  a full extra round. (2026-11-09, one project: group review reopened 7 of 15 tickets after the
+  tester had approved them.)
 - Run it on a different executor from the engineer's. Two passes by the same model miss the
   same things.
 - **Read the engineer's own open notes first.** Its handoff often lists "minor" or P3 notes.
