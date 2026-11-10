@@ -4,6 +4,19 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.11.1] - 2026-11-10
+
+### Fixed
+
+- `fleet retro` read the PM context per call for the whole UTC day, whatever `--since` said. It now follows the window, to the 10 minute. The cost figures stay counted by whole UTC day, as before. A session that only an old cache entry remembers still counts by day.
+- `fleet findings` reported an empty or missing review file as clean. It now says the review did not finish and exits 4, the same as a usage limit. A file with a marker but no final message does the same.
+- Waiting on a group PR with `gh pr checks --watch` could end early. A workflow can leave a skipped duplicate under the same check name, and `--watch` reads it as done while the real check still runs. The merge queue now waits on the run for the head commit (`gh run watch <id> --exit-status`) and confirms the required check concluded success on that head. `fleet status` and `fleet gate-stamp check` no longer let a skipped duplicate hide a running or passed check of the same name.
+- The `fleet-planner` and `fleet-scanner` agents could not read ticket comments. They now have `workitem_comment`, and their roles say they only list and retrieve.
+
+### Added
+
+- `engineering/references/brief-checklist.md` item 21: a rule about whether something may happen, or who may see or do something, gets one function every caller goes through, with the callers listed by grep before coding. It is numbered last so the numbers in existing briefs stay the same.
+
 ## [2.11.0] - 2026-11-09
 
 Lessons from one project's 27 hour run of 15 tickets. About 5 hours of that was agents thinking. The rest was the machine asleep, an expired login, merges in series and repeated checks.
