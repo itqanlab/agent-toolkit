@@ -58,14 +58,18 @@ def check_state(c):
 
 
 def summarize_checks(rollup, required=()):
-    """(text, required_state). Latest run per check name wins. required_state: green, red,
-    running, missing (a required job has not run) or n/a (no required jobs configured)."""
+    """(text, required_state). Latest run per check name wins, except that a skipped run never
+    hides a real one (a skipped duplicate can sit under the same name while the real run goes).
+    required_state: green, red, running, missing (a required job has not run) or n/a (no
+    required jobs configured)."""
     latest = {}
     for c in rollup or []:
         name = c.get("name") or c.get("context") or "?"
         t = c.get("startedAt") or c.get("completedAt") or ""
-        if name not in latest or t >= latest[name][0]:
-            latest[name] = (t, check_state(c))
+        st = check_state(c)
+        cur = latest.get(name)
+        if cur is None or ((st != "skipped", t) >= (cur[1] != "skipped", cur[0])):
+            latest[name] = (t, st)
     counts = {}
     for _, st in latest.values():
         counts[st] = counts.get(st, 0) + 1
@@ -276,4 +280,7 @@ def selftest(check):
     check("status: a re-run's latest result wins", text.startswith("1 pass 1 running 1 fail 1 skipped"), True)
     check("status: required still running", req, "running")
     check("status: a required job that never ran", summarize_checks(roll, ["unit", "build"])[1], "missing")
+    dup = [{"__typename": "CheckRun", "name": "e2e", "status": "IN_PROGRESS", "conclusion": "", "startedAt": "2026-10-25T09:00:00Z"},
+           {"__typename": "CheckRun", "name": "e2e", "status": "COMPLETED", "conclusion": "SKIPPED", "startedAt": "2026-10-25T09:05:00Z"}]
+    check("status: a skipped duplicate does not hide a running check", summarize_checks(dup, ["e2e"])[1], "running")
     check("status: required all green", summarize_checks(roll[:2], ["unit"])[1], "green")
