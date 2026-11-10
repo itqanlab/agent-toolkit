@@ -69,6 +69,15 @@ merged once its commits reach the trunk through the group. To make sure the suit
   local gate, and push. Then look for clashes a text merge cannot see, such as both groups
   adding the same method to one class. A watcher treats "no checks after N minutes" as a fault
   to report, never as pending.
+- **Wait on the run for the head commit, never on `gh pr checks --watch`.** A workflow can leave
+  a skipped duplicate under the same check name. `--watch` reads that skipped row as done and
+  returns while the real check still runs, so a group looks finished too early. Take the run id
+  for the head: `gh run list --branch <branch> --commit <head sha> --json databaseId,workflowName,status`.
+  Then `fleet watch <TICKET>-ci -- gh run watch <id> --exit-status`, one watcher per workflow
+  that matters. When it exits, confirm the required check concluded `success` on that same
+  head: `gh run view <id> --json conclusion,headSha`. A skipped check is not a pass for a
+  required name. `fleet status` and `fleet gate-stamp check` already ignore a skipped duplicate
+  when a real run of that name exists.
 - **When the group PR doesn't run the full suites** (some projects save them for the release
   to production), the builder still runs every test file that covers code the group changed,
   not only the specs the tickets name. Find them by what imports the changed modules (the

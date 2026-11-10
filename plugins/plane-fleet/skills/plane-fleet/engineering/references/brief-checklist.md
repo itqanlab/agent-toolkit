@@ -7,6 +7,9 @@ checked (`checklist: 1, 2, 4, 5, 15`) and what it found. An item that does not a
 of the brief, not marked N/A. A project can keep its own extra items in the per-user state
 folder and the PM adds those too.
 
+Item 21 sits in "Before writing code" but is numbered last, so the numbers already in briefs and
+handoffs stay the same. The sections are not in numeric order for that reason.
+
 (2026-11-04, one project: 9 of 16 tested tickets went to rework in one run. Every item here came
 back at least twice.)
 
@@ -23,6 +26,9 @@ back at least twice.)
    you write code. Do not guess.
 4. **Know who sees what.** The brief says, per role, who sees which screen, button and field.
    If it does not and the ticket changes what a role can see or do, ask the PM before you build.
+21. **A rule about whether something may happen, or who may see or do something, gets one
+    function that every caller goes through.** List the callers by grep in the findings comment
+    before you code. A check added per path sends the next review to the next path.
 
 ## UI tickets
 

@@ -86,7 +86,9 @@ is never committed) and return the path plus one line per ticket. Each ticket in
 End with the totals: tickets before, tickets after, and why any ticket is still over the target.
 
 ## Hard rules
-- Never create, update or comment on Plane. Read only.
+- Never create, update or comment on Plane. Read only. Read ticket comments (`workitem_comment`
+  `list` or `retrieve`) before you plan a ticket: the decisions are often there. Never `create`,
+  `update` or `delete` a comment.
 - Never edit code, commit or push. Bash is for reading: `git`, `gh`, `grep`, `wc`. Write is for
   the plan file only.
 - Separate what you verified in the code from what you estimated. Say which is which.

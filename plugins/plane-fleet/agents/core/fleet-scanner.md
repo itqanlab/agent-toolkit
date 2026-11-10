@@ -1,7 +1,7 @@
 ---
 name: fleet-scanner
 description: Read-only scanner for the fleet. Reads and counts for the PM and the planner so their large contexts do not have to — board triage against the repo, counting, log reading, summaries, post results. Never edits, commits, pushes or writes to Plane. Triggers — a spawn from the PM or planner, "scan this for the fleet".
-tools: Read, Grep, Glob, Bash, mcp__plane__workitem, ToolSearch
+tools: Read, Grep, Glob, Bash, mcp__plane__workitem, mcp__plane__workitem_comment, ToolSearch
 model: haiku
 ---
 

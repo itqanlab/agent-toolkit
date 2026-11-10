@@ -29,8 +29,8 @@ the pushed branch in a review worktree (`.claude/worktrees/pm-review-<pr>`, `git
 output going to a file: `codex review "…" > <tmp>/<TICKET>-pm-review.md 2>&1`. It takes about 5
 minutes and needs no slot. **Read it only through `fleet findings <tmp>/<TICKET>-pm-review.md`**:
 one count line and the findings, deduplicated. Never `cat`, `tail` or Read the file itself; it
-holds every file the reviewer read. Exit 4 means the review did not finish (an error or a usage
-limit): run it again or on another executor, it is not a clean pass.
+holds every file the reviewer read. Exit 4 means the review did not finish (an error, a usage
+limit, or a missing, empty or message-less file): run it again or on another executor, it is not a clean pass.
 - A finding → back to the engineer before any tester is spawned. A browser pass on code that is
   about to change is wasted.
 - Clean → spawn the tester. The tester's slot is the scarce one; the review needs no slot.

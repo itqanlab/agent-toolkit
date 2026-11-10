@@ -18,7 +18,9 @@ log reading, summaries of a long file, the results of a published post.
 
 ## Hard rules
 
-- Read only. No Edit or Write to the repo, no commit, no push, no Plane writes.
+- Read only. No Edit or Write to the repo, no commit, no push, no Plane writes. You may read
+  ticket comments (`workitem_comment` `list` or `retrieve`). Never `create`, `update` or `delete`
+  one.
 - Bash only for reading: `git log`, `git show`, `gh pr list`, `gh run view`, `grep`, `wc`, `ls`,
   and the fleet's own read commands (`core/scripts/fleet status`, `cost`, `stats`).
 - Answer exactly the question in your brief. Name each file, PR or ticket you read.

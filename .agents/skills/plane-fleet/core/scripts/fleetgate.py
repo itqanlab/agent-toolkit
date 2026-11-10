@@ -136,17 +136,25 @@ def newest_runs(checks, rollup):
     """`gh pr checks` keeps one row per check name, and it can keep a re-run attempt of an
     old workflow run (whose event still carries the old PR title, say) over a newer run of
     the same workflow. GitHub's merge state uses the newest run, so do the same: for each
-    name, the CheckRun from the highest workflow run id wins."""
+    name, the CheckRun from the highest workflow run id wins.
+
+    A skipped run never hides a real one. A workflow can leave a skipped duplicate under the
+    same name, with a higher run id, while the real run is still going. A skipped run counts
+    only when the name has nothing else."""
     best = {}
     for it in rollup or []:
         rid = run_id(it.get("detailsUrl"))
         if it.get("__typename") not in (None, "CheckRun") or not it.get("name") or rid is None:
             continue
-        if it["name"] not in best or rid > best[it["name"]][0]:
-            best[it["name"]] = (rid, it)
+        rank = (bucket_of(it)[0] != SKIP, rid)
+        if it["name"] not in best or rank > best[it["name"]][0]:
+            best[it["name"]] = (rank, it)
     out = []
     for c in checks:
         mine, top = run_id(c.get("link")), best.get(c.get("name"))
+        top = (top[0][1], top[1]) if top else None
+        if top and c.get("bucket") == SKIP and bucket_of(top[1])[0] != SKIP:
+            mine = -1        # the row gh kept is a skipped duplicate: the real run takes over
         if top and mine is not None and top[0] > mine:
             b, state = bucket_of(top[1])
             c = {**c, "bucket": b, "state": state, "link": top[1].get("detailsUrl"), "superseded": mine}
@@ -295,6 +303,14 @@ def selftest(check_):
         world["rollup"] = [world["rollup"][0] | {"conclusion": "SUCCESS"},
                            {"__typename": "CheckRun", "name": "Title", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": u(101)}]
         check_("gate: an older passing run never hides a newer failure", check(s, 7)["ready"], False)
+        # a skipped duplicate of the same name, with a higher run id, must not hide the real run
+        world["checks"][-1] = {"name": "Title", "bucket": "skipping", "state": "SKIPPED", "link": u(102)}
+        world["rollup"] = [
+            {"__typename": "CheckRun", "name": "Title", "status": "IN_PROGRESS", "conclusion": None, "detailsUrl": u(101)},
+            {"__typename": "CheckRun", "name": "Title", "status": "COMPLETED", "conclusion": "SKIPPED", "detailsUrl": u(102)}]
+        check_("gate: a skipped duplicate does not hide a running check", check(s, 7)["pending"], ["Title"])
+        world["rollup"][0].update(status="COMPLETED", conclusion="SUCCESS")
+        check_("gate: a passed check beats its skipped duplicate", check(s, 7)["ready"], True)
         world["checks"].pop(); world["rollup"] = []
         world["sha"] = "e" * 40
         check_("gate: a new head without its own stamp is not ready", check(s, 7)["ready"], False)

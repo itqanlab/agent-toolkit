@@ -114,8 +114,9 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    with their required checks, labels and mergeability, trunk CI, and worktrees left with no
    open PR. Run it before each pick and after each notification, instead of reading the meter
    file, looping over ports, or calling `gh` per PR (measured 2026-10-25: about 2,000 such PM
-   calls a month). To wait for CI, start `fleet watch <TICKET>-ci -- gh run watch <id>` with `run_in_background: true`
-   and carry on; never a `sleep` loop.
+   calls a month). To wait for CI, start `fleet watch <TICKET>-ci -- gh run watch <id> --exit-status` with `run_in_background: true`
+   and carry on; never a `sleep` loop, and never `gh pr checks --watch` (a skipped duplicate of a
+   check name ends it early; see the merge queue).
 1. **Tag** each spawn with role + task kind (`api`, `ui`, `schema`, `money-concurrency`,
    `copy-i18n`, `tests-only`, `infra-deps`, `retest`, `rework`) from triage paths/keywords and
    the ticket text.

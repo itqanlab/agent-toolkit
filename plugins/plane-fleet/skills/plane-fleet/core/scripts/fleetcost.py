@@ -284,7 +284,7 @@ def summarize_file(path):
                     c["tools"].append((b.get("name") or "", text[:2000]))
             first_ts = first_ts or ts
             last_ts = ts or last_ts
-    by_model, by_day, activity, rewrites = {}, {}, {}, {}
+    by_model, by_day, by_bucket, activity, rewrites = {}, {}, {}, {}, {}
     buckets = set()
     first_ctx = end_ctx = None
     prev_ctx, prev_t = 0, None
@@ -303,6 +303,7 @@ def summarize_file(path):
         _add(by_day.setdefault(day, {}), model, u)
         if t:
             buckets.add(int(t // BUCKET_S))
+            _add(by_bucket.setdefault(str(int(t // BUCKET_S)), {}), model, u)
         ctx = u[0] + u[1] + u[2] + u[3]
         if first_ctx is None:
             first_ctx = ctx
@@ -318,7 +319,7 @@ def summarize_file(path):
             a = activity.setdefault(cl, {})
             _add(a, model, share)
     return {"v": CACHE_VERSION, "calls": sum(v[5] for v in by_model.values()), "by_model": by_model,
-            "by_day": by_day, "activity": activity, "rewrites": rewrites, "first_ts": first_ts,
+            "by_day": by_day, "by_bucket": by_bucket, "activity": activity, "rewrites": rewrites, "first_ts": first_ts,
             "last_ts": last_ts, "first_ctx": first_ctx, "end_ctx": end_ctx, "prompt": prompt,
             "fleet_hint": fleet_hint, "spawns": spawns, "buckets": sorted(buckets)}
 
@@ -336,7 +337,9 @@ def cached_summary(path, cache_dir):
     try:
         with open(cpath) as f:
             c = json.load(f)
-        if c.get("key") == key and c.get("summary", {}).get("v") == CACHE_VERSION:
+        # a summary without by_bucket predates the window-exact context figure: read the file again
+        if c.get("key") == key and c.get("summary", {}).get("v") == CACHE_VERSION \
+                and "by_bucket" in c["summary"]:
             return c["summary"]
     except (OSError, ValueError):
         pass
@@ -624,8 +627,16 @@ def analyse(mains, agents, lanes, prs, prices, identifier, since, until, log_row
             continue
         for cl, bm in m["activity"].items():
             pm_act[cl] = pm_act.get(cl, 0) + usd_by_model(prices, bm)[0]
+    # context per call follows the window to the 10-minute bucket. Cost above stays by whole UTC day.
+    # A session known only from an old cache entry has no buckets, so its days stand in.
+    ctx_usage = _sum_usage(
+        ub for m in pm
+        for ub in ([u for b, u in m["by_bucket"].items()
+                    if (t0 is None or int(b) * BUCKET_S + BUCKET_S > t0) and (t1 is None or int(b) * BUCKET_S < t1)]
+                   if "by_bucket" in m else [u for d, u in m["by_day"].items() if day0 <= d < day1]))
     pm_calls = sum(u[5] for u in pm_usage.values())
-    pm_ctx = (sum(u[0] + u[1] + u[2] + u[3] for u in pm_usage.values()) / pm_calls) if pm_calls else None
+    ctx_calls = sum(u[5] for u in ctx_usage.values())
+    pm_ctx = (sum(u[0] + u[1] + u[2] + u[3] for u in ctx_usage.values()) / ctx_calls) if ctx_calls else None
     roles = {}
     for x in merged:
         for role, v in x["usd"].items():
@@ -922,6 +933,7 @@ def selftest(check):
     with open(os.path.join(pdir, "S1.jsonl"), "w") as f:
         f.write(line("user", "2026-10-01T09:59:00Z", content="run the board with team-pm"))
         f.write(line("assistant", "2026-10-01T09:59:30Z", "p1", u2, [{"type": "tool_use", "name": "Agent", "input": {"subagent_type": "fleet-engineer"}}]))
+        f.write(line("assistant", "2026-10-01T15:00:00Z", "p2", u3, []))
     dirs = project_dirs(repo, root=proot)
     check("project dirs: repo and worktree, not the sibling", sorted(os.path.basename(x) for x in dirs),
           sorted([encode_path(repo), encode_path(repo) + "--claude-worktrees-x"]))
@@ -949,6 +961,11 @@ def selftest(check):
     res = analyse(mains, agents, [], prs, prices, "ST", "2026-10-01T00:00:00Z", None, rows)
     x = res["tickets"]["ST-7"]
     check("cycle hours", round(x["cycle_h"], 2), 2.0)
+    check("PM context, whole day", round(res["pm"]["ctx_per_call"]), 100500)
+    late = analyse(mains, agents, [], prs, prices, "ST", "2026-10-01T12:00:00Z", None, rows)
+    check("PM context follows --since", round(late["pm"]["ctx_per_call"]), 101000)
+    early = analyse(mains, agents, [], prs, prices, "ST", "2026-10-01T00:00:00Z", "2026-10-01T12:00:00Z", rows)
+    check("PM context follows --until", round(early["pm"]["ctx_per_call"]), 100000)
     check("merged count", len(res["merged"]), 1)
     bf = backfill_rows(agents, rows, prices, "st")
     check("backfill matches the agent", [r["agent_id"] for r in bf], ["abc"])
