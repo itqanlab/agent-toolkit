@@ -11,8 +11,8 @@ Prints one count line, then the final findings block, deduplicated: the last
 "Full review comments:" / "Review comment(s):" section, else the P1/P2/P3 items in the final
 message, else the final message itself, cut short. `--titles` drops each finding's body.
 
-Exit codes: 0 no P1 or P2 open, 3 a P1 or P2 is listed, 4 the review did not finish (an error
-or a usage limit, so no verdict), 2 the file can't be read.
+Exit codes: 0 no P1 or P2 open, 3 a P1 or P2 is listed, 4 the review did not finish (a missing
+or empty file, no final message, an error or a usage limit, so no verdict), 2 the file can't be read.
 Standard library only. Python 3.9.
 """
 import os, re, sys
@@ -101,7 +101,7 @@ def extract(text):
         if raw:
             return [], dedupe(raw), len(raw), "whole file"
     tail = list(dict.fromkeys(l for l in msg if l.strip()))   # codex prints its last message twice
-    if any(UNFINISHED_RE.search(l) for l in tail):
+    if not tail or any(UNFINISHED_RE.search(l) for l in tail):   # no final message is no verdict
         return tail[-FALLBACK_LINES:], [], 0, "the review did not finish"
     return tail[-FALLBACK_LINES:], [], 0, "final message, no P1-P3 items"
 
@@ -136,6 +136,10 @@ def main(argv):
     try:
         with open(files[0], errors="replace") as f:
             text = f.read()
+    except FileNotFoundError:
+        # the reviewer never wrote its output: that is a review that did not finish, not a clean one
+        print(f"findings: 0 P1, 0 P2, 0 P3 · the review did not finish · {os.path.basename(files[0])} is missing")
+        return 4
     except OSError as e:
         print(f"fleet findings: cannot read {files[0]}: {e}", file=sys.stderr)
         return 2
@@ -207,6 +211,10 @@ def selftest(check=None):
     out, code = render("c.md", CLEAN)
     chk("findings: a clean review", (code, "0 P1, 0 P2" in out, "did not find" in out), (0, True, True))
     chk("findings: an unfinished review is not clean", render("b.md", BROKEN)[1], 4)
+    out, code = render("e.md", "")
+    chk("findings: an empty file is not clean", (code, "did not finish" in out), (4, True))
+    chk("findings: a blank file is not clean", render("e.md", "\n  \n")[1], 4)
+    chk("findings: a marker with no message is not clean", render("e.md", "user\nreview it\ncodex\ntokens used\n12\n")[1], 4)
     out, _ = render("r.md", SAMPLE, titles=True)
     chk("findings: --titles drops bodies", "drawer stays open" in out, False)
     return 1 if fails else 0
