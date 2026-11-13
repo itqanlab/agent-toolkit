@@ -46,6 +46,7 @@ Skills are the flagship: written to the open standard, they work everywhere unch
 | [`video-watch`](plugins/video-watch/skills/video-watch) | media | [3.0.0](plugins/video-watch/skills/video-watch/CHANGELOG.md) | Let the agent watch a video — any of 1750+ sites or a local file. | `ffmpeg`, `yt-dlp` |
 | [`toolkit-credentials`](plugins/toolkit-credentials/skills/toolkit-credentials) | productivity | [2.1.1](plugins/toolkit-credentials/skills/toolkit-credentials/CHANGELOG.md) | Shared credential setup and storage for skills that need an API key or token. | `node` |
 | [`toolkit-updates`](plugins/toolkit-updates/skills/toolkit-updates) | productivity | [2.2.0](plugins/toolkit-updates/skills/toolkit-updates/CHANGELOG.md) | Check whether the toolkit skills installed on this machine are up to date, and see exactly what changed in each newer version before updating. | `node` |
+| [`zernio-ops`](plugins/zernio-ops/skills/zernio-ops) | productivity | [1.0.0](plugins/zernio-ops/skills/zernio-ops/CHANGELOG.md) | Use every Zernio workspace from one MCP server. | `node` |
 <!-- skills:end -->
 
 ---

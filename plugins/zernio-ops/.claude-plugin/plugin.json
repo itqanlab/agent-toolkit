@@ -1,0 +1,19 @@
+{
+  "name": "zernio-ops",
+  "description": "Use every Zernio workspace from one MCP server. Post, schedule and read analytics across all your social accounts, with each call sent to the workspace that owns the account. Keys stay in one local file.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Itqan Lab",
+    "url": "https://github.com/itqanlab"
+  },
+  "homepage": "https://github.com/itqanlab/agent-toolkit/tree/main/plugins/zernio-ops",
+  "repository": "https://github.com/itqanlab/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "zernio",
+    "social-media",
+    "mcp",
+    "publishing",
+    "scheduling"
+  ]
+}
