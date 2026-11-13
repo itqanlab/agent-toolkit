@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "zernio": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/skills/zernio-ops/scripts/zernio-hub.mjs"
+      ]
+    }
+  }
+}

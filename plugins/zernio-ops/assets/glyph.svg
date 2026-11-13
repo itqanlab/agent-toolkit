@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- zernio-ops. Shapes only, no colours: scripts/lib/icons.mjs styles them from the class. -->
+  <g>
+    <path class="line" d="M212 212 L171 171 M300 212 L341 171 M212 300 L171 341 M300 300 L341 341"/>
+    <path class="main tint" d="M194 256 A62 62 0 1 1 318 256 A62 62 0 1 1 194 256 Z"/>
+    <circle class="ring-acc" cx="150" cy="150" r="30"/>
+    <circle class="ring-acc" cx="362" cy="150" r="30"/>
+    <circle class="ring-acc" cx="150" cy="362" r="30"/>
+    <circle class="ring-acc" cx="362" cy="362" r="30"/>
+    <circle class="dot-acc" cx="256" cy="256" r="9"/>
+  </g>
+</svg>
