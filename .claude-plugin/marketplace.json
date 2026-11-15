@@ -273,7 +273,7 @@
       "name": "video-watch",
       "source": "./plugins/video-watch",
       "description": "Let the agent watch a video — any of 1750+ sites or a local file. Pulls captions or transcribes locally, extracts frames the agent can Read. Includes a setup wizard. No API key.",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "author": {
         "name": "Itqan Lab",
         "url": "https://github.com/itqanlab"

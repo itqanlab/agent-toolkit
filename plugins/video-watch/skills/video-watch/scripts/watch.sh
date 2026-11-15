@@ -64,8 +64,33 @@ need ffmpeg
 SRT=""; IS_URL=0
 printf '%s' "$SRC" | grep -qiE '^https?://' && IS_URL=1
 
+# On macOS, Homebrew's Python can be built against a newer libexpat than the
+# one in /usr/lib. Its pyexpat module then fails to load, and yt-dlp dies on
+# "No module named expat" before it downloads anything. Homebrew ships the
+# right library in its expat formula; point the loader at it. This runs here
+# and not in the caller's shell because macOS drops DYLD_* variables whenever
+# a system binary such as /bin/bash starts.
+fix_expat() {
+  [ "$(uname -s)" = "Darwin" ] || return 0
+  local bin py lib
+  bin="$(command -v yt-dlp)"
+  py="$(head -n1 "$bin" 2>/dev/null | sed -n 's/^#! *//p' | awk '{print $1}')"
+  [ -n "$py" ] && [ -x "$py" ] || return 0   # a standalone binary, nothing to probe
+  "$py" -c 'import pyexpat' >/dev/null 2>&1 && return 0
+  for lib in /opt/homebrew/opt/expat/lib /usr/local/opt/expat/lib; do
+    [ -f "$lib/libexpat.1.dylib" ] || continue
+    if DYLD_LIBRARY_PATH="$lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" "$py" -c 'import pyexpat' >/dev/null 2>&1; then
+      export DYLD_LIBRARY_PATH="$lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+      echo "note: yt-dlp's Python could not load libexpat; using $lib" >&2
+      return 0
+    fi
+  done
+  echo "warning: yt-dlp's Python cannot load pyexpat. If yt-dlp fails, run: brew install expat" >&2
+}
+
 if [ "$IS_URL" -eq 1 ]; then
   need yt-dlp
+  fix_expat
 
   DL=(yt-dlp -q --no-warnings --write-auto-subs --write-subs
       --sub-lang "$LANG_PAT" --convert-subs srt
