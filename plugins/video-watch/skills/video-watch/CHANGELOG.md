@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/video-watch/CHANGELOG.md
 
 What changed in `video-watch` (called `watch-video` before 3.0.0), newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.2.0 were rebuilt from the git history.
 
+## [3.0.1] - 2026-11-15
+
+### Fixed
+
+- On a Mac, a link failed with "No module named expat" before anything downloaded. Homebrew's Python can be built against a newer libexpat than the one macOS ships, so yt-dlp could not start. The script now checks yt-dlp's Python first, and when the module fails to load it uses the libexpat from Homebrew's `expat` formula. If that formula is missing, it says to run `brew install expat`.
+
 ## [3.0.0] - 2026-10-13
 
 ### Breaking
