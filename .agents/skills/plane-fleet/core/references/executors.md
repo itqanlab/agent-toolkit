@@ -377,7 +377,13 @@ sessions themselves:
 - every Claude call in the repo's Claude Code session files, the PM's own and each agent's,
   deduplicated by message id and priced with the registry's `prices` block (API list prices, to
   compare options; plans bill differently; a model without a price shows tokens only)
-- each lane's usage from its log row, and merge times from GitHub (`gh`)
+- each lane's usage from its log row, priced with the same `prices` block and counted in Spend.
+  The Codex models carry OpenAI's standard short-context price (prompts up to 272K tokens). A lane
+  row does not say which calls went past 272K, and Codex does not report cache writes, so a lane's
+  figure is a floor. A lane row with no token counts is listed as "cost unknown" and is never
+  priced as zero. A model with a `valid_until` date that has passed is named in the report, so
+  the price gets updated
+- merge times from GitHub (`gh`)
 - per merged ticket: agent cost and agent + PM share, first spawn → merge, hours agents worked;
   cost by role; cost and cycle time by rework rounds; test failures by `fail_cause`
 - where the money goes: cache reads, cache writes and output; whole-context cache rewrites after

@@ -15,6 +15,7 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py report  --project P --since ISO [--until ISO]   Done, approvals, tokens, hours (see report -h)
   fleetctl.py cost    [--since ISO] [--until ISO] [--ticket T] [--json] [--backfill]   real spend and time, from the sessions
   fleetctl.py retro   [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself (fleetretro.py)
+  fleetctl.py review  [--cwd DIR] [--last N] [--md FILE] [--json]   every run measured the same way and kept (fleetreview.py)
   fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
@@ -33,12 +34,21 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet root>/core/scripts/
 BASE_REGISTRY = os.path.join(FLEET_ROOT, "core", "references", "executors.json")
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix")
+OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix", "decision")
 # Rows that mark something the PM did, not a session: never scored, never counted as spend.
-MARKER_OUTCOMES = ("done", "retro_fix")
+MARKER_OUTCOMES = ("done", "retro_fix", "decision")
+# a session that ended without a result must say why, or the review cannot learn from it
+REASON_OUTCOMES = ("blocked", "lane_failed", "deferred", "decision", "verify_fail")
 DUPLICATE_WINDOW_S = 600
 # Why a tester failed a PR (`core/pm/skills/spawn.md` §3 "Read a low pass rate correctly"); only "missed" counts against the model.
 FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
+# what kind of defect a missed verify_fail was, so the review can count rework by class.
+# criterion: an acceptance criterion not met. other_path: the rule works on one path, breaks on
+# another the change touches (edit, second screen, error code). stale_state: preview and save
+# disagree, or state changed between them. concurrency: race, deadlock, retry duplicate.
+# money_rule: rounding, discount share or another money rule applied differently. out_of_scope:
+# the ticket never asked for it. stacked: brought in by another ticket on the same branch.
+DEFECTS = ("criterion", "other_path", "stale_state", "concurrency", "money_rule", "out_of_scope", "stacked")
 def X(p):
     """~ expands; {state_home} is PLANE_FLEET_HOME (default ~/.config/plane-fleet); {fleet_root} is this folder."""
     if not isinstance(p, str):
@@ -575,8 +585,8 @@ def derive_quality(rows):
 def duplicate_of(reg, row, now=None):
     """The logged row this new one repeats, or None. A repeat is the same project, ticket, role,
     executor and outcome within DUPLICATE_WINDOW_S, or the same agent_id with the same outcome.
-    A retro_fix row is never a repeat: two fixes for two findings can land in one minute."""
-    if row.get("outcome") in ("retro_fix",):
+    A retro_fix or decision row is never a repeat: two of them can land in one minute."""
+    if row.get("outcome") in ("retro_fix", "decision"):
         return None
     now = now or time.time()
     key = (row.get("project"), row.get("ticket"), row.get("role"), row.get("executor"), row.get("outcome"))
@@ -674,6 +684,18 @@ def lane_result_fields(path):
     if res.get("status") and res["status"] != "completed":
         fields["lane_status"] = res["status"]
     return ident, fields, res
+
+
+def lane_reason(res):
+    """A reason taken from a lane's own result, marked as the lane's words; None when it said nothing."""
+    if not res:
+        return None
+    lines = [l.strip() for l in str(res.get("lastMessage") or res.get("error") or "").splitlines() if l.strip()]
+    if lines:
+        return "lane said: " + lines[-1][:200]
+    if res.get("status") and res["status"] != "completed":
+        return f"lane status {res['status']}"
+    return None
 
 
 def now_iso():
@@ -1198,6 +1220,25 @@ def selftest():
         check("--set string", r1.get("note"), "hello world")
         check("bare duration_ms", r2.get("duration_ms"), 10)
         check("bare tokens", r2.get("tokens"), 20)
+        try:
+            import contextlib, io
+            with contextlib.redirect_stderr(io.StringIO()):
+                main(base[:5] + ["ST-B"] + base[6:-1] + ["blocked"], quiet=True)
+            refused = False
+        except SystemExit:
+            refused = True
+        check("log add: blocked with no reason is refused", refused, True)
+        bres = os.path.join(d, "blocked.json")
+        json.dump({"executor": "codex", "model": "gpt-x", "role": "engineer", "ticket": "ST-C", "status": "completed",
+                   "lastMessage": "Done what I could.\nBlocked: the migration needs a DBA decision"}, open(bres, "w"))
+        main(["log", "add", "--project", "st", "--outcome", "blocked", "--from-result", bres], quiet=True)
+        rc = {r["ticket"]: r for r in load_rows(reg)}.get("ST-C", {})
+        check("log add: a blocked lane takes its reason from the lane", rc.get("reason"), "lane said: Blocked: the migration needs a DBA decision")
+        dec = ["log", "add", "--project", "st", "--ticket", "RUN", "--role", "pm", "--executor", "claude", "--model", "opus",
+               "--outcome", "decision"]
+        check("log add: two decisions in a minute both log",
+              (main(dec + ["--reason", "engineers to codex: owner order"], quiet=True), main(dec + ["--reason", "testers to codex"], quiet=True)), (0, 0))
+        check("a decision is not scored", any(k[0] == "pm" for k in scoreboard(reg, load_rows(reg))), False)
         check("--reason kept", r2.get("reason"), "a=b")
         check("row shape", sorted(k for k in r2 if k != "quality")[:6], ["duration_ms", "executor", "experiment", "model", "outcome", "project"])
         check("from-result executor", r3.get("executor"), "codex")
@@ -1222,16 +1263,26 @@ def selftest():
             check("verify_fail without a cause is refused", "logged", "refused")
         except SystemExit:
             check("verify_fail without a cause is refused", True, True)
-        main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"], quiet=True)
+        main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"], quiet=True)
         r4 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-4", {})
         check("--cause stored", r4.get("fail_cause"), "ticket")
-        st4 = base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"]
+        st4 = base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"]
         with contextlib.redirect_stderr(io.StringIO()) as err:
             code = main(st4, quiet=True)
         check("log add: a repeat within 10 minutes is refused", (code, "repeats a row" in err.getvalue()), (5, True))
         check("log add: --force logs it anyway", main(st4 + ["--force"], quiet=True), 0)
         check("log add: another executor is not a repeat",
-              main(base[:5] + ["ST-4"] + base[6:7] + ["codex"] + base[8:-1] + ["verify_fail", "--cause", "ticket"], quiet=True), 0)
+              main(base[:5] + ["ST-4"] + base[6:7] + ["codex"] + base[8:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"], quiet=True), 0)
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                main(base[:5] + ["ST-6"] + base[6:-1] + ["verify_fail", "--cause", "missed"], quiet=True)
+                vf_refused = False
+            except SystemExit:
+                vf_refused = True
+        check("verify_fail without a reason is refused", vf_refused, True)
+        main(base[:5] + ["ST-6"] + base[6:-1] + ["verify_fail", "--cause", "missed", "--defect", "other_path",
+                                                 "--reason", "edit path skips the hold"], quiet=True)
+        check("--defect stored", {r["ticket"]: r for r in load_rows(reg)}.get("ST-6", {}).get("defect"), "other_path")
         main(base[:5] + ["ST-5"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
         with contextlib.redirect_stderr(io.StringIO()):
             code = main(base[:5] + ["ST-6"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
@@ -1259,6 +1310,8 @@ def selftest():
         fleetcost.selftest(check)
         import fleetretro
         fleetretro.selftest(check, sys.modules[__name__])
+        import fleetreview
+        fleetreview.selftest(check)
         import fleetfindings
         fleetfindings.selftest(check)
         freemodels.selftest(check)
@@ -1317,6 +1370,7 @@ def main(argv=None, quiet=False):
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
     lg.add_argument("--cause", choices=FAIL_CAUSES, help="why the tester failed it; required with --outcome verify_fail")
+    lg.add_argument("--defect", choices=DEFECTS, help="what kind of defect a missed verify_fail was (see DEFECTS)")
     lg.add_argument("--force", action="store_true", help="log it even when a matching row is already logged")
     co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
@@ -1329,6 +1383,14 @@ def main(argv=None, quiet=False):
     rt.add_argument("--hours", type=float); rt.add_argument("--json", action="store_true")
     rt.add_argument("--no-record", action="store_true", help="don't save this run's findings for repeat detection")
     rt.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
+    rv = sub.add_parser("review", description="Every run measured the same way, kept, and compared with the runs before (fleetreview.py).")
+    rv.add_argument("--cwd"); rv.add_argument("--project"); rv.add_argument("--since", help="look for runs from here (default: after the last kept run, else 30 days)")
+    rv.add_argument("--last", type=int, help="runs to show side by side (default fleet.review.compare_runs, 5)")
+    rv.add_argument("--gap-hours", type=float, help="a gap longer than this between log rows starts a new run (default 4)")
+    rv.add_argument("--json", action="store_true"); rv.add_argument("--md", help="also write the review as markdown to this file")
+    rv.add_argument("--no-record", action="store_true", help="measure and show, keep nothing")
+    rv.add_argument("--rebuild", action="store_true", help="measure every run since --since again and rewrite the history")
+    rv.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
     rp = sub.add_parser("report", description=REPORT_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     rp.add_argument("--project"); rp.add_argument("--since", required=True); rp.add_argument("--until"); rp.add_argument("--cwd")
     sub.add_parser("selftest")
@@ -1374,9 +1436,9 @@ def main(argv=None, quiet=False):
         fields = parse_kv(args.extra)
         fields.update(parse_kv(args.set))
         if args.action == "add":
-            ident = {}
+            ident, lane_res = {}, {}
             if args.from_result:
-                ident, rfields, _ = lane_result_fields(args.from_result)
+                ident, rfields, lane_res = lane_result_fields(args.from_result)
                 for k, v in rfields.items():
                     fields.setdefault(k, v)  # numbers typed on the line win over the file
             for f in ("ticket", "role", "executor", "model", "effort"):
@@ -1392,11 +1454,21 @@ def main(argv=None, quiet=False):
                    "reason": args.reason, "outcome": args.outcome}
             if args.cause:
                 fields["fail_cause"] = args.cause
+            if args.defect:
+                fields["defect"] = args.defect
             row.update(fields)
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
+            if row["outcome"] in REASON_OUTCOMES and not (row.get("reason") or "").strip():
+                said = lane_reason(lane_res)
+                if not said:
+                    ap.error(f"{row['outcome']} needs --reason: what stopped the session, in a few words")
+                row["reason"] = said
             if row["outcome"] == "verify_fail" and row.get("fail_cause") not in FAIL_CAUSES:
                 ap.error(f"verify_fail needs --cause {'|'.join(FAIL_CAUSES)}: only 'missed' counts against the model")
+            if row["outcome"] == "verify_fail" and row.get("fail_cause") == "missed" and not row.get("defect") and not quiet:
+                print(f"fleetctl: logged; add --defect {'|'.join(DEFECTS)} next time, so the review can count rework by class",
+                      file=sys.stderr)
             dup = None if args.force else duplicate_of(reg, row)
             if dup is not None:
                 print(f"fleetctl: not logged, it repeats a row already in the log: {dup.get('ts')} {dup.get('ticket')} "
@@ -1425,6 +1497,9 @@ def main(argv=None, quiet=False):
     elif args.cmd == "retro":
         import fleetretro
         return fleetretro.run(sys.modules[__name__], args)
+    elif args.cmd == "review":
+        import fleetreview
+        return fleetreview.run(sys.modules[__name__], args)
     elif args.cmd == "stats":
         board = scoreboard(reg, load_rows(reg), args.role, args.kind, args.project)
         if args.json:

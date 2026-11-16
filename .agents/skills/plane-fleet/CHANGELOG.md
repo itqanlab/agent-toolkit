@@ -4,6 +4,91 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.13.0] - 2026-11-16
+
+The second review looked at rework and merge wait in one project. Rework stayed at 39-67% in every
+run, through three releases of "fix the class" brief rules, and most failed test rounds were the
+same rule breaking on a path nobody had listed. So this release changes the pipeline itself, behind
+switches a project turns on between runs, and measures what each failure was.
+
+### Added
+
+- `fleet.trials` in the config, all off by default. Turn one on only between runs. `fleet review`
+  shows a "trials on" row, so each trial is judged against the runs without it.
+  - `path_map`: on a money, stock, state or permission ticket the engineer posts a `PATH MAP:`
+    comment before code, with every entry point and writer the rule touches. The blind tester may
+    read it and checks every row in round 1.
+  - `money_ceiling`: the planner splits money, stock and state outcomes at 1000 lines.
+  - `own_commits_only`: a branch carries only its own ticket's work, in rework too. One ticket's
+    branch took in a group branch and three other tickets' fixes, and went through 9 test rounds.
+  - `group_cut_minutes`: the PM cuts a merge group no later than this many minutes after the first
+    approval starts waiting. Approved to group opened was a median 1.5h, and for 54% of it no other
+    group was open.
+- `--defect` on `log add` for a missed `verify_fail`: `criterion`, `other_path`, `stale_state`,
+  `concurrency`, `money_rule`, `out_of_scope` or `stacked`. The tester names it in its report, and
+  the review counts missed failures by kind.
+- `fleet status` warns about each ticket PR out of draft, with `gh pr ready --undo`. A draft runs
+  almost no CI; ticket PRs out of draft used about 3,600 runner minutes in 18 days.
+
+### Changed
+
+- A `verify_fail` row needs `--reason`, like `blocked`. 67 of 186 failures had none.
+
+## [2.12.0] - 2026-11-16
+
+The first review across five runs of one project showed the fleet's cost figures were wrong in
+three ways. A run done almost all on Codex lanes showed $1.66 per merged ticket; priced, it was
+$24.41.
+
+### Fixed
+
+- `fleet cost` and `fleet retro` left lane spend out. Lane tokens were read, but Codex had no
+  price, and lanes were never added to Spend, so a Codex-only run showed agents at $0. Lanes are
+  now priced and counted in Spend, the per-ticket cost and the PM share.
+- A lane row with no token counts was priced as $0. It is now counted as a session whose cost is
+  unknown, and the report says how many there are.
+- `fleet cost` dropped the PM's last day: a window ending 2026-11-14 17:00 left out all of the
+  14th, while `fleet retro` kept it. PM spend now follows the window to the 10 minute, like the
+  context per call already did. Whole days remain only for sessions known from an old cache entry.
+- `fleet cost` counted every PM session the repo ever had as the run's sessions (213 for a run
+  that had 1). It now counts the sessions with calls in the window.
+- `fleet retro` showed no lost time both when nothing was lost and when `fleet guard` never ran.
+  The guard now writes a start event, and the retro says "not checked" when no guard covered the
+  window.
+
+### Added
+
+- Prices for `gpt-6.1-sol` and `gpt-5.6-sol` (OpenAI standard tier, short context, read
+  2026-11-16). A price can carry its own `source` and a `valid_until` date. `fleet cost` names a
+  price whose date has passed. The `gpt-5.6-sol` price is promotional until 2026-11-30.
+- `fleet review`: finds the runs in the log, measures each with the same code as `cost` and
+  `retro`, keeps one scorecard per finished run in `{state_home}/reviews/<project>.jsonl`, and
+  prints the last runs side by side with what got better, what got worse, the toolkit versions
+  released between runs, the session mix and the decisions logged. `--md` writes it for the
+  owner's records. Config: `fleet.review`.
+- The review judges a run on three goals that count the same: time (merged tickets per run hour,
+  spawn to merge), results (rework rate, merged of started, escapes logged) and cost ($ per merged
+  ticket). A run better on one goal and worse on another is called a trade, never an improvement.
+- The review splits each merged ticket's time into stages: building, testing, rework, waiting for
+  an engineer, a tester or rework, pass to merge, and waiting while no fleet session ran. It also
+  gives cycle time and cost by rework rounds (0, 1, 2+).
+- Ticket timelines in the review use all of a ticket's sessions, and a ticket counts in the run
+  where its first engineer or tester work started. A reviewer that only names the ticket, or a
+  group merge, is not its work. Before, a ticket worked across two runs counted in both, and one
+  reviewer mention moved a ticket's start 13 days early.
+- Merges are read per run (up to 7 days after it), not in one call capped at 1000 PRs. A run whose
+  merges could not be read is not kept, and `--rebuild` keeps nothing when any run failed.
+- `--outcome decision`: a PM marker row for a routing choice or an owner's order, with a time
+  and a reason. Never scored, never refused as a repeat.
+- The PM's retro skill has a review section: when it runs, what to do with it, and when to
+  propose a bigger change than a tweak.
+
+### Changed
+
+- `fleet log add` refuses a `blocked`, `lane_failed`, `deferred` or `decision` row without
+  `--reason`. A lane row takes the lane's last message when no reason is given, marked
+  `lane said:`.
+
 ## [2.11.1] - 2026-11-10
 
 ### Fixed

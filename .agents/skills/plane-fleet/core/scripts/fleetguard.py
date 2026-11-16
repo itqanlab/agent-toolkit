@@ -116,6 +116,8 @@ def loop(args):
     next_probe = time.time()
     fails, down_since = 0, None
     last = time.time()
+    # the planned span, so the retro can tell "nothing lost" from "the guard never ran"
+    record("start", args.hours * 3600)
     while not stop["now"] and time.time() < deadline:
         time.sleep(TICK_S)
         t = time.time()

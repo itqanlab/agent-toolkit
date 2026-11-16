@@ -161,16 +161,21 @@ def guard_events(state_home, t0, t1):
         f = open(os.path.join(state_home, "guard-events.jsonl"))
     except OSError:
         return None
-    lost = {"asleep": 0.0, "agent_down": 0.0}
+    lost, ran = {"asleep": 0.0, "agent_down": 0.0}, False
     with f:
         for line in f:
             try:
                 e = json.loads(line)
             except ValueError:
                 continue
-            if e.get("kind") in lost and t0 <= (epoch(e.get("ts")) or 0) < t1:
+            t = epoch(e.get("ts")) or 0
+            if e.get("kind") == "start" and t < t1 and t + (e.get("seconds") or 0) > t0:
+                ran = True
+            if e.get("kind") in lost and t0 <= t < t1:
+                ran = True
                 lost[e["kind"]] += (e.get("seconds") or 0) / 3600
-    return lost
+    # no start event that covers the window: sleep and login were not checked, which is not zero
+    return lost if ran else None
 
 
 def merge_wait_hours(rows, cost, project):
@@ -189,14 +194,14 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
     now = now or time.time()
     win = lambda ts: (epoch(ts) or 0) >= t0 and (epoch(ts) or 0) < t1
     is_session = lambda r: r.get("type", "spawn") == "spawn" and not r.get("usage_only") \
-        and not (r.get("role") == "pm" and r.get("outcome") in ("done", "retro_fix"))
+        and not (r.get("role") == "pm" and r.get("outcome") in ("done", "retro_fix", "decision"))
     wrows = [r for r in rows if r.get("type", "spawn") == "spawn" and not r.get("usage_only") and win(r.get("ts"))
              and (not project or r.get("project") == project)]
     # log hygiene
     dups, seen_ids, last_by_key = [], {}, {}
     for r in sorted((r for r in raw_rows if r.get("type", "spawn") == "spawn" and not r.get("usage_only")
                      and win(r.get("ts")) and (not project or r.get("project") == project)
-                     and r.get("outcome") != "retro_fix"), key=lambda r: r.get("ts") or ""):
+                     and r.get("outcome") not in ("retro_fix", "decision")), key=lambda r: r.get("ts") or ""):
         key = (r.get("ticket"), r.get("role"), r.get("executor"), r.get("outcome"))
         prev = last_by_key.get(key)
         if prev and (epoch(r.get("ts")) or 0) - (epoch(prev.get("ts")) or 0) <= 600:
@@ -248,15 +253,16 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
                         "sessions_tools": per, "hours": hours, "outcome": outcome,
                         "causes": [r.get("fail_cause") or r.get("failure_cause") or "none" for r in fails],
                         "tested": any(r.get("outcome") in ("verify_pass", "verify_fail") for r in tr) or n_test > 0})
-    # spend: the PM's is counted by whole UTC days, so the agents' share is taken over the same days
+    # spend
     pm = (cost or {}).get("pm") or {}
-    day0 = datetime.datetime.fromtimestamp(t0, datetime.timezone.utc).strftime("%Y-%m-%d")
-    day1 = datetime.datetime.fromtimestamp(t1, datetime.timezone.utc).strftime("%Y-%m-%d")
-    agent_days = sum(fleetcost.usd_by_model(prices, a["by_model"])[0] for a in agents
-                     if day0 <= (a.get("first_ts") or "")[:10] <= day1)
     pm_usd = pm.get("usd") or 0.0
     ag = (cost or {}).get("agents") or {}
-    agent_usd = ag.get("usd") or 0.0
+    lanes_usd = (cost or {}).get("lanes_usd_total") or 0.0
+    claude_agent_usd = ag.get("usd") or 0.0
+    # lanes (Codex and the other CLIs) are agents too: leaving them out showed a Codex-only run as $0
+    agent_usd = claude_agent_usd + lanes_usd
+    # the PM's spend now follows the window to the 10 minute, so the agents' share is taken over the same window
+    agent_days = agent_usd
     share = pm_usd / (pm_usd + agent_days) if (pm_usd + agent_days) else None
     win_agents = [a for a in agents if win(a.get("first_ts"))]
     no_id = [r for r in sess_rows if (r.get("executor") or "claude") == "claude"
@@ -279,12 +285,15 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
     hours = (t1 - t0) / 3600
     return {
         "project": project, "since": iso(t0), "until": iso(t1), "hours": hours, "tickets": tickets,
-        "spend": {"pm": pm_usd, "agents": agent_usd, "agents_same_days": agent_days, "pm_share": share},
+        "spend": {"pm": pm_usd, "agents": agent_usd, "claude_agents": claude_agent_usd, "lanes": lanes_usd,
+                  "lanes_unpriced": (cost or {}).get("lanes_unpriced") or {},
+                  "lanes_no_usage": (cost or {}).get("lanes_no_usage") or {},
+                  "agents_same_days": agent_days, "pm_share": share},
         "pm": {"calls": pm.get("calls"), "ctx_per_call": pm.get("ctx_per_call"), "sessions": pm.get("sessions")},
         "rework": {"tested": len(tested), "reworked": sum(1 for x in tested if x["rework"] > 0),
                    "rate": (sum(1 for x in tested if x["rework"] > 0) / len(tested)) if tested else None,
                    "causes": causes},
-        "rewrite_share": (ag.get("rewrite_usd") or 0) / agent_usd if agent_usd else None,
+        "rewrite_share": (ag.get("rewrite_usd") or 0) / claude_agent_usd if claude_agent_usd else None,
         "duplicates": [{k: r.get(k) for k in ("ts", "ticket", "role", "executor", "outcome", "agent_id", "fail_cause")} for r in dups],
         "missing_agent_id": [{k: r.get(k) for k in ("ts", "ticket", "role")} for r in no_id],
         "lanes": {"n": len(lanes), "failed": [{k: l.get(k) for k in ("ticket", "role", "executor", "status")} for l in lane_fail],
@@ -296,6 +305,7 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
                   "samples": len(codex or [])},
         "agent_sessions": len(win_agents),
         "retro_fixes": [{k: r.get(k) for k in ("ts", "ticket", "reason")} for r in wrows if r.get("outcome") == "retro_fix"],
+        "decisions": [{k: r.get(k) for k in ("ts", "ticket", "reason")} for r in wrows if r.get("outcome") == "decision"],
     }
 
 
@@ -433,8 +443,8 @@ def render(d, findings, merge_error=None):
     until = "now" if d.get("until_is_now") else local(epoch(d["until"]))
     L.append(f"Fleet retro · {d['project']} · {local(epoch(d['since']))} to {until} · {d['hours']:.1f}h")
     s = d["spend"]
-    L.append(f"Spend: agents {money(s['agents'])}, PM {money(s['pm'])}"
-             + (f" · PM {pct(s['pm_share'])} of spend (by whole UTC day)" if s["pm_share"] is not None else "")
+    L.append(f"Spend: agents {money(s['agents'])} (Claude {money(s.get('claude_agents', s['agents']))}, lanes {money(s.get('lanes', 0))}), PM {money(s['pm'])}"
+             + (f" · PM {pct(s['pm_share'])} of spend" if s["pm_share"] is not None else "")
              + (f" · PM {d['pm']['calls']:,} calls, {ktok(d['pm']['ctx_per_call'])} context per call" if d["pm"].get("calls") else ""))
     r = d["rework"]
     cs = ", ".join(f"{k} {v}" for k, v in sorted(r["causes"].items(), key=lambda kv: -kv[1]))
@@ -460,13 +470,12 @@ def render(d, findings, merge_error=None):
              + (f", longest {ln['longest'][0]['minutes']} min" if ln["longest"] else "")
              + " · Codex meter: " + (f"{cr:+.1f} points/h" if cr is not None else "not readable"))
     wait = d.get("merge_wait") or {}
-    if d.get("lost") is not None or wait:
-        parts = []
-        if d.get("lost") is not None:
-            parts.append(f"asleep {d['lost']['asleep']:.1f}h, agents down {d['lost']['agent_down']:.1f}h")
-        if wait:
-            parts.append(f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h")
-        L.append("Lost time: " + " · ".join(parts))
+    # always say whether sleep and login were checked: an unchecked window is not zero lost
+    parts = [f"asleep {d['lost']['asleep']:.1f}h, agents down {d['lost']['agent_down']:.1f}h" if d.get("lost") is not None
+             else "fleet guard did not run, so sleep and login were not checked"]
+    if wait:
+        parts.append(f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h")
+    L.append("Lost time: " + " · ".join(parts))
     alerts = [f for f in findings if f["level"] == "alert"]
     L.append("")
     if not findings:
@@ -485,34 +494,20 @@ def render(d, findings, merge_error=None):
 
 
 # ---------------------------------------------------------------- entry
-def run(fleetctl, args):
-    """Called by fleetctl.main for `retro`."""
-    cwd = args.cwd or os.getcwd()
-    reg = fleetctl.load_registry(cwd, args.project)
+def load(fleetctl, cwd, project=None, claude_dir=None, since_iso=None, prs=True):
+    """Everything a window is measured from, read once: config, sessions, log rows, merges."""
+    reg = fleetctl.load_registry(cwd, project)
     cfg = fleetctl.project_config(cwd)
-    project = args.project or reg.get("_project")
-    now = time.time()
-    t1 = epoch(args.until) if args.until else now
-    if args.until and t1 is None:
-        raise SystemExit(f"fleet retro: --until {args.until!r} is not an ISO time")
-    if args.since:
-        t0 = epoch(args.since)
-        if t0 is None:
-            raise SystemExit(f"fleet retro: --since {args.since!r} is not an ISO time")
-    else:
-        t0 = t1 - (args.hours or 24) * 3600
-    th, lv = thresholds(cfg)
+    project = project or reg.get("_project")
     repo = fleetctl.git(cwd, "rev-parse", "--show-toplevel") or cwd
     common = fleetctl.git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
     main_repo = os.path.dirname(common.rstrip("/")) if common else repo
     identifier = (cfg.get("plane") or {}).get("identifier")
     trunk = (cfg.get("git") or {}).get("trunk")
-    prices = reg.get("prices") or {}
     cost_cfg = (cfg.get("fleet") or {}).get("cost") or {}
-    dirs = fleetcost.project_dirs(main_repo, cost_cfg.get("claude_project_dirs") or (), args.claude_dir)
+    dirs = fleetcost.project_dirs(main_repo, cost_cfg.get("claude_project_dirs") or (), claude_dir)
     mains, agents = fleetcost.collect(dirs, os.path.join(fleetctl.STATE_HOME, "cost-cache"), identifier)
     rows = fleetctl.load_rows(reg)
-    proj_rows = [r for r in rows if not project or r.get("project") == project]
     raw = []
     try:
         with open(fleetctl.P(reg, "path")) as f:
@@ -523,19 +518,49 @@ def run(fleetctl, args):
                     pass
     except OSError:
         pass
-    lane_rows = fleetcost.lane_sessions(rows, project)
-    prs, err = fleetcost.merged_prs(main_repo, trunk, iso(t0)[:10])
-    cost = fleetcost.analyse(mains, agents, lane_rows, prs, prices, identifier, iso(t0), iso(t1) if args.until else None, proj_rows)
-    codex_cfg = fleetctl.budget_cfg(reg, "codex")
-    codex = codex_samples(codex_cfg.get("sessions_dir"), t0, t1) if codex_cfg.get("source") == "codex-session-log" else None
-    lanes = lane_records(fleetctl.STATE_HOME, main_repo, t0, t1)
-    d = build(t0, t1, project, proj_rows, raw, cost, agents, lanes, codex, prices, now)
-    d["until_is_now"] = not args.until
+    # prs=False: the caller reads merges itself, per window
+    prs, err = fleetcost.merged_prs(main_repo, trunk, (since_iso or "")[:10] or None) if prs else ([], None)
+    return {"reg": reg, "cfg": cfg, "project": project, "main_repo": main_repo, "identifier": identifier,
+            "prices": reg.get("prices") or {}, "mains": mains, "agents": agents, "rows": rows, "raw": raw,
+            "proj_rows": [r for r in rows if not project or r.get("project") == project],
+            "lane_rows": fleetcost.lane_sessions(rows, project), "prs": prs, "merge_error": err,
+            "codex_cfg": fleetctl.budget_cfg(reg, "codex")}
+
+
+def measure(fleetctl, ctx, t0, t1, now, until_given=True):
+    """One window: (data, cost) where data is build()'s dict plus lost time and merge waits."""
+    cost = fleetcost.analyse(ctx["mains"], ctx["agents"], ctx["lane_rows"], ctx["prs"], ctx["prices"], ctx["identifier"],
+                             iso(t0), iso(t1) if until_given else None, ctx["proj_rows"])
+    cc = ctx["codex_cfg"]
+    codex = codex_samples(cc.get("sessions_dir"), t0, t1) if cc.get("source") == "codex-session-log" else None
+    lanes = lane_records(fleetctl.STATE_HOME, ctx["main_repo"], t0, t1)
+    d = build(t0, t1, ctx["project"], ctx["proj_rows"], ctx["raw"], cost, ctx["agents"], lanes, codex, ctx["prices"], now)
+    d["until_is_now"] = not until_given
     d["lost"] = guard_events(fleetctl.STATE_HOME, t0, t1)
-    d["merge_wait"] = merge_wait_hours(proj_rows, cost, project)
+    d["merge_wait"] = merge_wait_hours(ctx["proj_rows"], cost, ctx["project"])
+    return d, cost
+
+
+def run(fleetctl, args):
+    """Called by fleetctl.main for `retro`."""
+    cwd = args.cwd or os.getcwd()
+    now = time.time()
+    t1 = epoch(args.until) if args.until else now
+    if args.until and t1 is None:
+        raise SystemExit(f"fleet retro: --until {args.until!r} is not an ISO time")
+    if args.since:
+        t0 = epoch(args.since)
+        if t0 is None:
+            raise SystemExit(f"fleet retro: --since {args.since!r} is not an ISO time")
+    else:
+        t0 = t1 - (args.hours or 24) * 3600
+    ctx = load(fleetctl, cwd, args.project, args.claude_dir, iso(t0))
+    th, lv = thresholds(ctx["cfg"])
+    d, _ = measure(fleetctl, ctx, t0, t1, now, until_given=bool(args.until))
     findings = evaluate(d, th, lv)
-    mark_repeats(findings, os.path.join(fleetctl.STATE_HOME, "retro", f"{project}.json"), now,
+    mark_repeats(findings, os.path.join(fleetctl.STATE_HOME, "retro", f"{ctx['project']}.json"), now,
                  record=not args.no_record and not args.until)
+    err = ctx["merge_error"]
     if args.json:
         print(json.dumps({**d, "thresholds": th, "levels": lv, "findings": findings, "merge_error": err}, indent=2, default=str))
     else:
@@ -605,7 +630,17 @@ def selftest(check, fleetctl):
            bool(F["tool_calls_per_session"]["fix"] and F["tool_calls_per_session"]["cause"])), (576, 300, "pm", True))
     check("retro: config sets a threshold", F["codex_pts_per_hour"]["threshold"], 3)
     check("retro: a level can switch a check off", "rewrite_share" in F, False)
-    check("retro: PM share by the same days", round(data["spend"]["pm_share"], 2), 1.0)
+    check("retro: PM share over the same window", round(data["spend"]["pm_share"], 2), round(68 / 130, 2))
+    lane_cost = dict(cost, lanes_usd_total=40.0)
+    with_lanes = build(t0, t0 + 2 * 3600, "st", loaded, raw, lane_cost, agents, lanes, codex, {}, now=t0 + 2 * 3600)
+    gd = os.path.join(d, "guard-test")
+    os.makedirs(gd, exist_ok=True)
+    check("retro: no guard log means not checked", guard_events(gd, t0, t0 + 3600), None)
+    with open(os.path.join(gd, "guard-events.jsonl"), "w") as f:
+        f.write(json.dumps({"ts": ts(0), "kind": "start", "seconds": 24 * 3600}) + "\n")
+    check("retro: a guard start with nothing lost is zero", guard_events(gd, t0 + 60, t0 + 3600), {"asleep": 0.0, "agent_down": 0.0})
+    check("retro: a guard that ended before the window did not check it", guard_events(gd, t0 + 25 * 3600, t0 + 26 * 3600), None)
+    check("retro: lane spend counts as agent spend", (with_lanes["spend"]["agents"], with_lanes["spend"]["lanes"]), (102.0, 40.0))
     state = os.path.join(d, "retro", "st.json")
     now = t0 + 10 * 3600
     mark_repeats(evaluate(data, th, lv), state, now)

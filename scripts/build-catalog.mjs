@@ -289,8 +289,11 @@ const codex = `${JSON.stringify({
 // `npx skills` reads this folder and plugins/ and lists each skill once.
 const MIRROR = join(ROOT, '.agents', 'skills');
 const overlay = new Map(openaiYaml.map(([path, text]) => [path, text]));
+// Python writes __pycache__ next to any script it runs, in plugins/ or in this copy (a lane runs
+// the copy). Git ignores those files, so the catalog does too, or a running fleet blocks commits.
+const generated = (path) => path.split(sep).includes('__pycache__') || path.endsWith('.pyc');
 const listFiles = (dir) => readdirSync(dir, { recursive: true, withFileTypes: true })
-  .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
+  .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name)).filter((p) => !generated(p));
 
 // A file this run writes for the first time is not on disk yet, so it is added from the overlay.
 const filesOf = (base) => [...new Set([...listFiles(base), ...[...overlay.keys()].filter((p) => p.startsWith(base + sep))])];

@@ -83,9 +83,9 @@ def model_price(prices, model):
 
 
 def usd(prices, model, u):
-    """u = [input, cache_write_5m, cache_write_1h, cache_read, output] tokens."""
+    """u = [input, cache_write_5m, cache_write_1h, cache_read, output] tokens; None = usage unknown."""
     p = model_price(prices, model)
-    if p is None:
+    if p is None or u is None:
         return None
     i, o, r = p
     mult = (prices or {}).get("cache_write_multiplier") or {}
@@ -103,6 +103,14 @@ def usd_by_model(prices, by_model):
         else:
             total += c
     return total, unpriced
+
+
+def expired_prices(prices, models, until):
+    """Priced models whose price carries a valid_until before the window's end (or today)."""
+    end = (until or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"))[:10]
+    table = (prices or {}).get("models") or {}
+    return sorted({m for m in models if isinstance(table.get(m), dict)
+                   and table[m].get("valid_until") and table[m]["valid_until"] < end})
 
 
 # ---------------------------------------------------------------- tool-call classes
@@ -432,6 +440,7 @@ def lane_sessions(rows, project):
         start = (end - dur / 1000) if (end and dur) else end
         inp = r.get("input_tokens") or 0
         cached = r.get("cached_input_tokens") or 0
+        split = isinstance(r.get("input_tokens"), (int, float)) or isinstance(r.get("output_tokens"), (int, float))
         role = r.get("role") or "other"
         if role == "engineer" and r.get("task_kind") == "rework":
             role = "rework"
@@ -439,18 +448,21 @@ def lane_sessions(rows, project):
             role = "retest"
         out.append({"ticket": r.get("ticket"), "role": role, "executor": r.get("executor"), "model": r.get("model"),
                     "start": start, "end": end, "outcome": r.get("outcome"),
-                    "usage": [inp - cached, 0, 0, cached, r.get("output_tokens") or 0],
+                    # a row with no token split has unknown usage: never priced as zero
+                    "usage": [inp - cached, 0, 0, cached, r.get("output_tokens") or 0] if split else None,
                     "tokens": (inp + (r.get("output_tokens") or 0)) if (inp or r.get("output_tokens")) else r.get("tokens")})
     return out
 
 
 # ---------------------------------------------------------------- merges
-def merged_prs(repo, trunk, since_day):
+def merged_prs(repo, trunk, since_day, until_day=None):
     cmd = ["gh", "pr", "list", "--state", "merged", "--limit", "1000", "--json",
            "number,title,headRefName,baseRefName,createdAt,mergedAt,additions,deletions,changedFiles"]
     if trunk:
         cmd += ["--base", trunk]
-    if since_day:
+    if since_day and until_day:
+        cmd += ["--search", f"merged:{since_day}..{until_day}"]
+    elif since_day:
         cmd += ["--search", f"merged:>={since_day}"]
     try:
         r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=120)
@@ -582,22 +594,42 @@ def analyse(mains, agents, lanes, prs, prices, identifier, since, until, log_row
     tickets = build_tickets(agents, lanes, prs, prices, identifier, t0, t1, log_rows)
     in_win = lambda s: s and (not t0 or epoch(s) >= t0) and (not t1 or epoch(s) < t1)
     day0 = datetime.datetime.fromtimestamp(t0, datetime.timezone.utc).strftime("%Y-%m-%d") if t0 else ""
-    day1 = datetime.datetime.fromtimestamp(t1, datetime.timezone.utc).strftime("%Y-%m-%d") if t1 else "9999"
-    pm = [m for m in mains if m["kind"] == "pm"]
-    other = [m for m in mains if m["kind"] == "other"]
-    pm_usage = _sum_usage(u for m in pm for d, u in m["by_day"].items() if day0 <= d < day1)
-    other_usage = _sum_usage(u for m in other for d, u in m["by_day"].items() if day0 <= d < day1)
+    # the last day the window touches, inclusive (a window ending 17:00 still holds that day)
+    day1 = datetime.datetime.fromtimestamp(t1 - 1, datetime.timezone.utc).strftime("%Y-%m-%d") if t1 else "9999"
+
+    def window_usage(m):
+        """A main session's usage inside the window, to the 10-minute bucket. A session known only
+        from an old cache entry has no buckets, so its whole days stand in."""
+        if "by_bucket" in m:
+            return [u for b, u in m["by_bucket"].items()
+                    if (t0 is None or int(b) * BUCKET_S + BUCKET_S > t0) and (t1 is None or int(b) * BUCKET_S < t1)]
+        return [u for d, u in m["by_day"].items() if day0 <= d <= day1]
+
+    # only sessions with calls in the window: the count used to be every session the repo ever had
+    pm = [m for m in mains if m["kind"] == "pm" and window_usage(m)]
+    other = [m for m in mains if m["kind"] == "other" and window_usage(m)]
+    pm_usage = _sum_usage(u for m in pm for u in window_usage(m))
+    other_usage = _sum_usage(u for m in other for u in window_usage(m))
     win_agents = [a for a in agents if in_win(a["first_ts"])]
     agent_usage = _sum_usage(a["by_model"] for a in win_agents)
     pm_usd, pm_unpriced = usd_by_model(prices, pm_usage)
     agent_usd, agent_unpriced = usd_by_model(prices, agent_usage)
     other_usd, _ = usd_by_model(prices, other_usage)
     merged = [x for x in tickets.values() if x.get("merged")]
-    lane_tok = {}
+    lane_tok, lane_usd, lane_unpriced, lane_no_usage = {}, {}, {}, {}
     for l in lanes:
-        if l["start"] and (not t0 or l["start"] >= t0) and (not t1 or l["start"] < t1) and l["tokens"]:
-            k = f"{l['executor']}:{l['model']}"
+        if not (l["start"] and (not t0 or l["start"] >= t0) and (not t1 or l["start"] < t1)):
+            continue
+        k = f"{l['executor']}:{l['model']}"
+        if l["tokens"]:
             lane_tok[k] = lane_tok.get(k, 0) + l["tokens"]
+        c = usd(prices, l["model"], l["usage"])
+        if c is not None:
+            lane_usd[k] = lane_usd.get(k, 0) + c
+        elif l["usage"] is None and not l["tokens"]:
+            lane_no_usage[k] = lane_no_usage.get(k, 0) + 1
+        else:
+            lane_unpriced[k] = lane_unpriced.get(k, 0) + (l["tokens"] or 0)
     # fleet running: any PM call or agent call in a 10-minute bucket, plus lane spans
     alive = set()
     for m in pm:
@@ -623,17 +655,9 @@ def analyse(mains, agents, lanes, prs, prices, identifier, since, until, log_row
             first_ctx.setdefault(a.get("agent_type") or "?", []).append(a["first_ctx"])
     pm_act = {}
     for m in pm:
-        if not any(day0 <= d < day1 for d in m["by_day"]):
-            continue
         for cl, bm in m["activity"].items():
             pm_act[cl] = pm_act.get(cl, 0) + usd_by_model(prices, bm)[0]
-    # context per call follows the window to the 10-minute bucket. Cost above stays by whole UTC day.
-    # A session known only from an old cache entry has no buckets, so its days stand in.
-    ctx_usage = _sum_usage(
-        ub for m in pm
-        for ub in ([u for b, u in m["by_bucket"].items()
-                    if (t0 is None or int(b) * BUCKET_S + BUCKET_S > t0) and (t1 is None or int(b) * BUCKET_S < t1)]
-                   if "by_bucket" in m else [u for d, u in m["by_day"].items() if day0 <= d < day1]))
+    ctx_usage = pm_usage
     pm_calls = sum(u[5] for u in pm_usage.values())
     ctx_calls = sum(u[5] for u in ctx_usage.values())
     pm_ctx = (sum(u[0] + u[1] + u[2] + u[3] for u in ctx_usage.values()) / ctx_calls) if ctx_calls else None
@@ -650,7 +674,9 @@ def analyse(mains, agents, lanes, prs, prices, identifier, since, until, log_row
                    "rewrite_calls": sum(u[5] for u in rew.values()),
                    "first_ctx": {k: quantiles(v) for k, v in first_ctx.items()}},
         "other": {"sessions": len(other), "usd": other_usd},
-        "lanes": lane_tok, "roles": roles,
+        "lanes": lane_tok, "lanes_usd": lane_usd, "lanes_unpriced": lane_unpriced, "lanes_no_usage": lane_no_usage,
+        "lanes_usd_total": sum(lane_usd.values()), "roles": roles,
+        "prices_expired": expired_prices(prices, [k.split(":", 1)[1] for k in lane_usd], until),
         "fleet_running_share": (on / (on + off)) if (on + off) else None,
     }
 
@@ -685,16 +711,24 @@ def render(res, project, prices, prs_error=None, sources=None):
     if prs_error:
         L.append(f"  merges: {prs_error}")
     L.append("")
-    total = res["pm"]["usd"] + res["agents"]["usd"]
-    L.append(f"Spend: {money(total)} = agents {money(res['agents']['usd'])} + PM {money(res['pm']['usd'])}"
+    lanes_usd = res.get("lanes_usd_total") or 0.0
+    total = res["pm"]["usd"] + res["agents"]["usd"] + lanes_usd
+    L.append(f"Spend: {money(total)} = Claude agents {money(res['agents']['usd'])} + lanes {money(lanes_usd)} + PM {money(res['pm']['usd'])}"
              + (f"   (other sessions in this repo, not counted: {money(res['other']['usd'])})" if res["other"]["sessions"] else ""))
     unp = dict(res["agents"]["unpriced"])
     for k, v in res["pm"]["unpriced"].items():
         unp[k] = unp.get(k, 0) + v
-    for k, v in res["lanes"].items():
+    for k, v in (res.get("lanes_unpriced") or {}).items():
         unp[k] = unp.get(k, 0) + v
+    if res.get("lanes_usd"):
+        L.append("  lanes: " + ", ".join(f"{k} {money(v)}" for k, v in sorted(res["lanes_usd"].items(), key=lambda kv: -kv[1])))
     if unp:
-        L.append("  no price, tokens only: " + ", ".join(f"{k} {ktok(v)}" for k, v in sorted(unp.items(), key=lambda kv: -kv[1])))
+        L.append("  no price, tokens only (not in Spend): " + ", ".join(f"{k} {ktok(v)}" for k, v in sorted(unp.items(), key=lambda kv: -kv[1])))
+    if res.get("lanes_no_usage"):
+        L.append("  lane sessions with no usage logged (cost unknown, not in Spend): "
+                 + ", ".join(f"{k} {v}" for k, v in sorted(res["lanes_no_usage"].items(), key=lambda kv: -kv[1])))
+    if res.get("prices_expired"):
+        L.append("  price past its valid_until date, update executors.json: " + ", ".join(res["prices_expired"]))
     L.append("")
     if n:
         pm_share = res["pm"]["usd"] / n
@@ -735,7 +769,7 @@ def render(res, project, prices, prs_error=None, sources=None):
     a = res["agents"]
     sp = a["split"]
     st = sum(sp.values()) or 1
-    L.append("Where agent money goes")
+    L.append("Where Claude agent money goes")
     L.append("  " + " · ".join(f"{k} {100 * v / st:.0f}%" for k, v in sorted(sp.items(), key=lambda kv: -kv[1]) if v))
     if a["usd"]:
         L.append(f"  whole-context cache rewrites after a wait of 5+ min: {a['rewrite_calls']} calls, "
@@ -973,6 +1007,21 @@ def selftest(check):
     bf2 = backfill_rows(agents, [dict(rows[0], outcome="verify_fail", fail_cause="missed", role="engineer")], prices, "st")
     check("backfill row keeps the fail cause", bf2[0].get("fail_cause"), "missed")
     check("text report renders", "Merged tickets: 1" in render(res, "st", prices), True)
+    lp = dict(prices, models=dict(prices["models"], **{"gpt-x": {"input": 2, "output": 10, "cache_read": 0.1, "valid_until": "2026-10-01"}}))
+    lrows = [{"type": "spawn", "ts": "2026-10-01T10:00:00Z", "project": "st", "ticket": "ST-1", "role": "engineer",
+              "executor": "codex", "model": "gpt-x", "duration_ms": 600000, "input_tokens": 1_000_000,
+              "cached_input_tokens": 800_000, "output_tokens": 100_000, "tokens": 1_100_000},
+             {"type": "spawn", "ts": "2026-10-01T11:00:00Z", "project": "st", "ticket": "ST-1", "role": "tester",
+              "executor": "codex", "model": "gpt-x", "duration_ms": 600000}]
+    ls = lane_sessions(lrows, "st")
+    check("lane: a row with no token split has unknown usage", ls[1]["usage"], None)
+    lres = analyse(mains, agents, ls, prs, lp, "ST", "2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z", rows)
+    want_lane = (200_000 * 2 + 800_000 * 0.1 + 100_000 * 10) / 1e6
+    check("lane: priced and counted", round(lres["lanes_usd_total"], 6), round(want_lane, 6))
+    check("lane: no usage is counted, not priced as zero", lres["lanes_no_usage"], {"codex:gpt-x": 1})
+    check("lane: an expired price is named", lres["prices_expired"], ["gpt-x"])
+    out = render(lres, "st", lp)
+    check("lane: Spend includes lanes", ("lanes $" in out, "cost unknown" in out, "valid_until" in out), (True, True, True))
     check("ticket view renders", "ST-7" in render_ticket(x), True)
     import shutil
     shutil.rmtree(d, ignore_errors=True)

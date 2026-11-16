@@ -16,6 +16,7 @@
 #   fleet watch <name> --until '<test>' | -- <command>    one background watcher per name
 #   fleet watch --show <name> | --list | --stop <name> | --stop-prefix <prefix>
 #   fleet retro [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself: rounds, spend, findings
+#   fleet review [--cwd DIR] [--last N] [--md FILE] [--json]   every run measured the same way, kept and compared
 #   fleet findings <file> [--titles]    only the findings of a codex review/exec output file
 #   fleet cache-server start|stop|status|env [--cwd DIR]   one Nx cache shared by every worktree
 #   fleet slot-template build [--cwd DIR] [--ref origin/<trunk>] | clone <slot> [--test] | status
@@ -44,6 +45,6 @@ case "${1:-}" in
   slot-template) shift; exec python3 "$here/fleettemplate.py" "$@" ;;
   gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
   guard) shift; exec python3 "$here/fleetguard.py" "$@" ;;
-  pick|budget|log|stats|report|cost|retro|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
+  pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

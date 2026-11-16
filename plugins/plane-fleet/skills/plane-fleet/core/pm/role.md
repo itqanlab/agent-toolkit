@@ -54,7 +54,7 @@ merge, diagnosing a red trunk, writing a Rework ticket.
 | `skills/spawn-tester.md` | a PR opens | `core/pm/skills/spawn-tester.md` §4 |
 | `skills/merge-queue.md` | approved PRs wait: you alone merge, in groups | `core/pm/skills/merge-queue.md` §5 |
 | `skills/deploy-and-done.md` | a group merged: deploy, confirm CI/CD, Done, tell the client | `core/pm/skills/deploy-and-done.md` §6 |
-| `skills/retro.md` | a run starts (start the retro watcher), the watcher exits, a group merged, the run ends | new in 2.7.0 |
+| `skills/retro.md` | a run starts (start the retro watcher), the watcher exits, a group merged, the run ends (retro, then review) | new in 2.7.0; review in 2.12.0 |
 
 ## Autonomy contract — read this before anything else
 
