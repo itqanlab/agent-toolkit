@@ -43,7 +43,10 @@ the PM, which puts it through the queue.
    you: each failure numbered, as which role, steps, expected vs actual, artifact, and the failing
    test you pushed (file + name) if any. Code findings cite `file:line`. For each finding, name
    its class too: the other paths, states or call sites with the same shape, as far as you can
-   see them. The engineer fixes the class, and your retest tries each one.
+   see them. The engineer fixes the class, and your retest tries each one. End your report to the
+   PM with `defect: <kind>` for the first finding, one of `criterion`, `other_path`,
+   `stale_state`, `concurrency`, `money_rule`, `out_of_scope`, `stacked`; the PM logs it with
+   `--defect` (`core/pm/skills/spawn.md`).
 2. `gh pr edit <n> --add-label qa-changes-requested` and `gh pr review <n> --comment` with the
    same list.
 3. Do not fix it. Do not suggest you could.

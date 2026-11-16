@@ -38,10 +38,17 @@ OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_
 # Rows that mark something the PM did, not a session: never scored, never counted as spend.
 MARKER_OUTCOMES = ("done", "retro_fix", "decision")
 # a session that ended without a result must say why, or the review cannot learn from it
-REASON_OUTCOMES = ("blocked", "lane_failed", "deferred", "decision")
+REASON_OUTCOMES = ("blocked", "lane_failed", "deferred", "decision", "verify_fail")
 DUPLICATE_WINDOW_S = 600
 # Why a tester failed a PR (`core/pm/skills/spawn.md` §3 "Read a low pass rate correctly"); only "missed" counts against the model.
 FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
+# what kind of defect a missed verify_fail was, so the review can count rework by class.
+# criterion: an acceptance criterion not met. other_path: the rule works on one path, breaks on
+# another the change touches (edit, second screen, error code). stale_state: preview and save
+# disagree, or state changed between them. concurrency: race, deadlock, retry duplicate.
+# money_rule: rounding, discount share or another money rule applied differently. out_of_scope:
+# the ticket never asked for it. stacked: brought in by another ticket on the same branch.
+DEFECTS = ("criterion", "other_path", "stale_state", "concurrency", "money_rule", "out_of_scope", "stacked")
 def X(p):
     """~ expands; {state_home} is PLANE_FLEET_HOME (default ~/.config/plane-fleet); {fleet_root} is this folder."""
     if not isinstance(p, str):
@@ -1256,16 +1263,26 @@ def selftest():
             check("verify_fail without a cause is refused", "logged", "refused")
         except SystemExit:
             check("verify_fail without a cause is refused", True, True)
-        main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"], quiet=True)
+        main(base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"], quiet=True)
         r4 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-4", {})
         check("--cause stored", r4.get("fail_cause"), "ticket")
-        st4 = base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket"]
+        st4 = base[:5] + ["ST-4"] + base[6:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"]
         with contextlib.redirect_stderr(io.StringIO()) as err:
             code = main(st4, quiet=True)
         check("log add: a repeat within 10 minutes is refused", (code, "repeats a row" in err.getvalue()), (5, True))
         check("log add: --force logs it anyway", main(st4 + ["--force"], quiet=True), 0)
         check("log add: another executor is not a repeat",
-              main(base[:5] + ["ST-4"] + base[6:7] + ["codex"] + base[8:-1] + ["verify_fail", "--cause", "ticket"], quiet=True), 0)
+              main(base[:5] + ["ST-4"] + base[6:7] + ["codex"] + base[8:-1] + ["verify_fail", "--cause", "ticket", "--reason", "AC 2 fails"], quiet=True), 0)
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                main(base[:5] + ["ST-6"] + base[6:-1] + ["verify_fail", "--cause", "missed"], quiet=True)
+                vf_refused = False
+            except SystemExit:
+                vf_refused = True
+        check("verify_fail without a reason is refused", vf_refused, True)
+        main(base[:5] + ["ST-6"] + base[6:-1] + ["verify_fail", "--cause", "missed", "--defect", "other_path",
+                                                 "--reason", "edit path skips the hold"], quiet=True)
+        check("--defect stored", {r["ticket"]: r for r in load_rows(reg)}.get("ST-6", {}).get("defect"), "other_path")
         main(base[:5] + ["ST-5"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
         with contextlib.redirect_stderr(io.StringIO()):
             code = main(base[:5] + ["ST-6"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
@@ -1353,6 +1370,7 @@ def main(argv=None, quiet=False):
     lg.add_argument("--experiment", action="store_true"); lg.add_argument("--set", nargs="*", default=None, action="extend")
     lg.add_argument("--from-result", help="a lane's result.json: duration, tokens and identity come from it")
     lg.add_argument("--cause", choices=FAIL_CAUSES, help="why the tester failed it; required with --outcome verify_fail")
+    lg.add_argument("--defect", choices=DEFECTS, help="what kind of defect a missed verify_fail was (see DEFECTS)")
     lg.add_argument("--force", action="store_true", help="log it even when a matching row is already logged")
     co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
@@ -1436,6 +1454,8 @@ def main(argv=None, quiet=False):
                    "reason": args.reason, "outcome": args.outcome}
             if args.cause:
                 fields["fail_cause"] = args.cause
+            if args.defect:
+                fields["defect"] = args.defect
             row.update(fields)
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
@@ -1446,6 +1466,9 @@ def main(argv=None, quiet=False):
                 row["reason"] = said
             if row["outcome"] == "verify_fail" and row.get("fail_cause") not in FAIL_CAUSES:
                 ap.error(f"verify_fail needs --cause {'|'.join(FAIL_CAUSES)}: only 'missed' counts against the model")
+            if row["outcome"] == "verify_fail" and row.get("fail_cause") == "missed" and not row.get("defect") and not quiet:
+                print(f"fleetctl: logged; add --defect {'|'.join(DEFECTS)} next time, so the review can count rework by class",
+                      file=sys.stderr)
             dup = None if args.force else duplicate_of(reg, row)
             if dup is not None:
                 print(f"fleetctl: not logged, it repeats a row already in the log: {dup.get('ts')} {dup.get('ticket')} "

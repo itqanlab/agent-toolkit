@@ -152,10 +152,16 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    log its `tokens`: that is the last call's size, not the spend. `$L cost --backfill` writes the
    real usage onto the row from the session file, matched by `agent_id`. A tester's
    `verify_fail` needs `--cause missed|ticket|spec_changed|environment` (the table under "Read a
-   low pass rate correctly"); the log refuses one without it. Lane: `$L log add --from-result <out>/result.json --kind …
+   low pass rate correctly"); the log refuses one without it. It also needs `--reason`: the
+   first finding in a few words. A `missed` one takes `--defect` too, the kind of defect:
+   `criterion` (a criterion not met), `other_path` (works on one path, breaks on another the change
+   touches), `stale_state` (preview and save disagree), `concurrency`, `money_rule` (rounding or a
+   money rule applied differently), `out_of_scope` (the ticket never asked for it) or `stacked`
+   (another ticket on the same branch). (2026-11-16: 67 of 186 failures had no reason, so the
+   review could not say which kind of rework to cut.) Lane: `$L log add --from-result <out>/result.json --kind …
    --outcome … --reason "…"` (ticket, role, executor, model, duration and tokens come from the
    file). One log for all projects, `~/.config/plane-fleet/executor-outcomes.jsonl`.
-   A `blocked`, `lane_failed` or `deferred` row needs `--reason` saying what stopped the session;
+   A `blocked`, `lane_failed`, `deferred` or `verify_fail` row needs `--reason` saying what stopped the session;
    the log refuses one without it. A lane row with no `--reason` takes the lane's last message,
    marked `lane said:`. (2026-11-16: 12 of 21 blocked sessions in one run had no reason, so the
    review could not tell a ticket gap from a stuck lane.) A routing choice or an owner's order is

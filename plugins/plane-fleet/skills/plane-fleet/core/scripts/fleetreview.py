@@ -17,7 +17,7 @@ Config: `fleet.review` (core/references/config-schema.md).
 Exit codes: 0 done, 1 no runs found.
 Standard library only. Python 3.9.
 """
-import datetime, json, os, re, statistics, time
+import collections, datetime, json, os, re, statistics, time
 
 import fleetcost
 import fleetretro
@@ -312,6 +312,9 @@ def scorecard(d, tl, alive, t0, t1, n_rows, rows, project, versions, decisions_p
         "rework_rate_merged": (sum(1 for x in merged if x["rounds"]) / n) if n else None,
         "mix": dict(sorted(mix.items(), key=lambda kv: -kv[1])),
         "blocked": len(blocked), "blocked_no_reason": sum(1 for r in blocked if not r.get("reason")),
+        "defects": dict(collections.Counter(r.get("defect") or "not logged" for r in sess
+                                            if r.get("outcome") == "verify_fail" and r.get("fail_cause") == "missed")),
+        "fails_no_reason": sum(1 for r in sess if r.get("outcome") == "verify_fail" and not r.get("reason")),
         "retro_fixes": [x.get("reason") for x in d["retro_fixes"]],
         # logged decision rows carry their time; the decisions file only its day
         "decisions": [f"{x['ts'][5:16].replace('T', ' ')} {x.get('reason')}" for x in d.get("decisions") or []]
@@ -491,6 +494,10 @@ def render(cards, open_card, verdict, project, notes):
             L.append(f"  retro fix: {x}")
         if last.get("fail_causes"):
             L.append("  test failures by cause: " + ", ".join(f"{k} {v}" for k, v in sorted(last["fail_causes"].items(), key=lambda kv: -kv[1])))
+        if last.get("defects"):
+            L.append("  missed defects by class: " + ", ".join(f"{k} {v}" for k, v in sorted(last["defects"].items(), key=lambda kv: -kv[1])))
+        if last.get("fails_no_reason"):
+            L.append(f"  test failures with no reason logged: {last['fails_no_reason']}")
         al = [k for k, lv in (last.get("findings") or {}).items() if lv == "alert"]
         if al:
             L.append("  retro alerts: " + ", ".join(al))
