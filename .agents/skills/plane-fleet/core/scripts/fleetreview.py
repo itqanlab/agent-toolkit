@@ -343,6 +343,17 @@ def read_history(path):
     return [out[k] for k in sorted(out)]
 
 
+def trials_on(cfg):
+    """The pipeline trials switched on in fleet.trials, as short labels."""
+    out = []
+    for k, v in sorted(((cfg.get("fleet") or {}).get("trials") or {}).items()):
+        if v is True:
+            out.append(k)
+        elif isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
+            out.append(f"{k}={v:g}")
+    return out
+
+
 def append_history(path, cards):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a") as f:
@@ -460,6 +471,8 @@ def render(cards, open_card, verdict, project, notes):
     L.append(f"  {'run start (UTC)':<28}" + "".join(f"{h:>{w}}" for h in head))
     L.append(f"  {'hours':<28}" + "".join(f"{c['hours']:>{w}.1f}" for c in cols))
     L.append(f"  {'toolkit version':<28}" + "".join(f"{(c.get('version') or '—'):>{w}}" for c in cols))
+    if any(c.get("trials") for c in cols):
+        L.append(f"  {'trials on':<28}" + "".join(f"{(','.join(c.get('trials') or []) or '—')[:w - 1]:>{w}}" for c in cols))
     for g in GOALS + (None,):
         L.append(f"  {('-- ' + g) if g else '-- drivers':<28}")
         for key, label, kind, _, goal in METRICS:
@@ -519,6 +532,7 @@ def render_md(cards, open_card, verdict, project, notes):
         L.append("| metric | " + " | ".join(c["start"][5:16].replace("T", " ") for c in cols) + " |")
         L.append("|---|" + "---|" * len(cols))
         L.append("| toolkit version | " + " | ".join(c.get("version") or "—" for c in cols) + " |")
+        L.append("| trials on | " + " | ".join(", ".join(c.get("trials") or []) or "—" for c in cols) + " |")
         for key, label, kind, _, goal in sorted(METRICS, key=lambda m: (GOALS + (None,)).index(m[4])):
             L.append(f"| {(goal + ': ') if goal else ''}{label.strip()} | " + " | ".join(fmt(c.get(key), kind) for c in cols) + " |")
         last = cols[-1]
@@ -567,6 +581,8 @@ def run(fleetctl, args):
     project = args.project or reg.get("_project")
     hpath = history_path(fleetctl.STATE_HOME, project)
     kept = [] if args.rebuild else read_history(hpath)
+    # the config says which trials are on now, not when an old run ran, so a rebuild keeps the recorded ones
+    old_trials = {c["start"]: c.get("trials") for c in read_history(hpath)}
     since = epoch(args.since) if args.since else None
     if args.since and since is None:
         raise SystemExit(f"fleet review: --since {args.since!r} is not an ISO time")
@@ -601,6 +617,7 @@ def run(fleetctl, args):
                                             None, None, ctx["proj_rows"])
             tl = [y for y in timelines(every, ctx["proj_rows"], project, alive).values() if a <= y["first"] < t1]
             card = scorecard(d, tl, alive, a, t1, n, rows, project, versions, decisions_path)
+            card["trials"] = old_trials.get(card["start"]) if args.rebuild else trials_on(ctx["cfg"])
             if is_open:
                 open_card = card
             else:
@@ -685,3 +702,7 @@ def selftest(check):
     with open(dp, "w") as f:
         f.write("| 2026-11-13 | engineer/* | claude:sonnet → codex | owner order | x |\n- 2026-11-01: old line\n")
     check("review: decisions on the run's days", len(decisions_on(dp, "2026-11-13", "2026-11-14")), 1)
+    check("review: trials on", trials_on({"fleet": {"trials": {"path_map": True, "money_ceiling": False,
+                                                               "group_cut_minutes": 30, "off": 0}}}),
+          ["group_cut_minutes=30", "path_map"])
+    check("review: no trials block", trials_on({}), [])

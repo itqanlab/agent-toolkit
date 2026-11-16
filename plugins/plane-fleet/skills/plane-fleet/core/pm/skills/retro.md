@@ -121,6 +121,9 @@ sessions with no reason. A run still going is shown and marked open, never kept.
 
    An owner's order is logged the same way, with `owner order:` at the start of the reason.
    A `decision` row needs a reason, is never refused as a repeat and is never scored.
+   A pipeline change on trial is a switch in `fleet.trials` (`core/references/config-schema.md`).
+   Turn it on or off only between runs, never mid-run, and log that as a decision too. The review
+   shows a "trials on" row, so each trial is judged against the runs without it.
 4. **The next review checks it.** Read the metrics the last review's changes named. A change
    whose metric did not move is not kept by default: say so and propose to undo it or replace it.
 5. **Small tweaks are not the only option.** When the same metric is worse in two reviews in a row,

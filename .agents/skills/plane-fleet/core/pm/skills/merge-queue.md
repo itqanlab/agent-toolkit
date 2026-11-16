@@ -52,7 +52,15 @@ review (`codex review "<instructions naming the base>" > <tmp>/group-<n>-review.
 `--base` cannot be combined with a prompt), reads it only through `fleet findings <that file>`,
 and opens ONE PR into the trunk. Per-PR CI skips most jobs on drafts, so the group PR carries
 all the risk: keep a group small (about 5) when it includes a shared UI change or a dependency
-change. That PR is where the whole server and browser suites
+change. **When `fleet.trials.group_cut_minutes` is set above 0, cut the group no later than
+that many minutes after the first approval started waiting**, even with one or two branches,
+unless a group PR is still open (the one-group-at-a-time rules below still hold). Measured
+2026-11-16 on one project, 209 tickets: approved to group PR opened took a median 1.5h, and in
+54% of that time no other group was open, so nothing but the cut was holding it. A group costs
+about 47 runner minutes (group PR and trunk push). Pay for the extra groups by keeping every
+ticket PR a draft: in the same period, ticket PRs taken out of draft ran the full CI on every
+push, about 3,600 runner minutes in 18 days, while a draft runs almost nothing. `fleet status`
+warns about each one. That PR is where the whole server and browser suites
 run, so testers no longer run them per ticket (the tester role). Ticket PRs stay drafts the whole
 way: never mark one ready and never put the e2e label on one. A draft ticket PR still shows as
 merged once its commits reach the trunk through the group. To make sure the suites really run:

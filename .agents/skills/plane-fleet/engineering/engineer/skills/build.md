@@ -5,6 +5,23 @@
 
 ## 3) Implement
 
+### 3a. Path map before code (trial: `fleet.trials.path_map`)
+
+Only when the trial is on in the project config, and the ticket changes a money, stock, state or
+permission rule. Before you write code, find every place that rule runs: each entry point (create,
+edit, store order, online order, exchange, retry, import), each writer of the fields it sets, each
+screen that shows a preview of it. Search the whole repo, not the files you expect to touch.
+Post it on the ticket as one comment that starts with `PATH MAP:`, one row per path:
+
+| Path | Where (`file:line`) | What the ticket needs there | How a tester reaches it |
+|---|---|---|---|
+
+Rows the ticket does not cover are listed too, marked `out of scope: <ticket that owns it>`.
+Then build every in-scope row, and keep the map current if you find a new path. The tester
+checks every row in round 1. Why: measured 2026-11-16 on one project, most failed test rounds
+were the same rule breaking on a path nobody had listed yet, found one path per round, and three
+releases of "fix the class" rules did not move the rework rate (39-67% in every run).
+
 - Small **logical** commits, conventional style, each one self-contained and building.
   Message references the ticket: `fix(orders): persist item quantities (PROJ-57)`.
 - Follow the repo's own contracts/conventions (CLAUDE.md, `contracts/`, lint boundaries).

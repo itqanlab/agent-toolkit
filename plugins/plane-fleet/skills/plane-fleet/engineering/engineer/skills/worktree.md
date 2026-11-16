@@ -22,6 +22,14 @@ If it prints commits, you branched off the wrong base: delete the worktree and b
 again. (2026-09-30: an engineer branched off an open PR's branch, and its PR carried someone
 else's commits.) A rework engineer is the one exception: it continues on the existing PR branch.
 
+**When `fleet.trials.own_commits_only` is on, a branch carries only its own ticket's work, in
+rework too.** Every commit names this ticket and no other. A defect that belongs to another
+ticket gets fixed on that ticket's branch, or filed (`engineering/engineer/skills/follow-ups.md`).
+To catch up, merge or rebase `origin/<trunk>` only, never a group branch or another ticket's
+branch. A blocker named in your brief is the base you start from, not something you merge in
+later. (2026-11-16, one project: one ticket's branch took in a group branch and fixes for three
+other tickets during rework, and went through 9 test rounds, each one checking all four.)
+
 **Give the worktree its own real `node_modules` — do not symlink it into the main checkout's.**
 A symlinked `node_modules` causes two confirmed failure modes:
 

@@ -12,7 +12,7 @@ ticket and config; the running app, its network responses, the slot DB.
 **Forbidden until Phase A's verdict is posted:** the diff, the PR description, commit messages,
 the engineer's handoff comment, the source tree.
 
-Two exceptions. First: comments that start with `PM SCOPE DECISION:`. Read them before
+Two exceptions, and a third while a trial is on. First: comments that start with `PM SCOPE DECISION:`. Read them before
 extracting criteria. They are the owner's scope changes after the ticket was claimed, and where
 they differ from the description, **they win**. Judge against them, and list which ones you
 applied in your Phase A comment. Every other comment stays unread until Phase B.
@@ -21,6 +21,11 @@ Second: the `built against ticket updated_at <ts>` line in the engineer's handof
 Read it first and compare with the ticket's current `updated_at`. If the ticket changed after the
 build, **stop and report to the manager instead of judging**. Say what the new text demands that
 the old did not. Failing work against a spec written after it was built is a false negative.
+
+Third, only when `fleet.trials.path_map` is on: the engineer's `PATH MAP:` comment. It lists
+where the rule runs, not what the engineer found. Check every in-scope row in this round, add any
+path you find that it missed (that is a finding of its own), and fail an `out of scope` row only
+when the ticket's criteria clearly cover it.
 
 Then:
 

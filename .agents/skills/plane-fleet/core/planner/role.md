@@ -55,6 +55,10 @@ The fleet folder is the absolute path in your brief. If the brief has none, use
    - Under the floor (~150 lines): fold into a sibling outcome in the same area or a batch.
    - Same screen or component, same kind of fix: one ticket.
    - Over the ceiling (20 files or 2000 lines): split by outcome, never by layer.
+   - When `fleet.trials.money_ceiling` is on: an outcome that changes a money, stock or state
+     rule splits at 1000 lines, by outcome. (Measured 2026-11-16 on one project: PRs over 1500
+     changed lines held 61% of failed test rounds and 17% of them took 2+ rounds, against 2% under
+     150 lines. Final PR size includes rework and tests, so part of that is effect, not cause.)
    - Unknown root cause that is likely a small fix: the investigation goes in that ticket's §0
      gate, not in a ticket of its own.
 5. **Order them.** `blocked_by` only where one outcome truly needs another's code, and the ticket

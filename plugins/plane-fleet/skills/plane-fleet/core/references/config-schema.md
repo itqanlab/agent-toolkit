@@ -175,6 +175,15 @@ by key; lists and plain values replace.
       "compare_runs": 5,                 // runs shown side by side, and the runs the last one is judged against
       "change_pct": 10                   // a metric that moved more than this against their median is called better or worse
     },
+    "trials": {                          // OPTIONAL. Pipeline changes on trial, all off by default. Turn one on
+                                         // between runs, never mid-run; `fleet review` records which were on
+      "path_map": false,                 // money/stock/state tickets: the engineer posts a PATH MAP before code,
+                                         // the tester checks every row in round 1 (engineer build.md §3a)
+      "money_ceiling": false,            // planner splits money/stock/state outcomes over 1000 lines (planner role)
+      "own_commits_only": false,         // a ticket branch carries only its own ticket's commits (engineer worktree.md)
+      "group_cut_minutes": 0             // cut a merge group no later than this many minutes after the first
+                                         // approval waiting; 0 = off (PM merge-queue.md)
+    },
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []
     },
