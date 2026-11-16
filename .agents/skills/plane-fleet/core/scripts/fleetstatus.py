@@ -242,6 +242,11 @@ def render(s):
         prs = s["prs"]
         ready = [p for p in prs if p["required"] == "green" and "qa-approved" in p["labels"]]
         L.append(f"open PRs ({len(prs)}; approved with required checks green: {len(ready)}):")
+        loud = [p for p in prs if ready_ticket_pr(p, s["trunk"])]
+        if loud:
+            # measured 2026-11-16, one project: ticket PRs out of draft used about 3,600 runner minutes in 18 days
+            L.append(f"  WARNING {len(loud)} ticket PR(s) out of draft run the full CI on every push: "
+                     + " ".join(f"gh pr ready --undo {p['number']};" for p in loud))
         for p in sorted(prs, key=lambda p: p["number"]):
             if p["draft"] and p["required"] == "missing":
                 p["required"] = "on group"   # ticket PRs stay drafts; the required jobs run on the group PR
@@ -270,7 +275,17 @@ def run(fleetctl, args):
 
 
 # ---------------------------------------------------------------- selftest
+def ready_ticket_pr(p, trunk):
+    """A ticket PR out of draft runs the full CI on every push. Only group and release PRs should."""
+    return (not p.get("draft") and bool(p.get("tickets")) and not str(p.get("branch") or "").startswith("release/")
+            and p.get("base") == trunk)
+
+
 def selftest(check):
+    tp = {"draft": False, "tickets": ["P-1"], "branch": "feat/P-1-x", "base": "develop"}
+    check("status: a ticket PR out of draft is flagged", ready_ticket_pr(tp, "develop"), True)
+    check("status: a group PR is not", ready_ticket_pr({**tp, "branch": "release/group-1"}, "develop"), False)
+    check("status: a draft is not", ready_ticket_pr({**tp, "draft": True}, "develop"), False)
     roll = [{"__typename": "CheckRun", "name": "unit", "status": "COMPLETED", "conclusion": "FAILURE", "startedAt": "2026-10-25T08:00:00Z"},
             {"__typename": "CheckRun", "name": "unit", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-10-25T09:00:00Z"},
             {"__typename": "CheckRun", "name": "e2e", "status": "IN_PROGRESS", "conclusion": "", "startedAt": "2026-10-25T09:00:00Z"},
