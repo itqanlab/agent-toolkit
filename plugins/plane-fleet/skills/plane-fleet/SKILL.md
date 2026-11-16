@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Needs git, the GitHub CLI (gh) signed in, python3 and node 18 or newer, and a Plane MCP server named plane (see README.md). Optional: other coding CLIs for non-default executors. Network access to Plane and GitHub."
 metadata:
   author: itqanlab
-  version: 2.11.1
+  version: 2.12.0
   category: devops
   short: "Run a Plane board with sections of agent roles"
   starter: "fleet run: work the board until the queue is empty"
@@ -87,6 +87,7 @@ scripts/fleet pick --role engineer --kind api --cwd <repo>
 scripts/fleet cost --since 2026-10-01      # real spend and time per merged ticket
 scripts/fleet cost --ticket PROJ-12        # one ticket's sessions in order
 scripts/fleet retro --since <run start> --cwd <repo>   # numbered findings on the run: cause, fix, owner; exit 3 on an alert
+scripts/fleet review --cwd <repo> --md <file>          # every run measured the same way, kept, compared with the runs before
 scripts/fleet findings /tmp/PROJ-12-review.md          # only the findings of a review transcript, deduplicated
 scripts/fleet watch --stop-prefix PROJ-12-  # stop every watcher of one ticket, before the report
 scripts/fleet free-models refresh          # today's free models, for read-only scans
