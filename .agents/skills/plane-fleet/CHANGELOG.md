@@ -4,6 +4,36 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.13.0] - 2026-11-16
+
+The second review looked at rework and merge wait in one project. Rework stayed at 39-67% in every
+run, through three releases of "fix the class" brief rules, and most failed test rounds were the
+same rule breaking on a path nobody had listed. So this release changes the pipeline itself, behind
+switches a project turns on between runs, and measures what each failure was.
+
+### Added
+
+- `fleet.trials` in the config, all off by default. Turn one on only between runs. `fleet review`
+  shows a "trials on" row, so each trial is judged against the runs without it.
+  - `path_map`: on a money, stock, state or permission ticket the engineer posts a `PATH MAP:`
+    comment before code, with every entry point and writer the rule touches. The blind tester may
+    read it and checks every row in round 1.
+  - `money_ceiling`: the planner splits money, stock and state outcomes at 1000 lines.
+  - `own_commits_only`: a branch carries only its own ticket's work, in rework too. One ticket's
+    branch took in a group branch and three other tickets' fixes, and went through 9 test rounds.
+  - `group_cut_minutes`: the PM cuts a merge group no later than this many minutes after the first
+    approval starts waiting. Approved to group opened was a median 1.5h, and for 54% of it no other
+    group was open.
+- `--defect` on `log add` for a missed `verify_fail`: `criterion`, `other_path`, `stale_state`,
+  `concurrency`, `money_rule`, `out_of_scope` or `stacked`. The tester names it in its report, and
+  the review counts missed failures by kind.
+- `fleet status` warns about each ticket PR out of draft, with `gh pr ready --undo`. A draft runs
+  almost no CI; ticket PRs out of draft used about 3,600 runner minutes in 18 days.
+
+### Changed
+
+- A `verify_fail` row needs `--reason`, like `blocked`. 67 of 186 failures had none.
+
 ## [2.12.0] - 2026-11-16
 
 The first review across five runs of one project showed the fleet's cost figures were wrong in
