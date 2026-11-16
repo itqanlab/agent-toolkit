@@ -15,6 +15,7 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py report  --project P --since ISO [--until ISO]   Done, approvals, tokens, hours (see report -h)
   fleetctl.py cost    [--since ISO] [--until ISO] [--ticket T] [--json] [--backfill]   real spend and time, from the sessions
   fleetctl.py retro   [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself (fleetretro.py)
+  fleetctl.py review  [--cwd DIR] [--last N] [--md FILE] [--json]   every run measured the same way and kept (fleetreview.py)
   fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
@@ -1292,6 +1293,8 @@ def selftest():
         fleetcost.selftest(check)
         import fleetretro
         fleetretro.selftest(check, sys.modules[__name__])
+        import fleetreview
+        fleetreview.selftest(check)
         import fleetfindings
         fleetfindings.selftest(check)
         freemodels.selftest(check)
@@ -1362,6 +1365,14 @@ def main(argv=None, quiet=False):
     rt.add_argument("--hours", type=float); rt.add_argument("--json", action="store_true")
     rt.add_argument("--no-record", action="store_true", help="don't save this run's findings for repeat detection")
     rt.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
+    rv = sub.add_parser("review", description="Every run measured the same way, kept, and compared with the runs before (fleetreview.py).")
+    rv.add_argument("--cwd"); rv.add_argument("--project"); rv.add_argument("--since", help="look for runs from here (default: after the last kept run, else 30 days)")
+    rv.add_argument("--last", type=int, help="runs to show side by side (default fleet.review.compare_runs, 5)")
+    rv.add_argument("--gap-hours", type=float, help="a gap longer than this between log rows starts a new run (default 4)")
+    rv.add_argument("--json", action="store_true"); rv.add_argument("--md", help="also write the review as markdown to this file")
+    rv.add_argument("--no-record", action="store_true", help="measure and show, keep nothing")
+    rv.add_argument("--rebuild", action="store_true", help="measure every run since --since again and rewrite the history")
+    rv.add_argument("--claude-dir", help="Claude Code projects folder (default $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
     rp = sub.add_parser("report", description=REPORT_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     rp.add_argument("--project"); rp.add_argument("--since", required=True); rp.add_argument("--until"); rp.add_argument("--cwd")
     sub.add_parser("selftest")
@@ -1463,6 +1474,9 @@ def main(argv=None, quiet=False):
     elif args.cmd == "retro":
         import fleetretro
         return fleetretro.run(sys.modules[__name__], args)
+    elif args.cmd == "review":
+        import fleetreview
+        return fleetreview.run(sys.modules[__name__], args)
     elif args.cmd == "stats":
         board = scoreboard(reg, load_rows(reg), args.role, args.kind, args.project)
         if args.json:

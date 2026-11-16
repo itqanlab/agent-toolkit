@@ -156,7 +156,7 @@ by key; lists and plain values replace.
     "retro": {                           // OPTIONAL, for `fleet retro`. Every number has a default; set only what differs
       "tool_calls_per_session": 300,     // one engineer or tester session (the soft cap)
       "usd_per_ticket": 15,              // all sessions on one ticket in the window
-      "pm_share": 0.45,                  // PM spend over all spend, same whole UTC days
+      "pm_share": 0.45,                  // PM spend over all spend (agents and lanes), same window
       "pm_ctx_per_call": 150000,         // average PM context per call, in tokens
       "rework_rounds": 2,                // rework rounds on one ticket
       "rework_rate": 0.4,                // reworked over tested tickets, checked from 3 tested
@@ -168,6 +168,12 @@ by key; lists and plain values replace.
       "lane_minutes": 75,                // longest lane
       "codex_pts_per_hour": 4.0,         // Codex weekly meter points per hour
       "levels": { "lane_minutes": "off" }  // per key: alert (exit 3), warn, or off. Defaults in fleetretro.py
+    },
+    "review": {                          // OPTIONAL, for `fleet review`. Defaults shown
+      "gap_hours": 4,                    // a gap longer than this between log rows starts a new run
+      "min_rows": 5,                     // a run needs this many session rows, so a single test spawn is not a run
+      "compare_runs": 5,                 // runs shown side by side, and the runs the last one is judged against
+      "change_pct": 10                   // a metric that moved more than this against their median is called better or worse
     },
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []

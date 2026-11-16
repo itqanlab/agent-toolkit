@@ -37,7 +37,7 @@ script, `--hours N` for a rolling window. Thresholds and levels are in config un
   same watcher again. One watcher only: a second start under the name exits 75.
 - **After each group merge**, once the deploy is confirmed.
 - **At the end of a run**, with the whole run as the window. Its findings go into the resume
-  note.
+  note. Then run the review (§9).
 
 ### What to do with each finding
 
@@ -78,3 +78,66 @@ script, `--hours N` for a rolling window. Thresholds and levels are in config un
 | `lane_failures`, `lane_minutes` | other-CLI lanes fail or run long | move that task kind to another executor in config |
 | `rewrite_share` | too much agent spend went to cache rewrites after long waits | waits of at most 4 minutes; background waits through `fleet watch` |
 | `codex_pts_per_hour` | the Codex weekly meter burns too fast (owner) | lower Codex slots or move reviews to Claude |
+
+## 9) Review: every run, measured the same way, kept
+
+The retro looks at one window. The review looks at runs side by side, so a change can be judged
+by the run after it. (2026-11-16, one project: the first review across five runs found that a
+run moved to Codex showed $1.66 per merged ticket. Codex had no price. Priced, it was $24.41,
+the dearest of the five, while its time to merge was the best.)
+
+```bash
+<fleet>/core/scripts/fleet review --cwd <repo> --md <tmp>/review-<project>-<run date>.md
+```
+
+It finds the runs in the log (a gap of more than 4 hours starts a new run). It measures each new
+run with the same code as `cost` and `retro`, and keeps one scorecard per finished run in
+`{state_home}/reviews/<project>.jsonl`. Then it prints the last five runs side by side. For
+the last finished run it adds: the metrics that moved more than 10% against the median of the
+runs before (better and worse), the toolkit versions released since the run before, the
+session mix by role and executor, the decisions and retro fixes logged, and the blocked
+sessions with no reason. A run still going is shown and marked open, never kept.
+
+### When it runs
+
+- **At the end of every run**, after the final retro, before the resume note.
+- **Once a week** by the owner, across all projects that ran, even when no run ended cleanly.
+
+### What to do with it
+
+1. **Say the result to the owner in three lines:** time, results and cost, as the review's
+   headline gives them, and the one change you would make first. Numbers, not adjectives. The
+   three goals count the same: a run faster but dearer, or cheaper but with more rework, is a
+   trade. Never call it an improvement.
+2. **Fill the last section of the markdown, "What we change before the next run".** One line per
+   change, each naming the metric it should move and in which direction. Hand the file to the
+   owner, who keeps it with the project's records.
+3. **Log every change you make, when you make it:**
+
+   ```bash
+   <fleet>/core/scripts/fleet log add --role pm --ticket RUN --executor claude --model <yours> \
+     --outcome decision --reason "<what changed>: <the metric it should move>"
+   ```
+
+   An owner's order is logged the same way, with `owner order:` at the start of the reason.
+   A `decision` row needs a reason, is never refused as a repeat and is never scored.
+4. **The next review checks it.** Read the metrics the last review's changes named. A change
+   whose metric did not move is not kept by default: say so and propose to undo it or replace it.
+5. **Small tweaks are not the only option.** When the same metric is worse in two reviews in a row,
+   or a tweak did not move it, propose a bigger change with the numbers behind it: another
+   executor mix, a role dropped or merged, a different pipeline shape, other group sizes. Keep
+   the cost per merged ticket, the time to merge and the rework rate in the proposal, before
+   and expected after.
+
+### Reading the numbers right
+
+- Prices are API list prices, the same for every run, so runs can be compared. Plans bill
+  differently, so this is not the invoice.
+- Lane cost is a floor: lane rows don't say which calls went past 272K tokens, and Codex
+  does not report cache writes. A lane that logged no usage is counted as unknown, never as zero.
+- `Codex meter points` count all Codex use on the machine in the run's hours, not only the
+  fleet's lanes.
+- "Where the time went" covers merged tickets from first work to merge, across runs. The biggest
+  stage is where the next change should go, as long as it doesn't cost the other two goals.
+- `lost to sleep or login` is empty (`—`) when `fleet guard` did not run. That means not
+  checked, not zero.
