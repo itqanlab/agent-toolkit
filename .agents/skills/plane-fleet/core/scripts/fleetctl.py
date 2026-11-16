@@ -33,9 +33,11 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet root>/core/scripts/
 BASE_REGISTRY = os.path.join(FLEET_ROOT, "core", "references", "executors.json")
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix")
+OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix", "decision")
 # Rows that mark something the PM did, not a session: never scored, never counted as spend.
-MARKER_OUTCOMES = ("done", "retro_fix")
+MARKER_OUTCOMES = ("done", "retro_fix", "decision")
+# a session that ended without a result must say why, or the review cannot learn from it
+REASON_OUTCOMES = ("blocked", "lane_failed", "deferred", "decision")
 DUPLICATE_WINDOW_S = 600
 # Why a tester failed a PR (`core/pm/skills/spawn.md` §3 "Read a low pass rate correctly"); only "missed" counts against the model.
 FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
@@ -575,8 +577,8 @@ def derive_quality(rows):
 def duplicate_of(reg, row, now=None):
     """The logged row this new one repeats, or None. A repeat is the same project, ticket, role,
     executor and outcome within DUPLICATE_WINDOW_S, or the same agent_id with the same outcome.
-    A retro_fix row is never a repeat: two fixes for two findings can land in one minute."""
-    if row.get("outcome") in ("retro_fix",):
+    A retro_fix or decision row is never a repeat: two of them can land in one minute."""
+    if row.get("outcome") in ("retro_fix", "decision"):
         return None
     now = now or time.time()
     key = (row.get("project"), row.get("ticket"), row.get("role"), row.get("executor"), row.get("outcome"))
@@ -674,6 +676,18 @@ def lane_result_fields(path):
     if res.get("status") and res["status"] != "completed":
         fields["lane_status"] = res["status"]
     return ident, fields, res
+
+
+def lane_reason(res):
+    """A reason taken from a lane's own result, marked as the lane's words; None when it said nothing."""
+    if not res:
+        return None
+    lines = [l.strip() for l in str(res.get("lastMessage") or res.get("error") or "").splitlines() if l.strip()]
+    if lines:
+        return "lane said: " + lines[-1][:200]
+    if res.get("status") and res["status"] != "completed":
+        return f"lane status {res['status']}"
+    return None
 
 
 def now_iso():
@@ -1198,6 +1212,25 @@ def selftest():
         check("--set string", r1.get("note"), "hello world")
         check("bare duration_ms", r2.get("duration_ms"), 10)
         check("bare tokens", r2.get("tokens"), 20)
+        try:
+            import contextlib, io
+            with contextlib.redirect_stderr(io.StringIO()):
+                main(base[:5] + ["ST-B"] + base[6:-1] + ["blocked"], quiet=True)
+            refused = False
+        except SystemExit:
+            refused = True
+        check("log add: blocked with no reason is refused", refused, True)
+        bres = os.path.join(d, "blocked.json")
+        json.dump({"executor": "codex", "model": "gpt-x", "role": "engineer", "ticket": "ST-C", "status": "completed",
+                   "lastMessage": "Done what I could.\nBlocked: the migration needs a DBA decision"}, open(bres, "w"))
+        main(["log", "add", "--project", "st", "--outcome", "blocked", "--from-result", bres], quiet=True)
+        rc = {r["ticket"]: r for r in load_rows(reg)}.get("ST-C", {})
+        check("log add: a blocked lane takes its reason from the lane", rc.get("reason"), "lane said: Blocked: the migration needs a DBA decision")
+        dec = ["log", "add", "--project", "st", "--ticket", "RUN", "--role", "pm", "--executor", "claude", "--model", "opus",
+               "--outcome", "decision"]
+        check("log add: two decisions in a minute both log",
+              (main(dec + ["--reason", "engineers to codex: owner order"], quiet=True), main(dec + ["--reason", "testers to codex"], quiet=True)), (0, 0))
+        check("a decision is not scored", any(k[0] == "pm" for k in scoreboard(reg, load_rows(reg))), False)
         check("--reason kept", r2.get("reason"), "a=b")
         check("row shape", sorted(k for k in r2 if k != "quality")[:6], ["duration_ms", "executor", "experiment", "model", "outcome", "project"])
         check("from-result executor", r3.get("executor"), "codex")
@@ -1374,9 +1407,9 @@ def main(argv=None, quiet=False):
         fields = parse_kv(args.extra)
         fields.update(parse_kv(args.set))
         if args.action == "add":
-            ident = {}
+            ident, lane_res = {}, {}
             if args.from_result:
-                ident, rfields, _ = lane_result_fields(args.from_result)
+                ident, rfields, lane_res = lane_result_fields(args.from_result)
                 for k, v in rfields.items():
                     fields.setdefault(k, v)  # numbers typed on the line win over the file
             for f in ("ticket", "role", "executor", "model", "effort"):
@@ -1395,6 +1428,11 @@ def main(argv=None, quiet=False):
             row.update(fields)
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
+            if row["outcome"] in REASON_OUTCOMES and not (row.get("reason") or "").strip():
+                said = lane_reason(lane_res)
+                if not said:
+                    ap.error(f"{row['outcome']} needs --reason: what stopped the session, in a few words")
+                row["reason"] = said
             if row["outcome"] == "verify_fail" and row.get("fail_cause") not in FAIL_CAUSES:
                 ap.error(f"verify_fail needs --cause {'|'.join(FAIL_CAUSES)}: only 'missed' counts against the model")
             dup = None if args.force else duplicate_of(reg, row)

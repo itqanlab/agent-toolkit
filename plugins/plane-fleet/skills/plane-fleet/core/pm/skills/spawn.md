@@ -155,6 +155,11 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    low pass rate correctly"); the log refuses one without it. Lane: `$L log add --from-result <out>/result.json --kind …
    --outcome … --reason "…"` (ticket, role, executor, model, duration and tokens come from the
    file). One log for all projects, `~/.config/plane-fleet/executor-outcomes.jsonl`.
+   A `blocked`, `lane_failed` or `deferred` row needs `--reason` saying what stopped the session;
+   the log refuses one without it. A lane row with no `--reason` takes the lane's last message,
+   marked `lane said:`. (2026-11-16: 12 of 21 blocked sessions in one run had no reason, so the
+   review could not tell a ticket gap from a stuck lane.) A routing choice or an owner's order is
+   its own row, `--outcome decision` (`core/pm/skills/retro.md` §9).
    **Back-fill** as the ticket moves: `$L log backfill --ticket … --role engineer --set
    verify_first_pass=… ci_first_pass=…`, and `reverted` / `bug_filed` when they happen. When a
    ticket reaches **Done**: `$L log add --ticket … --role pm --executor claude --model <yours>
