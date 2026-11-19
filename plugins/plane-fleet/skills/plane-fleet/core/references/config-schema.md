@@ -167,6 +167,7 @@ by key; lists and plain values replace.
       "rewrite_share": 0.10,             // share of agent spend on cache rewrites after long waits
       "lane_minutes": 75,                // longest lane
       "codex_pts_per_hour": 4.0,         // Codex weekly meter points per hour
+      "held_hours": 0.5,                 // hours tickets sat held behind a pushed blocker with a slot free
       "levels": { "lane_minutes": "off" }  // per key: alert (exit 3), warn, or off. Defaults in fleetretro.py
     },
     "review": {                          // OPTIONAL, for `fleet review`. Defaults shown

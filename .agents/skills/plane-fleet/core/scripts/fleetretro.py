@@ -40,15 +40,17 @@ DEFAULTS = {
     "lane_minutes": 75,                # one lane's run time
     "codex_pts_per_hour": 4.0,         # Codex weekly meter points used per hour, when readable
     "lost_hours": 0.25,                # hours the machine slept or the agents could not run (fleet guard)
+    "held_hours": 0.5,                 # hours tickets sat held behind a pushed blocker while a slot was free
 }
 LEVELS = {
     "tool_calls_per_session": "alert", "usd_per_ticket": "alert", "pm_share": "alert",
     "pm_ctx_per_call": "alert", "rework_rounds": "alert", "rework_rate": "warn",
     "ticket_cause_failures": "alert", "duplicate_rows": "warn", "missing_agent_id": "warn",
     "lane_failures": "warn", "rewrite_share": "warn", "lane_minutes": "warn", "codex_pts_per_hour": "alert",
-    "lost_hours": "alert",
+    "lost_hours": "alert", "held_hours": "alert",
 }
 REPEAT_MIN_S, REPEAT_MAX_S = 20 * 60, 3 * 3600
+HELD_GAP_S = 30 * 60   # two held sightings further apart than this count as this much, not the whole gap
 FAIL_LANE = ("timeout", "failed", "error", "aborted", "killed")
 
 
@@ -176,6 +178,36 @@ def guard_events(state_home, t0, t1):
                 lost[e["kind"]] += (e.get("seconds") or 0) / 3600
     # no start event that covers the window: sleep and login were not checked, which is not zero
     return lost if ran else None
+
+
+def held_hours(state_home, project, t0, t1):
+    """Hours each ticket sat held with a free slot and room on the machine, from the sightings
+    `fleet status` writes. None when status never recorded held work for this project: the
+    outcome log has no field for it, so an unrecorded run is not zero."""
+    d = os.path.join(state_home, "held")
+    seen = os.path.join(d, f"{project}-seen.jsonl")
+    if not os.path.exists(seen) and not os.path.exists(os.path.join(d, f"{project}.json")):
+        return None
+    by = {}
+    try:
+        with open(seen) as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                t = epoch(e.get("ts"))
+                if t is not None and t0 <= t < t1 and e.get("ticket"):
+                    by.setdefault(e["ticket"], []).append(t)
+    except OSError:
+        pass
+    out = {}
+    for ticket, ts in by.items():
+        ts = sorted(set(ts))
+        h = sum(min(b - a, HELD_GAP_S) for a, b in zip(ts, ts[1:])) / 3600
+        if h > 0:
+            out[ticket] = h
+    return out
 
 
 def merge_wait_hours(rows, cost, project):
@@ -318,6 +350,14 @@ def evaluate(d, th, lv):
             return
         F.append({"key": key, "level": lv.get(key, "warn"), "number": number, "shown": shown,
                   "threshold": th[key], "cause": cause, "fix": fix, "who": who, "where": where or []})
+
+    held = d.get("held") or {}
+    if sum(held.values()) > th["held_hours"]:
+        top = sorted(held.items(), key=lambda kv: -kv[1])
+        add("held_hours", round(sum(held.values()), 2), f"{sum(held.values()):.1f}h of tickets held behind a pushed blocker with a slot free",
+            "the PM waited for a blocker to merge when its branch was already pushed",
+            "answer every held-work line in `fleet status` in the same turn: spawn the ticket stacked on the named "
+            "branch, or log why not (`--outcome decision`).", "pm", [f"{t} {h:.1f}h" for t, h in top])
 
     lost = d.get("lost") or {}
     if sum(lost.values()) > th["lost_hours"]:
@@ -475,6 +515,11 @@ def render(d, findings, merge_error=None):
              else "fleet guard did not run, so sleep and login were not checked"]
     if wait:
         parts.append(f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h")
+    held = d.get("held")
+    if held is None:
+        parts.append("held work not recorded (no `fleet held` entries for this project, and the outcome log has no field for it)")
+    else:
+        parts.append(f"held with a slot free {sum(held.values()):.1f}h" + (f" (longest {max(held, key=held.get)} {max(held.values()):.1f}h)" if held else ""))
     L.append("Lost time: " + " · ".join(parts))
     alerts = [f for f in findings if f["level"] == "alert"]
     L.append("")
@@ -538,6 +583,7 @@ def measure(fleetctl, ctx, t0, t1, now, until_given=True):
     d["until_is_now"] = not until_given
     d["lost"] = guard_events(fleetctl.STATE_HOME, t0, t1)
     d["merge_wait"] = merge_wait_hours(ctx["proj_rows"], cost, ctx["project"])
+    d["held"] = held_hours(fleetctl.STATE_HOME, ctx["project"], t0, t1)
     return d, cost
 
 
@@ -652,5 +698,21 @@ def selftest(check, fleetctl):
     check("retro: text names the findings", ("FINDINGS:" in out, "tool_calls_per_session" in out, "ST-1" in out), (True, True, True))
     calm = build(t0, t0 + 3600, "st", [], [], {"tickets": {}, "pm": {}, "agents": {}}, [], [], None, {}, now=t0 + 3600)
     check("retro: an empty window is healthy", (evaluate(calm, *thresholds({})), "healthy" in render(calm, [])), ([], True))
+    hd = os.path.join(d, "held-test")
+    check("retro: no held record means not measured", held_hours(hd, "st", t0, t0 + 3600), None)
+    os.makedirs(os.path.join(hd, "held"))
+    with open(os.path.join(hd, "held", "st-seen.jsonl"), "w") as f:
+        for m in (0, 10, 20, 30, 150, 160):      # 10-min sightings, a 2h gap, then more
+            f.write(json.dumps({"ts": ts(m), "ticket": "ST-7", "blocked_by": ["ST-6"], "free_slots": 1}) + "\n")
+        f.write(json.dumps({"ts": ts(5), "ticket": "ST-8", "blocked_by": ["ST-6"], "free_slots": 1}) + "\n")
+    hh = held_hours(hd, "st", t0, t0 + 4 * 3600)
+    check("retro: held hours sum sightings, a long gap counts 30 min", round(hh["ST-7"], 2), round((30 + 30 + 10) / 60, 2))
+    check("retro: one sighting is no held time", "ST-8" in hh, False)
+    check("retro: held hours keep to the window", held_hours(hd, "st", t0 + 3 * 3600, t0 + 4 * 3600), {})
+    hdata = dict(calm, held=hh)
+    HF = {f["key"]: f for f in evaluate(hdata, *thresholds({}))}
+    check("retro: held time over the limit is a pm alert", (HF["held_hours"]["level"], HF["held_hours"]["who"]), ("alert", "pm"))
+    check("retro: render says held work was not recorded", "held work not recorded" in render(calm, []), True)
+    check("retro: render shows held hours", "held with a slot free 1.2h" in render(hdata, []), True)
     import shutil
     shutil.rmtree(d, ignore_errors=True)
