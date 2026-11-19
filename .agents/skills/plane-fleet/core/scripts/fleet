@@ -11,6 +11,7 @@
 #   fleet apply  [--dry-run]           fleet seed       fleet models
 #   fleet free-models [list|refresh]    the free models opencode serves today
 #   fleet status [--json]               budget, slots, lanes, open PRs and CI in one call
+#   fleet held set T --blocked-by A[,B] | clear T | list   Todo tickets skipped for their blockers
 #   fleet resources [--json] [--gate heavy|light] [--wait [--max-wait S]]
 #                                       the machine's memory, swap, CPU and disk gate (any OS)
 #   fleet watch <name> --until '<test>' | -- <command>    one background watcher per name
@@ -45,6 +46,6 @@ case "${1:-}" in
   slot-template) shift; exec python3 "$here/fleettemplate.py" "$@" ;;
   gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
   guard) shift; exec python3 "$here/fleetguard.py" "$@" ;;
-  pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status) exec python3 "$here/fleetctl.py" "$@" ;;
+  pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status|held) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"
