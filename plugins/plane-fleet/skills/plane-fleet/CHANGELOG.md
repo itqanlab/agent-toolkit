@@ -4,6 +4,34 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.14.0] - 2026-11-19
+
+In one run the PM held a ticket about 3 hours while its blocker sat in a group PR in CI. 16 more
+tickets were chained behind it, and the machine had room for 4 heavy jobs while 1 or 2 ran.
+pick.md already said to start such a ticket stacked on the pushed branch. Nothing checked it.
+
+### Added
+
+- `fleet held set|clear|list`: the PM records each Todo ticket it skips for its blockers, from
+  the relations it already read at pick time. No extra Plane call.
+- `fleet status` prints a `held work` line when every blocker of a held ticket has an open PR
+  (draft, approved or in a group PR), a slot is free, and the machine is ok or tight with room.
+  It names the ticket, the blocker PR and the branch to stack on. No line while a blocker has no
+  pushed branch, no slot is free, or the machine is closed or critical. The compact-resume hook
+  shows it too.
+- `fleet retro` counts the hours a ticket sat held with a slot free, from the sightings status
+  writes: `held_hours`, a PM alert over half an hour. A run with nothing recorded says so
+  instead of showing zero, since the outcome log has no field for it.
+- A `STACKED ON` block for the engineer brief: start from the blocker branch, rebase onto trunk
+  after it merges, open the PR against trunk.
+
+### Changed
+
+- role.md and pick.md: a held-work line is answered in the same turn, by a stacked spawn or a
+  reason logged as `--outcome decision`. Waiting for the blocker to merge is not a reason.
+- The engineer's worktree skill allows a blocker branch as the base when the brief has a
+  `STACKED ON` block.
+
 ## [2.13.0] - 2026-11-16
 
 The second review looked at rework and merge wait in one project. Rework stayed at 39-67% in every

@@ -46,6 +46,27 @@ relations via `workitem_relation(action="list")`; an unparsed error means treat 
 unblocked; tickets filed during this run wait their turn except an `urgent` regression on a
 batch you just shipped).
 
+**Record every ticket you skip for its blockers**, from the relations you just read. No extra
+Plane call:
+
+```bash
+<fleet>/core/scripts/fleet held set PROJ-12 --blocked-by PROJ-11[,PROJ-10] --cwd <repo>
+```
+
+`fleet status` then prints a `held work` line when that ticket could start now: every blocker
+has an open PR (draft, approved, or in a group PR), a slot is free, and the `machine:` line is
+ok or tight with room. The line names the ticket, the blocker PR and the branch to stack on.
+There is no line while a blocker has no pushed branch, no slot is free, or the machine is closed
+or critical. Status drops a record once the ticket has its own PR; `fleet held clear PROJ-12`
+drops one by hand, `fleet held list` shows them.
+
+**One rule: a held-work line is answered in the same turn.** Either spawn the ticket stacked on
+the named branch (`core/pm/skills/spawn.md`, stacked brief), or log why not:
+`fleet log add --role pm --ticket PROJ-12 --executor claude --model <yours> --outcome decision
+--reason "held: <why>"`. A real reason is file overlap with an open PR, owner-gated, or a schema
+ticket outside the window. "The blocker has not merged yet" is not one. `fleet retro` counts the
+hours a ticket sat held with a slot free as waste (`held_hours`).
+
 **Check at pick time whether a ticket can finish without the owner.** Skip it, or put the
 question to the owner BEFORE claiming, if any of these apply:
 - the done criteria include a step only the owner may approve (a prod data change, a prod env

@@ -31,6 +31,8 @@ the fleet state below is current. Before the next pick:
   merge without Approved + qa-approved + required checks green; log every spawn with its
   agent_id; a verify_fail needs --cause; spawn nothing heavy unless the `machine:` line says
   ok or tight with room, and at critical free memory first (spawn-tester.md, machine gate).
+- A `held work` line below is answered this turn: spawn that ticket stacked on the branch it
+  names, or log why not (`--outcome decision`, pick.md).
 """
 
 

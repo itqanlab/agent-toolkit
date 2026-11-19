@@ -22,6 +22,8 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py config  [--get a.b.c] [--cwd DIR]   .plane/config.json + the per-user project override
   fleetctl.py free-models [list|refresh] [--json]   the free models opencode serves today (freemodels.py)
   fleetctl.py status  [--cwd DIR] [--json]   budget, slots, lanes, open PRs and CI in one call (fleetstatus.py)
+  fleetctl.py held    set T --blocked-by A[,B] | clear T [T ...] | list [--json] [--cwd DIR]
+                      Todo tickets skipped for their blockers; status says when one can start stacked
   fleet resources     [--cwd DIR] [--json] [--gate heavy|light] [--wait]   the machine gate (fleetres.py)
 
 Layers, later wins: <this dir>/../executors.json  <  user override (log.user_override)
@@ -1400,6 +1402,11 @@ def main(argv=None, quiet=False):
     sd = sub.add_parser("seed"); sd.add_argument("--cwd")
     cf = sub.add_parser("config"); cf.add_argument("--get"); cf.add_argument("--cwd")
     stt = sub.add_parser("status"); stt.add_argument("--cwd"); stt.add_argument("--json", action="store_true")
+    hd = sub.add_parser("held", description="Todo tickets the PM skipped for their blockers. `fleet status` names the ones "
+                        "that can start now, stacked on the blockers' pushed branches.")
+    hd.add_argument("action", choices=["set", "clear", "list"]); hd.add_argument("tickets", nargs="*")
+    hd.add_argument("--blocked-by", help="set: the blocker tickets, comma separated"); hd.add_argument("--cwd")
+    hd.add_argument("--json", action="store_true")
     fm = sub.add_parser("free-models"); fm.add_argument("action", nargs="?", default="list", choices=["list", "refresh"])
     fm.add_argument("--json", action="store_true"); fm.add_argument("--cwd")
     args, rest = ap.parse_known_args(argv)
@@ -1521,6 +1528,9 @@ def main(argv=None, quiet=False):
     elif args.cmd == "status":
         import fleetstatus
         return fleetstatus.run(sys.modules[__name__], args)
+    elif args.cmd == "held":
+        import fleetstatus
+        return fleetstatus.held_cmd(sys.modules[__name__], args)
     elif args.cmd == "free-models":
         pol = freemodels.policy(reg)
         if args.action == "refresh":

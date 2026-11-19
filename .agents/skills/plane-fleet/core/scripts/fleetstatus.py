@@ -8,11 +8,16 @@ and who holds them, lanes running and just ended, open PRs with their required c
 and mergeability, trunk CI, and worktrees left with no open PR. The board itself stays a Plane
 MCP read.
 
+Held work: the PM records a Todo ticket it skips for its blockers with `fleet held set`, from the
+relations it already read at pick time. Status then needs no Plane call to say when that ticket
+could start now, stacked on its blockers' pushed branches.
+
 Standard library only. Python 3.9.
 """
 import datetime, glob, json, os, re, subprocess, time
 
 RECENT_S = 6 * 3600
+HELD_SEEN_KEEP = 5000      # sightings kept in the held-work log
 
 
 def sh(args, cwd=None, timeout=60):
@@ -200,6 +205,151 @@ def worktrees_view(repo, open_branches):
     return extra, orphan
 
 
+# ---------------------------------------------------------------- held work
+# Measured on one project: the PM held a ticket about 3 hours for a blocker that sat in an open
+# group PR. 16 tickets waited behind it, and the machine had room for 4 heavy jobs while 1 or 2
+# ran. pick.md already said to start it stacked. Nothing checked.
+def held_paths(state_home, project):
+    d = os.path.join(state_home, "held")
+    return os.path.join(d, f"{project}.json"), os.path.join(d, f"{project}-seen.jsonl")
+
+
+def load_held(path):
+    """{ticket: {"blocked_by": [...], "since": iso}} or {} when nothing is recorded."""
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    t = d.get("tickets") if isinstance(d, dict) else None
+    return t if isinstance(t, dict) else {}
+
+
+def save_held(path, tickets):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"tickets": tickets}, f, indent=2, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def seq(t):
+    m = re.search(r"-(\d+)$", t or "")
+    return (t.rsplit("-", 1)[0], int(m.group(1))) if m else (t or "", 0)
+
+
+def free_slot_count(slots):
+    return sum(1 for p in slots if p.endswith(" free") and not p.startswith("shared"))
+
+
+def held_work(held, prs, free_slots, gate, running=()):
+    """The held tickets that could start now, stacked on their blockers' pushed branches.
+
+    A ticket qualifies when every blocker has an open PR (draft, approved, or named in a group
+    PR), at least one slot is free and the machine admits a heavy spawn (ok, or tight with room).
+    A ticket that already has its own PR or a running lane is not held any more."""
+    import fleetres
+    if not held or free_slots < 1 or not fleetres.admit(gate, True):
+        return []
+    by = {}
+    for p in prs or []:
+        for t in p.get("tickets") or []:
+            by.setdefault(t, []).append(p)
+    busy = " ".join(running)
+    out = []
+    for t in sorted(held, key=seq):
+        blockers = [b for b in (held[t].get("blocked_by") or []) if b != t]
+        if not blockers or t in by or re.search(r"(^|[^A-Za-z0-9-])" + re.escape(t) + r"([^0-9]|$)", busy):
+            continue
+        found = []
+        for b in blockers:
+            ps = by.get(b) or []
+            own = [p for p in ps if not str(p.get("branch") or "").startswith("release/")]
+            group = [p for p in ps if str(p.get("branch") or "").startswith("release/")]
+            pick = (own or group or [None])[0]
+            if not pick:
+                break
+            found.append({"ticket": b, "pr": pick["number"], "branch": pick["branch"],
+                          "group": group[0]["number"] if group and own else None,
+                          "approved": "qa-approved" in (pick.get("labels") or [])})
+        else:
+            branches = list(dict.fromkeys(f["branch"] for f in found))
+            out.append({"ticket": t, "blockers": found, "stack_on": branches[0], "merge_in": branches[1:],
+                        "since": held[t].get("since")})
+    return out
+
+
+def held_lines(items, free_slots):
+    if not items:
+        return []
+    L = [f"held work ({len(items)}; {free_slots} slot(s) free, machine has room). Start it stacked now, "
+         "or log why not (pick.md):"]
+    for h in items:
+        bl = ", ".join(f"{b['ticket']} #{b['pr']}" + (" approved" if b["approved"] else "")
+                       + (f" in group #{b['group']}" if b["group"] else "") for b in h["blockers"])
+        tail = f" then merge in {', '.join(h['merge_in'])}" if h["merge_in"] else ""
+        L.append(f"  {h['ticket']} held by {bl} · stack on {h['stack_on']}{tail}"
+                 + (f" · held {ago(epoch(h['since']))}" if h.get("since") else ""))
+    return L
+
+
+def record_seen(path, items, free_slots, now=None):
+    """One line per held ticket per status call. `fleet retro` turns these into held hours."""
+    if not items:
+        return
+    ts = datetime.datetime.fromtimestamp(now or time.time(), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a") as f:
+            for h in items:
+                f.write(json.dumps({"ts": ts, "ticket": h["ticket"], "blocked_by": [b["ticket"] for b in h["blockers"]],
+                                    "free_slots": free_slots}) + "\n")
+        with open(path) as f:
+            lines = f.readlines()
+        if len(lines) > HELD_SEEN_KEEP:
+            with open(path, "w") as f:
+                f.writelines(lines[-HELD_SEEN_KEEP:])
+    except OSError:
+        pass
+
+
+def prune_held(held, prs):
+    """Drop held tickets that now have a PR of their own: they were started."""
+    started = {t for p in prs or [] if not str(p.get("branch") or "").startswith("release/") for t in p.get("tickets") or []}
+    return {t: v for t, v in held.items() if t not in started}
+
+
+def held_cmd(fleetctl, args):
+    """fleet held set T --blocked-by A,B | clear T [T ...] | list"""
+    cwd = args.cwd or os.getcwd()
+    project = fleetctl.load_registry(cwd).get("_project") or "default"
+    path, _ = held_paths(fleetctl.STATE_HOME, project)
+    held = load_held(path)
+    if args.action == "set":
+        blockers = [b.strip() for b in (args.blocked_by or "").split(",") if b.strip()]
+        if len(args.tickets) != 1 or not blockers:
+            raise SystemExit("fleet held set: one ticket and --blocked-by A[,B] are required")
+        t = args.tickets[0]
+        old = held.get(t) or {}
+        held[t] = {"blocked_by": blockers, "since": old.get("since") or
+                   datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        save_held(path, held)
+        print(f"held: {t} blocked by {', '.join(blockers)}")
+    elif args.action == "clear":
+        gone = [t for t in args.tickets if held.pop(t, None) is not None]
+        save_held(path, held)
+        print("held: cleared " + (", ".join(gone) or "nothing"))
+    else:
+        if args.json:
+            print(json.dumps(held, indent=2, sort_keys=True))
+        else:
+            for t in sorted(held, key=seq):
+                print(f"{t} blocked by {', '.join(held[t].get('blocked_by') or [])} since {held[t].get('since')}")
+            if not held:
+                print("held: nothing recorded")
+    return 0
+
+
 # ---------------------------------------------------------------- render
 def collect(fleetctl, cwd):
     reg = fleetctl.load_registry(cwd)
@@ -218,8 +368,23 @@ def collect(fleetctl, cwd):
     sample = fleetres.attach_tool_caches(fleetres.probe(fpaths, top_n=8), fcfg)
     gate = fleetres.judge(sample, fcfg, wdirs)
     machine = {"summary": fleetres.summary_line(sample, gate), **gate}
-    return {"machine": machine, "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),
-            "slots": slots_view(cfg, repo), "lanes_running": running, "lanes_ended": ended,
+    slots = slots_view(cfg, repo)
+    held_path, seen_path = held_paths(fleetctl.STATE_HOME, reg.get("_project") or "default")
+    held = load_held(held_path)
+    if held and prs is not None:
+        kept = prune_held(held, prs)
+        if kept != held:
+            try:
+                save_held(held_path, kept)
+            except OSError:
+                pass
+        held = kept
+    free = free_slot_count(slots)
+    held_items = held_work(held, prs, free, gate, running) if prs is not None else []
+    record_seen(seen_path, held_items, free)
+    return {"held_work": held_items, "held_recorded": len(held),
+            "machine": machine, "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),
+            "slots": slots, "lanes_running": running, "lanes_ended": ended,
             "prs": prs, "prs_error": pr_err, "trunk_runs": runs, "trunk_error": run_err,
             "worktrees": len(trees), "orphan_worktrees": [t.get("path", "")[len(repo):].lstrip("/") for t in orphan]}
 
@@ -233,6 +398,7 @@ def render(s):
           for h in m["hogs"] if not h["fleet"] and h.get("safe")]
     L += [f"  warning: {w}" for w in m["warnings"]]
     L += [f"budget: {s['budget']}", "slots: " + (" · ".join(s["slots"]) or "none configured")]
+    L += held_lines(s.get("held_work"), free_slot_count(s["slots"]))
     L.append(f"lanes running ({len(s['lanes_running'])}): " + (" | ".join(s["lanes_running"]) or "none"))
     if s["lanes_ended"]:
         L.append("lanes ended (6h): " + " | ".join(s["lanes_ended"]))
@@ -299,3 +465,39 @@ def selftest(check):
            {"__typename": "CheckRun", "name": "e2e", "status": "COMPLETED", "conclusion": "SKIPPED", "startedAt": "2026-10-25T09:05:00Z"}]
     check("status: a skipped duplicate does not hide a running check", summarize_checks(dup, ["e2e"])[1], "running")
     check("status: required all green", summarize_checks(roll[:2], ["unit"])[1], "green")
+
+    # held work
+    ok_gate, tight_full = {"code": 0, "room_heavy": 2}, {"code": 1, "room_heavy": 0}
+    held = {"P-12": {"blocked_by": ["P-11"], "since": "2026-11-19T08:00:00Z"}, "P-20": {"blocked_by": ["P-18", "P-19"]}}
+    prs = [{"number": 211, "tickets": ["P-11"], "branch": "feat/P-11-a", "labels": ["qa-approved"]},
+           {"number": 215, "tickets": ["P-11", "P-18"], "branch": "release/group-1", "labels": []}]
+    h = held_work(held, prs, 1, ok_gate)
+    check("held: a blocker in an open PR, a free slot and room give a line", [x["ticket"] for x in h], ["P-12"])
+    check("held: it names the blocker PR, the group and the branch to stack on",
+          (h[0]["blockers"][0]["pr"], h[0]["blockers"][0]["group"], h[0]["stack_on"]), (211, 215, "feat/P-11-a"))
+    check("held: a blocker with no pushed branch gives no line", "P-20" in [x["ticket"] for x in h], False)
+    check("held: no free slot gives no line", held_work(held, prs, 0, ok_gate), [])
+    check("held: tight with no room gives no line", held_work(held, prs, 1, tight_full), [])
+    check("held: tight with room gives a line", len(held_work(held, prs, 1, {"code": 1, "room_heavy": 1})), 1)
+    check("held: closed gives no line", held_work(held, prs, 1, {"code": 2, "room_heavy": 3}), [])
+    check("held: critical gives no line", held_work(held, prs, 1, {"code": 3, "room_heavy": 0}), [])
+    both = prs + [{"number": 219, "tickets": ["P-19"], "branch": "feat/P-19-c", "labels": []}]
+    h2 = {x["ticket"]: x for x in held_work(held, both, 2, ok_gate)}
+    check("held: a blocker only in a group PR stacks on the group branch", h2["P-20"]["stack_on"], "release/group-1")
+    check("held: a second blocker branch is merged in", h2["P-20"]["merge_in"], ["feat/P-19-c"])
+    check("held: a ticket with a running lane is not held", held_work(held, prs, 1, ok_gate, ["codex:x engineer P-12 · 3m"]), [])
+    check("held: P-1 in a lane does not hide P-12", len(held_work(held, prs, 1, ok_gate, ["codex:x engineer P-1 · 3m"])), 1)
+    started = prs + [{"number": 230, "tickets": ["P-12"], "branch": "feat/P-12-b", "labels": []}]
+    check("held: a ticket with its own PR is pruned", sorted(prune_held(held, started)), ["P-20"])
+    check("held: free slots ignore the shared row", free_slot_count(["A free", "B busy (api · x)", "shared up (owner's, never assigned)"]), 1)
+    lines = held_lines(h, 1)
+    check("held: the line names ticket, PR and branch", ("P-12 held by P-11 #211 approved in group #215" in lines[1],
+                                                          "stack on feat/P-11-a" in lines[1]), (True, True))
+    check("held: nothing held prints nothing", held_lines([], 2), [])
+    import tempfile
+    d = tempfile.mkdtemp(prefix="fleetstatus-selftest-")
+    hp, sp = held_paths(d, "st")
+    save_held(hp, held)
+    check("held: the record round trips", load_held(hp), held)
+    record_seen(sp, h, 1, now=1_000_000)
+    check("held: a sighting is logged", json.loads(open(sp).readline())["ticket"], "P-12")
