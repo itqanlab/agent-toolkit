@@ -78,6 +78,12 @@ script, `--hours N` for a rolling window. Thresholds and levels are in config un
 | `lane_failures`, `lane_minutes` | other-CLI lanes fail or run long | move that task kind to another executor in config |
 | `rewrite_share` | too much agent spend went to cache rewrites after long waits | waits of at most 4 minutes; background waits through `fleet watch` |
 | `codex_pts_per_hour` | the Codex weekly meter burns too fast (owner) | lower Codex slots or move reviews to Claude |
+| `held_hours` | tickets sat held behind a pushed blocker while a slot was free | answer every `held work` line of `fleet status` in the same turn: a stacked spawn or a logged reason (pick.md) |
+
+`held_hours` comes from the sightings `fleet status` writes each time it prints a `held work`
+line. Two sightings up to 30 minutes apart count as held the whole time; a longer gap counts 30
+minutes. The outcome log has no field for held time, so a run where the PM recorded no
+`fleet held` entries prints "held work not recorded", not zero.
 
 ## 9) Review: every run, measured the same way, kept
 

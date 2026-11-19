@@ -20,7 +20,9 @@ pnpm install --frozen-lockfile
 `HEAD`. Before your first commit, `git log --oneline origin/<trunk>..HEAD` must print nothing.
 If it prints commits, you branched off the wrong base: delete the worktree and branch, and start
 again. (2026-09-30: an engineer branched off an open PR's branch, and its PR carried someone
-else's commits.) A rework engineer is the one exception: it continues on the existing PR branch.
+else's commits.) A rework engineer is one exception: it continues on the existing PR branch.
+A brief with a `STACKED ON:` block is the other: start from the blocker branch it names, rebase
+onto `origin/<trunk>` once that PR merges, and open your PR against `<trunk>`.
 
 **When `fleet.trials.own_commits_only` is on, a branch carries only its own ticket's work, in
 rework too.** Every commit names this ticket and no other. A defect that belongs to another

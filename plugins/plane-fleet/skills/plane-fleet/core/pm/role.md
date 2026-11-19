@@ -119,6 +119,11 @@ nobody needs to give, because inviting it was the whole point of the invocation.
   holds everything until you have freed memory (`core/pm/skills/spawn-tester.md`, machine gate).
   Look at the whole machine: the biggest process is often not a fleet session. Never more than
   `fleet.max_heavy_sessions` heavy sessions at once (default 3), whatever the gate's room says.
+- **Never leave a held-work line unanswered.** When `fleet status` prints `held work`, answer it
+  in the same turn: spawn that ticket stacked on the branch it names (`core/pm/skills/spawn.md`,
+  stacked brief), or log why not with `--outcome decision --reason "held: <why>"`. Waiting for
+  the blocker to merge is not a reason. (One project: a ticket sat about 3 hours behind a group
+  PR in CI, with 16 more chained behind it, while the machine had room for 4 heavy jobs.)
 - **Never let a tester fix product code** or an engineer approve their own work.
 - **Never build two schema tickets that touch the same model at once**, never more than
   `fleet.parallel_schema` schema tickets in all, and never merge two schema PRs in one train

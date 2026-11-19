@@ -280,6 +280,21 @@ Then add, per spawn: the ticket id and state, **the slot letter and its values**
 number/branch (testers and rework engineers), the owned-file list from currently open PRs, and
 whatever is specific to that ticket.
 
+**A stacked ticket gets this block**, filled from the `held work` line of `fleet status`
+(`core/pm/skills/pick.md`):
+
+```
+STACKED ON: #<N> (<blocker ticket>), branch <branch>.
+- Start your branch from origin/<branch>, not from origin/<trunk>.
+- More than one blocker branch: start from the first, then merge in the others, listed here.
+- After #<N> merges, rebase onto origin/<trunk> and drop the blocker's commits.
+- Open the PR against <trunk>, as a draft. Never against the blocker's branch.
+- Your PR body says "Stacked on #<N>" so the merge queue lands it after #<N>.
+```
+
+A PR opened against the blocker's branch closes when that branch is deleted at merge, and a
+closed PR cannot be retargeted (`core/pm/skills/merge-queue.md` §5).
+
 **Copy the checklist items that apply** from `engineering/references/brief-checklist.md` into
 every engineer brief, under `CHECKLIST:`, with their numbers. Pick by what the ticket touches
 (UI, money, dates, locks). The engineer names in its handoff which ones it checked. Edit the
