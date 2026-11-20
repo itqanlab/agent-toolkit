@@ -99,11 +99,22 @@ by key; lists and plain values replace.
                                          // missing = not green. `fleet gate-stamp check` and `fleet status` read it
   },
 
+  "sentry": {                            // OPTIONAL. Turns the built-in Sentry intake source on (`fleet intake`,
+    "host": "de.sentry.io",              // core/references/intake-sources.md). Only the projects named are read
+    "org": "acme", "projects": ["acme-web", "acme-api"], "environment": "production",
+    "always": ["acme-api"], "urgent_paths": ["/payments"], "ignore": [], "max_per_run": 5
+    // token: $SENTRY_AUTH_TOKEN (token_env), or "token_file" (mode 600) in the per-user override, never here
+  },
+
   "roles": ["owner", "admin", "manager", "staff"],
   // roles that must be exercised when verifying a permission/scope ticket
 
   "fleet": {                             // read by the PM role, the engineer role, the tester role
     "merge_train_size": 3,
+    "intake_sources": [                  // OPTIONAL. Feeds turned into tickets each pass (core/references/intake-sources.md)
+      { "name": "uptime", "command": "node tools/uptime/incidents.mjs", "max_per_run": 3,
+        "resolve_command": "node tools/uptime/close.mjs" }
+    ],
     "test_rounds_max": 2,                // OPTIONAL. Failed test rounds per ticket before the owner must allow more
                                          // (`fleet rounds allow`); the usage-pacer hook refuses the rework spawn. 0 = off
     "session_soft_cap": 300,             // OPTIONAL. Tool calls after which an engineer or tester stops and reports

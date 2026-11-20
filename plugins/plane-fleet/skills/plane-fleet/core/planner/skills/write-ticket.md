@@ -125,6 +125,17 @@ Angular error handler unwrapping `HttpErrorResponse` before our filter saw it. T
 
 ---
 
+### Items from an intake source
+
+An item from `fleet intake` (`core/references/intake-sources.md`) comes with evidence: the
+source link, counts, frames and breadcrumbs. Treat it as a report, not a cause. Open each frame
+at its `file:line` on the trunk, find the real cause, and write a normal bug ticket from that.
+Put the source link and the counts in §1. Return each ticket with its `external_source` and
+`external_id` so fleet-board can set them. One root cause behind several items is one ticket;
+list every external id in §1 and use the most-hit one as `external_id`. An item you can show is
+noise (a browser extension, a known offline error) gets no ticket. Say why, and name it for the
+source's `ignore` list.
+
 ## 2) Pick the kind
 
 | kind | when | deliverable |
