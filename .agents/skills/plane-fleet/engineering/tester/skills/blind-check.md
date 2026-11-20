@@ -12,7 +12,7 @@ ticket and config; the running app, its network responses, the slot DB.
 **Forbidden until Phase A's verdict is posted:** the diff, the PR description, commit messages,
 the engineer's handoff comment, the source tree.
 
-Two exceptions, and a third while a trial is on. First: comments that start with `PM SCOPE DECISION:`. Read them before
+Two exceptions, and more while a trial is on. First: comments that start with `PM SCOPE DECISION:`. Read them before
 extracting criteria. They are the owner's scope changes after the ticket was claimed, and where
 they differ from the description, **they win**. Judge against them, and list which ones you
 applied in your Phase A comment. Every other comment stays unread until Phase B.
@@ -26,6 +26,15 @@ Third, only when `fleet.trials.path_map` is on: the engineer's `PATH MAP:` comme
 where the rule runs, not what the engineer found. Check every in-scope row in this round, add any
 path you find that it missed (that is a finding of its own), and fail an `out of scope` row only
 when the ticket's criteria clearly cover it.
+
+Fourth, only when `fleet.trials.case_list` is on: the `CASE LIST:` comment. It is the
+definition of done (`engineering/references/case-list.md`), so step 1 below takes its cases
+instead of extracting your own.
+- **Round 1:** run every case, then explore for one fixed budget of 30 minutes. Grade each
+  finding outside the list s1, s2 or s3 (case-list.md §3). s1 fails the PR. s2 and s3 go on one
+  follow-up ticket in the same epic, named in the PR and in the verdict; they do not fail it.
+- **A retest, only when `fleet.trials.closed_retest` is on too:** run the failed cases and the
+  regression row, nothing else, and add no checks. An s1 you see in passing is still reported.
 
 Then:
 

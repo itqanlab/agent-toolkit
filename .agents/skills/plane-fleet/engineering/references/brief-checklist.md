@@ -8,7 +8,8 @@ of the brief, not marked N/A. A project can keep its own extra items in the per-
 folder and the PM adds those too.
 
 Item 21 sits in "Before writing code" but is numbered last, so the numbers already in briefs and
-handoffs stay the same. The sections are not in numeric order for that reason.
+handoffs stay the same. Items 22 to 24 are added at the end for the same reason. The sections are
+not in numeric order.
 
 (2026-11-04, one project: 9 of 16 tested tickets went to rework in one run. Every item here came
 back at least twice.)
@@ -86,3 +87,15 @@ back at least twice.)
 20. **One full gate at a time on the machine.** Take the gate lock before you push
     (`engineering/references/standing-brief.md`, "Run each check once per commit"). Never write
     a gate result line into a log by hand.
+
+## Outside codes, shared components, shared locks
+
+22. **Codes from an outside service** (a courier state, a payment status, a store event) go
+    through an allow-list. An unknown code takes the safe default. One function maps codes for
+    every path, and a unit test runs known and invented codes through every path.
+23. **A fault in a shared component.** The tester names the owner of each fault, files it on its
+    own ticket with the failing test as a patch, and does not fail the feature PR unless the
+    feature made it worse. The engineer never changes a shared component inside a feature
+    ticket to pass a test.
+24. **Two tickets in flight on the same locks** are stacked, not parallel. The first PR body
+    carries the lock-order table and the second extends it. The tester tests the stack.

@@ -59,6 +59,7 @@ The fleet folder is the absolute path in your brief. If the brief has none, use
      rule splits at 1000 lines, by outcome. (Measured 2026-11-16 on one project: PRs over 1500
      changed lines held 61% of failed test rounds and 17% of them took 2+ rounds, against 2% under
      150 lines. Final PR size includes rework and tests, so part of that is effect, not cause.)
+   - A UI outcome covers one screen. Two screens are two tickets, even when the fix is the same.
    - Unknown root cause that is likely a small fix: the investigation goes in that ticket's §0
      gate, not in a ticket of its own.
 5. **Order them.** `blocked_by` only where one outcome truly needs another's code, and the ticket
@@ -85,7 +86,12 @@ is never committed) and return the path plus one line per ticket. Each ticket in
 - expected files and estimated changed lines
 - evidence with `file:line` for anything you verified
 - `blocked_by`, and for regrouping, the tickets it absorbs
-- open questions only the owner can answer, marked as such. Do not guess an answer.
+- open questions only the owner can answer, marked as such. Do not guess an answer. A contract
+  or spec line the ticket would change is one of them, written in the ticket, never left for a
+  tester to find.
+- the rules in `core/planner/skills/write-ticket.md` §3 "Rules, grids, codes and locks": each
+  rule criterion names its grid, outside codes as an allow-list, each lock step's place in the
+  lock order
 
 End with the totals: tickets before, tickets after, and why any ticket is still over the target.
 

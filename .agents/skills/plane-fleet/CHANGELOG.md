@@ -4,6 +4,59 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.15.0] - 2026-11-20
+
+A 20 hour run on one project: 22 of 38 tickets failed their first test, 35 tests failed, and one
+ticket took 10 rework sessions. Most rounds did not bring the same fault back. Each round found a
+new one, because done was never a fixed list and the PM's retest briefs added checks. The skill
+already said to stop at two reworks and ask the owner. Nothing enforced it and the PM went past it
+on three tickets. So this release moves the rules that were skipped from text into the tools.
+
+### Added
+
+- Rework cap in the spawn hook. An engineer spawn for a ticket with `fleet.test_rounds_max`
+  failed test rounds (default 2, 0 turns it off) is refused until the owner's answer is recorded
+  with `fleet rounds allow <TICKET> --reason "..."`. One allowance covers one more round.
+  `fleet rounds` lists the count per ticket. Switch file: `rework-cap-off`.
+- Two trials in `fleet.trials`, off by default:
+  - `case_list`: before a build, a tester turns the ticket into a numbered `CASE LIST:` comment,
+    with a state table for a screen and the grid each rule holds over. The engineer builds to it
+    and reports pass or fail per case from a real run. A list over about 25 cases goes back to
+    the planner to split.
+  - `closed_retest`: a retest runs the failed cases and the list's regression, nothing new. A
+    finding outside the list is graded `s1`, `s2` or `s3`. Only `s1` blocks (data loss, money, a
+    wrong or duplicate send, security, a blocked main path). The rest become a follow-up ticket
+    that lands before the release carrying the feature.
+- `group.must_run` and `group.labels` in the config. `fleet gate-stamp check` fails a group PR
+  when a required job was skipped or missing, or a label is absent. A group PR had gone green in
+  17 minutes with its full suites skipped.
+- `fleet slot verify-clean <S>` and `fleet slot release <S>`. Engineers and testers paste the
+  verify line as their teardown report. `release` never kills a process and refuses when a port
+  or a database is in use.
+- `fleet queue add | list | next`: a spawn the machine gate refused is parked with its brief and
+  offered again when there is room. "Room for N heavy" now also counts sessions already running.
+- `fleet questions add | list | close`: open owner decisions, the PR each one holds, and its age.
+  Every status to the owner starts with them.
+- `log add`: `--outcome spawn` for the row written at the start of a session, so the result row
+  needs no `--force`. `--cause pm_ruling`. `--in-list`, `--severity` and `--repeat` on a failure.
+- `fleet status` shows failed rounds per open PR, slots with leftovers, "required ran: x of y" on
+  a group PR, queued spawns and open owner questions.
+- `fleet retro` counts PM-ruling failures (`pm_ruling_failures`), splits failures into new and
+  raised before, reports how long queued spawns waited, and splits tester pass to merge into
+  waiting for a group, CI and waiting for the owner.
+- `core/pm/skills/ruling.md`: a PM scope decision quotes the contract or spec line it rests on,
+  or is marked a guess to verify, and lists the tests it retargets.
+- Brief checklist items 22 to 24: codes from an outside service, a fault in a shared component,
+  two tickets in flight on the same locks.
+- Planner: one screen per UI ticket, a rule criterion names its grid, a contract change is an
+  owner question in the ticket.
+- `fleet.session_soft_cap` (default 300) and `fleet.client_engines`.
+
+### Changed
+
+- The soft cap on self-review is 2 passes, down from 3, and comes after the cases are green.
+- An agent asked for progress answers with counts, never only "waiting".
+- `fleet cost`, `fleet review` and `fleet retro` do not count a `spawn` start row as a session.
 ## [2.14.0] - 2026-11-19
 
 In one run the PM held a ticket about 3 hours while its blocker sat in a group PR in CI. 16 more

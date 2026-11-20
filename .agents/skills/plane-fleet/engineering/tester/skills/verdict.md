@@ -46,12 +46,19 @@ the PM, which puts it through the queue.
    see them. The engineer fixes the class, and your retest tries each one. End your report to the
    PM with `defect: <kind>` for the first finding, one of `criterion`, `other_path`,
    `stale_state`, `concurrency`, `money_rule`, `out_of_scope`, `stacked`; the PM logs it with
-   `--defect` (`core/pm/skills/spawn.md`).
+   `--defect` (`core/pm/skills/spawn.md`). Add `in_list: yes|no` (was it a case on the list, or
+   in the ticket when there is no list), `severity: s1|s2|s3` (`engineering/references/case-list.md`
+   §3) and `repeat: yes|no` (was the same finding raised in an earlier round) for that finding.
+   The PM logs them as `--in-list`, `--severity` and `--repeat`.
 2. `gh pr edit <n> --add-label qa-changes-requested` and `gh pr review <n> --comment` with the
    same list.
 3. Do not fix it. Do not suggest you could.
 
 ### Something else is broken
+
+A fault in a shared component the feature did not make worse: name its owner, file it on its
+own ticket with the failing test as a patch, and don't fail this PR for it
+(`engineering/references/brief-checklist.md` item 23).
 
 Not this ticket's fault → walk the filing ladder in
 `engineering/references/ticket-rules.md` §1 first: comment on an existing ticket, or add
@@ -67,7 +74,8 @@ workers (`test.e2e_workers`). Two specs that passed locally on one worker broke 
 
 ### Teardown, then report
 
-Tear down the slot (`engineering/tester/role.md` §0) and say so. That includes the local `test/<IDENTIFIER>-<n>` branch:
+Tear down the slot (`engineering/tester/role.md` §0) and end with `fleet slot verify-clean`; its
+one line is the teardown part of your report. That includes the local `test/<IDENTIFIER>-<n>` branch:
 `git branch -D test/<IDENTIFIER>-<n>` once your test commits are pushed to the PR branch.
 Never leave a `verify/*` or `test/*` branch behind in the main checkout. Stop every background
 job you started: `<fleet>/scripts/fleet watch --stop-prefix <TICKET>-`, each background shell and
@@ -83,8 +91,9 @@ test — PROJ-134 · PR #212 · slot C
 ```
 test — PROJ-134 · PR #212 · slot C
   REWORK    A: criterion 2 FAIL (sales sees all branches) · B: failing spec pushed · comment posted
+  defect: criterion · in_list: yes · severity: s1 · repeat: no
   filed: PROJ-171 (low, unrelated)
-  slot torn down: servers stopped, app_slot_c dropped, worktree removed
+  slot C clean: <the rest of the line `fleet slot verify-clean C` printed>
 ```
 
 Then stop. You do not pick the next PR, re-fire engineers, or fix anything.

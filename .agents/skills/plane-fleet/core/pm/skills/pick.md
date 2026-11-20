@@ -224,9 +224,10 @@ the tester pushed to the branch; it continues on the **same branch and PR**. A t
 been sent to Rework twice in a row is worth flagging in your pick announcement (it's a data point
 worth surfacing, not a reason to stop other work).
 
-**After the third round, stop patching.** A ticket going into its fourth engineer round gets a
-fresh `opus` engineer briefed to rebuild against written invariants, not to fix the last
-finding:
+**After the third round, stop patching.** Past `fleet.test_rounds_max` a round starts only with
+the owner's allowance (`fleet rounds allow`, `core/pm/skills/spawn-tester.md`, rounds cap). A
+ticket going into its fourth engineer round gets a fresh `opus` engineer briefed to rebuild
+against written invariants, not to fix the last finding:
 - write the ticket's invariants (three to five, each testable) in a PM comment on the ticket,
   and in the brief
 - the engineer re-reads the whole diff against them, lists every path and screen each one

@@ -11,6 +11,9 @@ jobs that re-run exactly the same checks.
       Says whether the PR head carries `local-gate` success, and which other checks are
       still pending or failing once the covered ones are set aside. Exit 0 only when the
       stamp is there and every non-covered check passed or was skipped; 1 otherwise.
+      It also holds a PR when a `group.must_run` job did not end in success on the head
+      (skipped and missing count as not green) or a `group.labels` label is missing.
+      With must_run or labels set and no covered jobs, it checks those alone (no stamp).
   fleet gate-stamp selftest
 
 Config:
@@ -20,6 +23,10 @@ Config:
                                               <sha> is replaced by the full SHA. Write it from
                                               a wrapper: `{ <gate>; echo "pre-push exit $? at $(git rev-parse HEAD)"; }`
   quality.pre_push_skip_regex                 optional: a log that matches it is a gate that skipped
+  group.must_run: []                          CI job names that must end in success on the PR head.
+                                              2026-11, one project: a group PR went green with its
+                                              full suites skipped, because a label was missing.
+  group.labels: []                            labels the group PR must carry
 """
 import argparse
 import json
@@ -51,7 +58,9 @@ def settings(cwd):
     cwd = os.path.abspath(cwd or os.getcwd())
     cfg = fleetctl.project_config(cwd) or {}
     ci, qual, git = cfg.get("ci") or {}, cfg.get("quality") or {}, cfg.get("git") or {}
+    grp = cfg.get("group") or {}
     return {"cwd": cwd, "covered": list(ci.get("covered_by_local_gate") or []),
+            "must_run": [str(x) for x in grp.get("must_run") or []], "labels": [str(x) for x in grp.get("labels") or []],
             "ok_re": qual.get("pre_push_success_regex") or DEFAULT_OK, "skip_re": qual.get("pre_push_skip_regex"),
             "trunk": git.get("trunk"), "runner": run, "host": socket.gethostname().split(".")[0]}
 
@@ -162,24 +171,44 @@ def newest_runs(checks, rollup):
     return out
 
 
+def must_run_states(checks, names):
+    """{job: pass | skipping | missing | pending | fail | cancel} for each group.must_run job."""
+    by = {c.get("name"): c.get("bucket") for c in checks}
+    return {n: (by.get(n) or "missing") if by.get(n) in (PASS, SKIP, FAILB, CANCEL, None) else "pending" for n in names}
+
+
 def check(s, pr):
-    if not s["covered"]:
-        raise Fail("gate-stamp: off (ci.covered_by_local_gate is empty)", 3)
-    view = gh_json(s, ["pr", "view", str(pr), "--json", "headRefOid,baseRefName,state,statusCheckRollup"])
+    must, want_labels = s.get("must_run") or [], s.get("labels") or []
+    if not s["covered"] and not must and not want_labels:
+        raise Fail("gate-stamp: off (ci.covered_by_local_gate, group.must_run and group.labels are empty)", 3)
+    view = gh_json(s, ["pr", "view", str(pr), "--json", "headRefOid,baseRefName,state,statusCheckRollup,labels"])
     sha, base = view.get("headRefOid", ""), view.get("baseRefName")
-    st = gh_json(s, ["api", f"repos/{{owner}}/{{repo}}/commits/{sha}/status"])
-    stamp = next((x for x in st.get("statuses") or [] if x.get("context") == CONTEXT), None)
+    stamp = None
+    if s["covered"]:
+        st = gh_json(s, ["api", f"repos/{{owner}}/{{repo}}/commits/{sha}/status"])
+        stamp = next((x for x in st.get("statuses") or [] if x.get("context") == CONTEXT), None)
     checks = newest_runs(gh_json(s, ["pr", "checks", str(pr), "--json", "name,bucket,state,link"]),
                          view.get("statusCheckRollup"))
-    covered = [c for c in checks if c.get("name") in s["covered"]]
-    others = [c for c in checks if c.get("name") not in s["covered"] and c.get("name") != CONTEXT]
+    covered = [c for c in checks if c.get("name") in s["covered"] and c.get("name") not in must]
+    others = [c for c in checks if c.get("name") not in s["covered"] and c.get("name") != CONTEXT and c.get("name") not in must]
     covered_stopped = any(c.get("bucket") in (CANCEL, FAILB) for c in covered)
     problems = []
-    if s["trunk"] and base != s["trunk"]:
+    if s["covered"] and s["trunk"] and base != s["trunk"]:
         problems.append(f"base is {base}, not the trunk {s['trunk']}: only a group PR into the trunk merges on the stamp")
-    if not stamp or stamp.get("state") != "success":
+    if s["covered"] and (not stamp or stamp.get("state") != "success"):
         problems.append(f"no {CONTEXT} success on the head {sha[:12]}" + (f" ({stamp.get('state')})" if stamp else ""))
-    pending, failing = [], []
+    have = {(l.get("name") if isinstance(l, dict) else str(l)) for l in view.get("labels") or []}
+    missing_labels = [l for l in want_labels if l not in have]
+    if missing_labels:
+        problems.append("missing labels: " + ", ".join(missing_labels)
+                        + f" (gh pr edit {pr} " + " ".join(f"--add-label {l}" for l in missing_labels)
+                        + "; then re-run CI, the jobs a label turns on did not run)")
+    req = must_run_states(checks, must)
+    not_green = [f"{n} ({'skipped' if b == SKIP else 'did not run' if b == 'missing' else b})"
+                 for n, b in req.items() if b not in (PASS, "pending")]
+    if not_green:
+        problems.append("required not green: " + ", ".join(not_green))
+    pending, failing = [n for n, b in req.items() if b == "pending"], []
     for c in others:
         b = c.get("bucket")
         if b == PASS:
@@ -196,7 +225,9 @@ def check(s, pr):
         problems.append("pending: " + ", ".join(pending))
     if failing:
         problems.append("failing: " + ", ".join(failing))
+    ran = sum(1 for b in req.values() if b == PASS)
     res = {"pr": pr, "sha": sha, "base": base, "stamp": bool(stamp and stamp.get("state") == "success"),
+           "must_run": req, "required_ran": f"{ran} of {len(req)}" if req else None, "missing_labels": missing_labels,
            "stamp_description": (stamp or {}).get("description"), "covered": [c["name"] for c in covered],
            "covered_running": [c["name"] for c in covered if c.get("bucket") == "pending"],
            "pending": pending, "failing": failing, "ready": not problems, "problems": problems}
@@ -208,9 +239,11 @@ def show(res, as_json):
         print(json.dumps(res, indent=1))
         return
     head = f"gate-stamp: PR #{res['pr']} head {res['sha'][:12]}"
+    if res.get("required_ran"):
+        head += f" · required ran: {res['required_ran']}"
     if res["ready"]:
         extra = f"; covered still running: {', '.join(res['covered_running'])} (cancel to free the runner)" if res["covered_running"] else ""
-        print(f"{head}: READY ({res['stamp_description'] or CONTEXT}){extra}")
+        print(f"{head}: READY ({res['stamp_description'] or (CONTEXT if res['stamp'] else 'required jobs green')}){extra}")
     else:
         print(f"{head}: NOT READY")
         for p in res["problems"]:
@@ -234,7 +267,7 @@ def selftest(check_):
         ok = lambda out: subprocess.CompletedProcess(argv, 0, json.dumps(out), "")
         if argv[1:3] == ["pr", "view"]:
             return ok({"headRefOid": world["sha"], "baseRefName": world["base"], "state": "OPEN",
-                       "statusCheckRollup": world["rollup"]})
+                       "statusCheckRollup": world["rollup"], "labels": [{"name": l} for l in world.get("labels", [])]})
         if argv[1:3] == ["pr", "checks"]:
             return ok(world["checks"])
         if argv[1] == "api" and argv[-1].endswith("/status"):
@@ -316,7 +349,31 @@ def selftest(check_):
         check_("gate: a new head without its own stamp is not ready", check(s, 7)["ready"], False)
         world["sha"], world["base"] = sha, "main"
         check_("gate: a PR into another branch is not ready", check(s, 7)["ready"], False)
+        # group.must_run: 2026-11, a group PR went green with its full suites skipped
+        world["checks"] = [{"name": "Nx Affected", "bucket": "pass", "state": "SUCCESS"},
+                           {"name": "server-e2e", "bucket": "skipping", "state": "SKIPPED"},
+                           {"name": CONTEXT, "bucket": "pass", "state": "SUCCESS"}]
+        world["base"] = "develop"
+        s["must_run"] = ["server-e2e", "client-e2e"]
+        r = check(s, 7)
+        check_("gate: a skipped or missing must_run job is not green",
+               (r["ready"], r["required_ran"], [p for p in r["problems"] if p.startswith("required")]),
+               (False, "0 of 2", ["required not green: server-e2e (skipped), client-e2e (did not run)"]))
+        world["checks"][1] = {"name": "server-e2e", "bucket": "pending", "state": "IN_PROGRESS"}
+        world["checks"].append({"name": "client-e2e", "bucket": "pass", "state": "SUCCESS"})
+        r = check(s, 7)
+        check_("gate: a running must_run job is pending", (r["ready"], r["pending"], r["required_ran"]), (False, ["server-e2e"], "1 of 2"))
+        world["checks"][1] = {"name": "server-e2e", "bucket": "pass", "state": "SUCCESS"}
+        check_("gate: every must_run job passed = ready", check(s, 7)["ready"], True)
+        s["labels"] = ["full-ci"]
+        r = check(s, 7)
+        check_("gate: a missing group label holds it", (r["ready"], r["missing_labels"]), (False, ["full-ci"]))
+        world["labels"] = ["full-ci"]
+        check_("gate: the label there = ready", check(s, 7)["ready"], True)
         s["covered"] = []
+        world["statuses"] = {}
+        check_("gate: must_run alone needs no stamp", check(s, 7)["ready"], True)
+        s["must_run"], s["labels"] = [], []
         e, _ = attempt(check, s, 7)
         check_("gate: off exits 3", getattr(e, "code", 0), 3)
     finally:
