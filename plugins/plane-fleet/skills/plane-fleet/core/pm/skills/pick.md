@@ -75,6 +75,14 @@ question to the owner BEFORE claiming, if any of these apply:
   Agents may refuse or get blocked partway through writing it up.
 - it's `[Decision needed]` or investigation-only (no PR to carry through the flow)
 
+### Intake pass: new errors and feed items become tickets first
+
+Once per loop, before the triage below, run `fleet intake` (skip it when the run-start check
+found no sources). Items that come out go through dedupe on the board, then one planner spawn
+for the batch, then fleet-board, as in `core/references/intake-sources.md` "The PM's loop". The
+new tickets land in Todo with their priority and are picked in the normal order. An `urgent` one
+jumps the queue like any urgent ticket. No items, or a failed source: carry on with the pick.
+
 ### Pre-pick triage: a script, not an engineer, finds stale tickets and open questions
 
 Before claiming, run the scan on every candidate you're about to pick. It is two steps and costs

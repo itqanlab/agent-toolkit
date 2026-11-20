@@ -40,6 +40,13 @@ it.)
 Read the project config (`core/scripts/fleet config`: `.plane/config.json` plus the per-user override). If missing, build it —
 `core/references/config-schema.md`.
 
+**Intake sources: `fleet intake check` right after the config.** It lists each feed the fleet
+pulls work from (Sentry when the config has a `sentry` block, and any `fleet.intake_sources`),
+and warns when the repo ships a Sentry SDK with no `sentry` block. Put every `FAIL` and
+`warning:` line in the opening summary. Then run the first intake pass
+(`core/references/intake-sources.md`, "The PM's loop"), before the first pick. A failed source
+never stops the run.
+
 Key fields this version reads:
 
 - `fleet.parallel_workers` — the most engineers at once (start at **2** if unset)

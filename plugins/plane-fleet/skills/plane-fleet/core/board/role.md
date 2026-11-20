@@ -54,6 +54,12 @@ Then resolve the project from `.plane/config.json` in the repo named in your bri
   refuses an action, stop and report it.
 - Bash is for reading the repo (`git log`, `gh pr list`, `wc`, the fleet scripts). Never commit,
   push or edit code.
+- **A ticket from an intake source** (Sentry or another feed, `core/references/intake-sources.md`)
+  is created with `external_source` and `external_id` set, in Todo. Check first with
+  `workitem list external_source=… external_id=…` that no open ticket has it (`HTTP 404` means
+  none; a validation error naming a `sequence_id` means that ticket has it). After each create, run
+  `core/scripts/fleet intake mark <source> <external_id> --ticket <PROJ-N>` for every external id the
+  ticket covers.
 
 ## Report
 
