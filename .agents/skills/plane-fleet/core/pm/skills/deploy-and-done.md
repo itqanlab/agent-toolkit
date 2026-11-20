@@ -17,6 +17,13 @@ The engineer looked at it and the tester looked at it. What is left is making su
 3. **All green** → each ticket in the train → `Done` (priority preserved), comment: merge commit,
    CI run, deployed commit.
 
+   **A ticket from an intake source closes its source item too.** For each one that carries
+   `external_source` and `external_id` (or lists more ids in its body), run
+   `core/scripts/fleet intake resolve <source> <external_id> --release <deployed sha> --ticket <PROJ-N>`.
+   For Sentry that is "resolved in this release". If the error comes back, Sentry marks it a
+   regression and the next intake pass files a new ticket linked to this one. A failed resolve
+   is a line in the Done comment, never a reason to hold `Done`.
+
    **A watcher waits for the named jobs to EXIST, then for them to finish.** Jobs are created
    one stage at a time, so "every job completed" is true for a moment after the first stage
    passes and before the e2e jobs appear. Check for the jobs by name (`ci.required_jobs`

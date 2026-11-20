@@ -4,6 +4,42 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [2.16.0] - 2026-11-21
+
+On one project, Sentry emailed every new production issue for five weeks. Of 14 open issues,
+none had a ticket, and two of them had hit 11 and 9 staff members. This release lets the fleet
+pull such feeds itself. Each new item goes through the planner and lands on the board as a
+normal ticket.
+
+### Added
+
+- `fleet intake`: every intake source's new items as JSON. A broken source shows `ok: false`
+  and never fails the pass. See `core/references/intake-sources.md`.
+- A built-in Sentry source, on whenever the project config has a `sentry` block. It reads only
+  the Sentry projects the block names, in its one environment. A new issue qualifies when it is
+  first seen inside `window_days` or regressed, and passes `min_users` or `min_events` (any issue
+  for `always` projects). Severity comes from users, `urgent_paths` and regressions. Evidence
+  carries the link, counts, release, in-app frames and breadcrumbs, with query strings, emails,
+  phone-like numbers and `token=`-style values removed.
+- Command sources in `fleet.intake_sources`, for any other feed. The command prints
+  `{"items": [...]}`, and an optional `resolve_command` closes the item.
+- `fleet intake check` at run start. It warns when a repo ships a Sentry SDK but has no `sentry`
+  block, so the PM tells the owner.
+- `fleet intake mark` and `fleet intake resolve`. A filed item is not offered again. A merged fix
+  resolves the Sentry issue in the deployed release with a note naming the ticket, and an issue
+  that comes back is offered again with `regression_of` set to the old ticket.
+- The token comes from `$SENTRY_AUTH_TOKEN` or a mode-600 `token_file` in the per-user override,
+  never the repo.
+
+### Changed
+
+- PM preflight runs `fleet intake check` and the first pass. Each loop runs a pass before
+  pre-pick triage. deploy-and-done resolves the source item. The planner and fleet-board have
+  rules for intake items (`external_source` and `external_id` set, deduped on the board first).
+- On Plane MCP versions before the fix for PMCP-24, `workitem list` by `external_source` and
+  `external_id` returns a validation error on a match instead of the row. The docs say how to
+  read it.
+
 ## [2.15.0] - 2026-11-20
 
 A 20 hour run on one project: 22 of 38 tickets failed their first test, 35 tests failed, and one
