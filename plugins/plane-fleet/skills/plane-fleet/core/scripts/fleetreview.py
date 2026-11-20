@@ -274,7 +274,7 @@ def scorecard(d, tl, alive, t0, t1, n_rows, rows, project, versions, decisions_p
     lost = d.get("lost")
     win = [r for r in rows if r.get("type", "spawn") == "spawn" and not r.get("usage_only")
            and (not project or r.get("project") == project) and t0 <= (epoch(r.get("ts")) or 0) < t1]
-    sess = [r for r in win if r.get("outcome") not in ("retro_fix", "decision") and r.get("role") != "pm"]
+    sess = [r for r in win if r.get("outcome") not in ("retro_fix", "decision", "spawn") and r.get("role") != "pm"]
     mix = {}
     for r in sess:
         k = f"{r.get('role')} {r.get('executor') or 'claude'}:{r.get('model') or '?'}"

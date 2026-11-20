@@ -433,6 +433,8 @@ def lane_sessions(rows, project):
     for r in rows:
         if r.get("type", "spawn") != "spawn" or r.get("executor") not in NON_CLAUDE_EXECUTORS:
             continue
+        if r.get("outcome") == "spawn":
+            continue  # the row written when a session starts: its result row carries the session
         if project and r.get("project") != project:
             continue
         end = epoch(r.get("ts"))
@@ -820,6 +822,8 @@ def backfill_rows(agents, rows, prices, project):
             continue
         if r.get("role") == "pm" or isinstance(r.get("input_tokens"), (int, float)) or r.get("usage_source") == "transcript":
             continue
+        if r.get("outcome") == "spawn":
+            continue  # a start row: the result row takes the session's usage
         a = by_id.get(r.get("agent_id"))
         if a is None:
             t = epoch(r.get("ts"))

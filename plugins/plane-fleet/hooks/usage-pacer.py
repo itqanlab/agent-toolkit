@@ -18,6 +18,14 @@ It also holds a spawn the machine cannot carry (fleetres.py, any OS): an enginee
 needs the resource gate ok or tight with room for one more heavy session; other fleet roles are
 held only when it is critical. Switch file: resources-off.
 
+Rework cap (2.14): an engineer spawn whose prompt names a ticket (the first PROJ-N in it) that
+already has fleet.test_rounds_max failed test rounds (default 2) is refused until the owner
+allows one more with `fleet rounds allow`. The allowance is used only when the spawn goes ahead.
+Switch file: rework-cap-off. 2026-11: the cap was text in the PM skill and one ticket still had
+10 rework sessions, so the tool enforces it. An unreadable log or config never blocks a spawn.
+
+Every error inside the hook allows the spawn: a broken gate must not stop the fleet.
+
 Switch files in PLANE_FLEET_HOME: pacer-off / pacer-off-claude (no gate), pace-off /
 pace-off-claude (hard stop only). Thresholds: the registry's budget block, overridden in
 PLANE_FLEET_HOME/budget.json.
@@ -73,21 +81,55 @@ def resources_hold(role):
             f"{role} session. " + ("; ".join(gate["reasons"]) + ". ") +
             (f"Biggest non-fleet processes: {hogs}. " if hogs else "") +
             "Run `fleet resources`, apply the safe fixes, sweep leftovers, and let running sessions finish. "
+            "Park this spawn with `fleet queue add --ticket <T> --role <engineer|tester> --slot <S> --brief <file>` "
+            "(save the brief to a file first) and send it when `fleet queue next` prints it. "
             f"Override once only on the owner's word: touch {STATE_HOME}/resources-off.")
+
+
+def rework_state(role, tool_input):
+    """The round state when this engineer spawn would pass the rework cap, else None."""
+    if role != "team-engineer":
+        return None
+    try:
+        sys.path[:0] = LANES_DIRS
+        import fleetctl  # noqa
+        text = tool_input.get("prompt") if isinstance(tool_input.get("prompt"), str) else json.dumps(tool_input)
+        return fleetctl.rework_gate(os.getcwd(), text)
+    except Exception:
+        return None  # unreadable log or config: never block on it
 
 
 def main():
     try:
         event = json.load(sys.stdin)
+        tool_input = event.get("tool_input", {}) or {}
+        prompt = json.dumps(tool_input)
+        # a plugin install names agents <plugin>:<section>:<agent>
+        role = FLEET_AGENTS.get(str(tool_input.get("subagent_type", "")).split(":")[-1]) \
+            or next((v for k, v in FLEET.items() if k in prompt), None)
     except Exception:
         return 0
-    tool_input = event.get("tool_input", {})
-    prompt = json.dumps(tool_input)
-    # a plugin install names agents <plugin>:<section>:<agent>
-    role = FLEET_AGENTS.get(str(tool_input.get("subagent_type", "")).split(":")[-1]) \
-        or next((v for k, v in FLEET.items() if k in prompt), None)
     if not role:
         return 0
+    try:
+        cap = rework_state(role, tool_input)
+        if cap and not cap.get("allowed"):
+            import fleetctl  # noqa (loaded by rework_state)
+            log(os.environ.get("USAGE_PACER_LOG") or os.path.join(STATE_HOME, "pacer-log.jsonl"),
+                {"ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "role": role, "decision": "rework-cap",
+                 "ticket": cap.get("ticket"), "rounds": cap.get("rounds"), "cap": cap.get("cap")})
+            print(fleetctl.rework_refusal(cap), file=sys.stderr)
+            return 2
+        code = gates(role)
+        if code == 0 and cap and cap.get("needs_allowance"):
+            import fleetctl  # noqa
+            fleetctl.consume_allowance(cap.get("project"), cap.get("ticket"), cap.get("rounds"))
+        return code
+    except Exception:
+        return 0  # fail open
+
+
+def gates(role):
     held = resources_hold(role)
     if held:
         print(held, file=sys.stderr)
