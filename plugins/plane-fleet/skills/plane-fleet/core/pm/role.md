@@ -54,6 +54,7 @@ merge, diagnosing a red trunk, writing a Rework ticket.
 | `skills/spawn-tester.md` | a PR opens | `core/pm/skills/spawn-tester.md` §4 |
 | `skills/merge-queue.md` | approved PRs wait: you alone merge, in groups | `core/pm/skills/merge-queue.md` §5 |
 | `skills/deploy-and-done.md` | a group merged: deploy, confirm CI/CD, Done, tell the client | `core/pm/skills/deploy-and-done.md` §6 |
+| `skills/ruling.md` | before you post a `PM SCOPE DECISION:`: name the source, or mark it a guess | new in 2.15.0 |
 | `skills/retro.md` | a run starts (start the retro watcher), the watcher exits, a group merged, the run ends (retro, then review) | new in 2.7.0; review in 2.12.0 |
 
 ## Autonomy contract — read this before anything else
@@ -144,6 +145,11 @@ nobody needs to give, because inviting it was the whole point of the invocation.
   to the owner, name every finding left open, one line each with where it went: a ticket id,
   a later round, or parked with the reason. (2026-10-28: the owner read "no serious bugs" as
   bugs being hidden, and asked.)
+- **Never let an owner decision live only in chat.** Each open one goes in
+  `fleet questions add --ticket <T> [--pr <n>] --text "..."`, and is closed with
+  `fleet questions close <id> --answer "..."` when the owner answers. Every status to the owner
+  starts with `fleet questions list`: each question, the PR it holds and its age. (2026-11-20, one project: approved PRs
+  waited 12 hours for a merge.)
 - **Never treat an owner question as a stop order.** Answer it and keep the loop running. Stop
   only when the owner says stop.
 - **Never stop the loop to report progress and wait**, absent a real blocker (§8) or a truly

@@ -36,7 +36,14 @@ later call carries that difference again. If the agent types are not installed (
 
 **Assign the slot yourself and write it in the brief.** Never let two sessions choose their own
 ports; two independent choices can collide. Track which slot each live session holds. A slot is
-free again only after its session reported teardown.
+free again only after `fleet slot verify-clean <slot> --cwd <repo>` passes
+(`core/pm/skills/spawn-tester.md`, "When the tester reports").
+
+**Case list first, only when `fleet.trials.case_list` is on.** Before a ticket above "small" is
+built, spawn a tester for a short case-list session (`tester <TICKET> case list`, no slot, no
+build; `engineering/tester/skills/case-list.md`). Answer its questions before the engineer
+starts. A list over about 25 cases sends the ticket back to the planner to split. The engineer
+brief then points at the `CASE LIST:` comment (`engineering/references/case-list.md`).
 
 ### Which model to spawn on — default by role, escalate by ticket
 
@@ -115,7 +122,8 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    open PR. Run it before each pick and after each notification, instead of reading the meter
    file, looping over ports, or calling `gh` per PR (measured 2026-10-25: about 2,000 such PM
    calls a month). To wait for CI, start `fleet watch <TICKET>-ci -- gh run watch <id> --exit-status` with `run_in_background: true`
-   and carry on; never a `sleep` loop, and never `gh pr checks --watch` (a skipped duplicate of a
+   and carry on. `fleet watch` has no expiry, so it outlasts a long CI run; never a `sleep`
+   loop, and never `gh pr checks --watch` (a skipped duplicate of a
    check name ends it early; see the merge queue).
 1. **Tag** each spawn with role + task kind (`api`, `ui`, `schema`, `money-concurrency`,
    `copy-i18n`, `tests-only`, `infra-deps`, `retest`, `rework`) from triage paths/keywords and
@@ -146,13 +154,19 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    to read those commits first and judge them: keep, squash or rewrite. It never builds on top
    of them unread. (2026-10-27: a Codex lane timed out at 2 hours with 13 unpushed commits going
    in circles; an Opus engineer replaced them with one fix.)
-6. **Log every spawn** at its end. Claude: `$L log add --ticket … --role … --kind … --executor
+6. **Log every spawn twice: a `spawn` row when you start it, and the result row at its report.**
+   `$L log add --ticket … --role … --kind … --executor … --model … --outcome spawn` at the start.
+   A `spawn` row and the later result row of the same session are never treated as repeats, so
+   neither needs `--force`. The result row, at its end: Claude: `$L log add --ticket … --role … --kind … --executor
    claude --model … --outcome … [--experiment] --reason "…" --set duration_ms=… agent_id=…` with
    the duration and the agent id (the `task-id` of its notification) from the Agent result. Do not
    log its `tokens`: that is the last call's size, not the spend. `$L cost --backfill` writes the
    real usage onto the row from the session file, matched by `agent_id`. A tester's
-   `verify_fail` needs `--cause missed|ticket|spec_changed|environment` (the table under "Read a
-   low pass rate correctly"); the log refuses one without it. It also needs `--reason`: the
+   `verify_fail` needs `--cause missed|ticket|spec_changed|environment|pm_ruling` (the table under
+   "Read a low pass rate correctly"; `pm_ruling` when a PM scope decision or brief caused it,
+   `core/pm/skills/ruling.md`); the log refuses one without it. Add the tester's grading of the
+   first finding when its report gives it: `--in-list yes|no`, `--severity s1|s2|s3`, `--repeat
+   yes|no`. It also needs `--reason`: the
    first finding in a few words. A `missed` one takes `--defect` too, the kind of defect:
    `criterion` (a criterion not met), `other_path` (works on one path, breaks on another the change
    touches), `stale_state` (preview and save disagree), `concurrency`, `money_rule` (rounding or a
@@ -174,7 +188,9 @@ scan → **opencode `kimi-k2.7-code`** (fallback claude `haiku`); ticket writer 
    (`core/pm/skills/preflight.md` §0.6). Both also hold a spawn the machine can't carry
    (`fleet resources`, see spawn-tester.md "Sweep and machine gate"): a lane comes back
    `deferred` with `resources <level>` in its error, and a held Claude spawn names the level
-   and the biggest processes. Free memory first; never pass `--ignore-resources` on your own. A rate-limit in a lane records a back-off and is a lane failure.
+   and the biggest processes. Free memory first; never pass `--ignore-resources` on your own.
+   Park the refused spawn with `$L queue add --ticket … --role … --slot … --brief <file>` and
+   send it when `$L queue next --pop` prints it (spawn-tester.md, machine gate). A rate-limit in a lane records a back-off and is a lane failure.
 
 ### Record every spawn so the defaults can be checked later
 
@@ -200,7 +216,7 @@ and the `usage` block (`input_tokens`, `cached_input_tokens`, `output_tokens`) a
 `executor`: read them as `claude`. Compute the pass rates below per **(role, executor,
 model)**, and change an executor default only on the same evidence rules.
 
-`outcome` is one of `pr_opened` / `blocked` / `verify_pass` / `verify_fail` / `done`. Fill
+`outcome` is one of `spawn` / `pr_opened` / `blocked` / `verify_pass` / `verify_fail` / `done`. Fill
 `verify_first_pass` on the ticket's worker row once its verify verdict is known — that is the
 number that actually answers "was this model good enough".
 
@@ -221,10 +237,11 @@ anything:
 | environment (budget wall, trunk moved, shared port died) | not the worker | fix the environment; exclude from the model signal |
 | the ticket's own DoD was wrong or incomplete | not the worker | fix ticket quality — see the planner's `write-ticket` skill |
 | the spec changed mid-build | not the worker | the text-freeze rule (`core/pm/skills/preflight.md` §0) |
+| a PM scope decision or brief caused it (`pm_ruling`) | not the worker | `core/pm/skills/ruling.md`: name the source before ruling |
 | the worker missed something demonstrable it was asked to check | **this one is the model signal** | only these count toward the pass rate |
 
 Only the last row justifies changing a model default. A pass rate dragged down by the first
-three says the *tickets or the environment* need work, and moving to a bigger model will not fix
+four says the *tickets, the PM or the environment* need work, and moving to a bigger model will not fix
 it — it will just cost more.
 
 **And do not read this run's 64% as licence to drop a tier either.** The failures that were

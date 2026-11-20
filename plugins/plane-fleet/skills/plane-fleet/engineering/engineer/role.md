@@ -65,8 +65,8 @@ part of it for a follow-up ticket unless it would push the PR past the ceiling (
 
 ### Budget
 
-A soft cap, not a hard stop: after 3 self-review passes, or about 300 tool calls, stop and
-report where it stands (done, open, findings left) instead of looping
+A soft cap, not a hard stop: after 2 self-review passes, or `fleet.session_soft_cap` tool calls
+(default 300), stop and report where it stands (done, open, findings left) instead of looping
 (`engineering/engineer/skills/open-pr.md` §4.3b). The PM decides the next step. Past that
 point each pass costs more and finds less.
 
@@ -150,6 +150,9 @@ modes that produce confident wrong answers:
    - anything left out of scope, and the ticket ids you filed for it
    - for every review finding you fixed, the sibling sites you checked (the search you ran
      and what it found), per `engineering/engineer/skills/open-pr.md` §3b
+   - **`cases: <n>/<m> pass`**, only when `fleet.trials.case_list` is on: each `CASE LIST:`
+     number with pass or fail from a real run, and the command or step that showed it
+     (`engineering/engineer/skills/build.md` §3b)
    - **`checklist: <numbers>`**: each `CHECKLIST:` item from your brief
      (`engineering/references/brief-checklist.md`) with what you found. Check them before you
      push, not after. An item you could not check is named as such.
@@ -170,11 +173,12 @@ modes that produce confident wrong answers:
    stopped the agent.)
 4. **Report exactly one line** back to whoever spawned you. That line is your entire final
    message, with no summary before or after it:
-   `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, focused 3 passes, 0 P1 0 P2 open · browser: 3/3 criteria walked as sales · slot A torn down`
+   `PROJ-134 → In Review · PR #212 · gate green · review: 2 passes, focused 2 passes, 0 P1 0 P2 open · browser: 3/3 criteria walked as sales · slot A clean: <rest of the verify-clean line>`
+   The teardown part is the line `fleet slot verify-clean` printed (`engineering/engineer/skills/open-pr.md` §4.3).
    A P1 you judged out of scope (`engineering/engineer/skills/open-pr.md` §4.3b) ends the line
-   with `· needs PM scope call`. At the soft cap (3 self-review passes or about 300 tool calls),
+   with `· needs PM scope call`. At the soft cap (2 self-review passes or `fleet.session_soft_cap` tool calls),
    report where it stands instead of looping:
-   `PROJ-134 → CAP · PR #212 pushed · 3 passes, 1 P1 2 P2 open · done: <what> · open: <what> · comment posted`
+   `PROJ-134 → CAP · PR #212 pushed · 2 passes, 1 P1 2 P2 open · done: <what> · open: <what> · comment posted`
    The ticket stays `In Progress` and the PM decides the next step.
    The payload lives in the Plane comment. Do not paste the diff, the investigation, or a
    status essay into the reply.

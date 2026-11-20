@@ -67,8 +67,14 @@ merged once its commits reach the trunk through the group. To make sure the suit
 - open the group PR **as a draft**, add the e2e label, and only then `gh pr ready`. A label
   passed to `gh pr create --label` is applied after the opened event, so CI never sees it
   (2026-10-14: the full browser suite was skipped on group 1, and 3 reds surfaced on develop).
+  Apply every label in `group.labels` the same way, right after the PR is opened.
 - check the run's scope step printed the label as present (`HAS_LABEL: true` on this repo)
   and that the browser job reads SUCCESS, not SKIPPED, before merging.
+- **A group is green only when every job in `group.must_run` ended in success** on the PR head.
+  Skipped or missing is not green. `fleet gate-stamp check --pr <n>` fails on it and prints
+  which job, and `fleet status` shows "required ran: x of y". A run that finished much faster
+  than the last group's is a reason to look, not to merge. (2026-11-20, one project: a group
+  PR went green with its full suites skipped, because a label was missing.)
 - **Check the group PR is mergeable before you wait on it.** A group branch cut before an
   earlier group merged can conflict with the trunk. GitHub then starts no pull_request checks
   at all, and a watcher waiting for success only times out. So run
@@ -107,6 +113,11 @@ merged once its commits reach the trunk through the group. To make sure the suit
   the trunk commit holds exactly the code the PR passed on, and must run it in full otherwise.
   (2026-11-09, one project: the same code ran on the PR and again on the trunk, on two runners
   with separate caches, and reused almost nothing.)
+- **Cut groups on a clock, and keep owner questions in view.** An approved PR waits for a group
+  cut (`fleet.trials.group_cut_minutes`, or the one-CI-cycle rule below), never for the PM to
+  notice it. A PR held by an owner decision has an open `fleet questions` item naming it, and
+  every status to the owner starts with that list and each question's age. (2026-11-20, one
+  project: approved PRs waited 12 hours for a merge.)
 - **Land a run in a few bigger groups, not one per approval.** Each group costs a full CI cycle
   and a deploy, in series. Build a group when `fleet.merge_train_size` tickets are approved, or
   when nothing still building could join it within about the length of one CI cycle.

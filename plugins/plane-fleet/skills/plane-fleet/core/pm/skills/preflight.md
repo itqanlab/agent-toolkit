@@ -25,6 +25,12 @@ summary if it is not on power. `fleet guard stop` when the run ends. Lost time s
 (2026-11-08, one project: 3.4 hours lost to a sleeping machine and 2 to an expired login in one
 27 hour run, and neither was visible from the board.)
 
+**Look for machine hogs before the first spawn.** Read the `machine:` line and any `warning:`
+line of `fleet resources`: a file watcher rooted at the repo (watchman, an indexer) covers
+every worktree, and known hogs (a VM, a leftover Nx daemon, old headless browsers) take what
+the slots need. Drop or report them now (`core/pm/skills/spawn-tester.md`, machine gate), not
+after a spawn is refused.
+
 **Keep big outputs out of your context.** A review transcript, a CI log or a test run is read
 through a filter, never whole: `fleet findings <file>` for a `codex review` or `codex exec`
 output, `gh run view --log-failed | tail` for CI, a `scan` lane for anything longer. (2026-11-01:
@@ -325,8 +331,8 @@ cost technique matters most here because you read the board every pass: `fields`
    **Plan for a fresh PM, don't wait for a degraded one (owner, 2026-10-01).** A small context
    is only safe if every decision comes from a fresh lookup, and a long run erodes that: old
    tool output crowds out the current state. So:
-   - After **every group that reaches `Done`**, rewrite the FLEET RESUME NOTE (§0.3) so it is
-     complete on its own: open PRs and their state, the approved queue and group plan, held
+   - After **every group that reaches `Done`**, and at least every few hours in any case,
+     rewrite the FLEET RESUME NOTE (§0.3) so it is complete on its own: open PRs and their state, the approved queue and group plan, held
      decisions, slots in use, live sessions. Then a restart at any moment, whether by the
      owner, by automatic context compaction or by a usage-limit pause, loses nothing.
    - **Never ask the owner to restart the PM, and never stop the loop to suggest it.** You can't

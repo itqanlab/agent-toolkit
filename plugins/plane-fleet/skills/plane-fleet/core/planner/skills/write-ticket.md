@@ -225,6 +225,19 @@ decided here, not during review.</li></ul>
 </ul>
 ```
 
+**Rules, grids, codes and locks.** These keep a tester from finding the ticket's gaps for you:
+- **One screen per UI ticket.** A second screen is a second ticket.
+- **A rule criterion names its grid**: "no raw code shown, at 360, 768 and 1280 wide, in both
+  languages, in light and dark mode, in every engine in `fleet.client_engines`". A rule with no
+  grid gets checked on one cell.
+- **A decision on codes from an outside service is an allow-list**: the codes that do each
+  thing, and the safe default for any code not listed.
+- **A step that takes a lock names its place in the lock order** that every other path taking
+  it follows.
+- **A contract or spec line the ticket would change is an owner question in the ticket**, under
+  §4 Scope, not a finding a tester makes later. It is the one open question a ticket may
+  carry, and the PM puts it to the owner before claiming.
+
 **A screenshot, a visual baseline, or an e2e assertion on a count, a date or a relative time
 must be deterministic, and the ticket says how.** In §3, for each shot or assertion, write:
 - the data it shows, seeded fresh for that shot or masked in the shot, never data a previous
