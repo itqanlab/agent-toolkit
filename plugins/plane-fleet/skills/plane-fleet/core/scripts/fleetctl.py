@@ -9,6 +9,8 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py budget  [status|line|check EXE [--model M]|backoff EXE [--minutes M] [--reason TEXT]|lane-start EXE] [--json]
   fleetctl.py log     add --ticket T --role R --executor E --model M --outcome O [--kind K]
                       [--set k=v ...] [k=v ...] [--from-result <lane>/result.json] [--force]
+                      verify_fail: --cause C [--defect D] [--in-list yes|no] [--severity s1|s2|s3] [--repeat yes|no]
+                      --outcome spawn: the row written when a session starts; its result row is not a repeat
                       (a row matching one already logged is refused without --force)
   fleetctl.py log     backfill --ticket T --role R --set k=v [k=v ...]
   fleetctl.py stats   [--role R] [--kind K] [--project P] [--json]
@@ -16,6 +18,11 @@ and by the Claude usage-pacer hook. Standard library only. Never prints secrets.
   fleetctl.py cost    [--since ISO] [--until ISO] [--ticket T] [--json] [--backfill]   real spend and time, from the sessions
   fleetctl.py retro   [--since ISO|--hours N] [--cwd DIR] [--json]   the fleet reviews itself (fleetretro.py)
   fleetctl.py review  [--cwd DIR] [--last N] [--md FILE] [--json]   every run measured the same way and kept (fleetreview.py)
+  fleetctl.py rounds  [--ticket T] [--cwd DIR] [--json]   failed test rounds per ticket, the cap, one more allowed?
+  fleetctl.py rounds  allow <TICKET> --reason "<the owner's words>"   one more rework spawn past the cap
+  fleetctl.py queue   add --ticket T --role engineer|tester --slot S --brief FILE | list [--all] | next [--pop]
+                      (next: exit 3 when the machine gate admits no heavy session, 4 when empty)
+  fleetctl.py questions add --ticket T [--pr N] --text "..." | list [--all] | close <id> --answer "..."
   fleetctl.py selftest                      log add round trip in a temp log
   fleetctl.py apply   [--dry-run]          promotions / demotions -> user override + decisions log
   fleetctl.py seed                          fold legacy run-log rows (log.legacy_glob) into the log
@@ -36,14 +43,22 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 FLEET_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))       # <fleet root>/core/scripts/
 BASE_REGISTRY = os.path.join(FLEET_ROOT, "core", "references", "executors.json")
 STATE_HOME = os.environ.get("PLANE_FLEET_HOME") or os.path.expanduser("~/.config/plane-fleet")
-OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix", "decision")
+OUTCOMES = ("pr_opened", "blocked", "verify_pass", "verify_fail", "done", "lane_failed", "stale", "deferred", "retro_fix", "decision",
+            "spawn")
+# The row the PM writes when it starts a session (2.14). Its result comes later as a row of its
+# own; the start row is never scored and never counted as a session, so nothing counts twice.
+START_OUTCOMES = ("spawn",)
 # Rows that mark something the PM did, not a session: never scored, never counted as spend.
 MARKER_OUTCOMES = ("done", "retro_fix", "decision")
 # a session that ended without a result must say why, or the review cannot learn from it
 REASON_OUTCOMES = ("blocked", "lane_failed", "deferred", "decision", "verify_fail")
 DUPLICATE_WINDOW_S = 600
 # Why a tester failed a PR (`core/pm/skills/spawn.md` §3 "Read a low pass rate correctly"); only "missed" counts against the model.
-FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment")
+# pm_ruling (2.14): the fail came from a PM scope decision or brief, not from the engineer.
+FAIL_CAUSES = ("missed", "ticket", "spec_changed", "environment", "pm_ruling")
+# Severity of a tester finding (2.14). s1: data loss, money, a wrong or duplicate send to a
+# customer, security, a blocked main path. s2: a visible fault with a workaround. s3: polish.
+SEVERITIES = ("s1", "s2", "s3")
 # what kind of defect a missed verify_fail was, so the review can count rework by class.
 # criterion: an acceptance criterion not met. other_path: the rule works on one path, breaks on
 # another the change touches (edit, second screen, error code). stale_state: preview and save
@@ -737,7 +752,7 @@ def summarize(reg, rows):
 def scoreboard(reg, rows, role=None, kind=None, project=None):
     groups = {}
     for r in rows:
-        if r.get("type", "spawn") != "spawn" or r.get("outcome") in ("deferred",) or r.get("usage_only"):
+        if r.get("type", "spawn") != "spawn" or r.get("outcome") in ("deferred", *START_OUTCOMES) or r.get("usage_only"):
             continue
         if r.get("role") == "pm" and r.get("outcome") in MARKER_OUTCOMES:  # a PM marker, not a session
             continue
@@ -1112,7 +1127,7 @@ def report(reg, project, since, until=None):
             done[r.get("ticket")] = r  # latest done row per ticket wins
     approved = sorted({r.get("ticket") for r in rows if r.get("role") in ("tester", "verifier-legacy")
                        and r.get("outcome") == "verify_pass"})
-    sessions = [r for r in rows if not is_marker(r) and r.get("outcome") != "deferred"]
+    sessions = [r for r in rows if not is_marker(r) and r.get("outcome") not in ("deferred", *START_OUTCOMES)]
     L = []
     w = f"{since}" + (f" to {until}" if until else " to now")
     L.append(f"Fleet report · {project or 'all projects'} · {w}")
@@ -1285,6 +1300,7 @@ def selftest():
         main(base[:5] + ["ST-6"] + base[6:-1] + ["verify_fail", "--cause", "missed", "--defect", "other_path",
                                                  "--reason", "edit path skips the hold"], quiet=True)
         check("--defect stored", {r["ticket"]: r for r in load_rows(reg)}.get("ST-6", {}).get("defect"), "other_path")
+        selftest_214(check, d, reg, base)
         main(base[:5] + ["ST-5"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
         with contextlib.redirect_stderr(io.StringIO()):
             code = main(base[:5] + ["ST-6"] + base[6:] + ["--set", "agent_id=a77"], quiet=True)
@@ -1340,6 +1356,413 @@ def selftest():
     return 0 if ok else 1
 
 
+# ---------------------------------------------------------------- rounds, queue, questions (2.14)
+# 2026-11, one 20 hour run: 22 of 38 tickets failed their first test and one ticket had 10
+# rework sessions. The PM skill already said "cap at two reworks" and was passed under load, so
+# the cap now lives here and the usage-pacer hook enforces it. Five spawns the machine gate
+# refused were retried by hand: the queue parks them. Approved PRs waited 12 hours on owner
+# answers nobody tracked: the questions file keeps them in front of the PM.
+TICKET_RE = re.compile(r"\b[A-Z][A-Z0-9]+-\d+\b")
+# Prefixes that look like ticket ids and never are (UTF-8, SHA-256, ISO-8601).
+NOT_TICKETS = ("UTF", "SHA", "ISO", "RFC", "HTTP", "TLS", "ES", "MD", "AES", "RSA")
+TEST_ROUNDS_MAX = 2
+QUEUE_ROLES = ("engineer", "tester")
+
+
+def ticket_in(text):
+    """The first ticket identifier in a prompt, or None."""
+    for m in TICKET_RE.finditer(text or ""):
+        if m.group(0).split("-", 1)[0] not in NOT_TICKETS:
+            return m.group(0)
+    return None
+
+
+def yes_no(v):
+    """yes/no, true/false or a bool -> bool; anything else -> None."""
+    if isinstance(v, bool):
+        return v
+    s = str(v or "").strip().lower()
+    return True if s in ("yes", "y", "true") else False if s in ("no", "n", "false") else None
+
+
+def failed_rounds(rows, ticket, project=None):
+    """Failed test rounds of one ticket: its verify_fail rows, a fail written twice counted once.
+    Two fail rows are one round when they share an agent_id, or when no engineer row of the
+    ticket sits between them and they are at most DUPLICATE_WINDOW_S apart."""
+    n, last, agents, eng_since = 0, None, set(), True
+    for r in sorted(rows, key=lambda r: r.get("ts") or ""):
+        if r.get("ticket") != ticket or r.get("usage_only") or r.get("type", "spawn") != "spawn":
+            continue
+        if project and r.get("project") and r.get("project") != project:
+            continue
+        if r.get("outcome") != "verify_fail":
+            eng_since = eng_since or r.get("role") == "engineer"
+            continue
+        aid = r.get("agent_id")
+        if aid and aid in agents:
+            continue
+        if aid:
+            agents.add(aid)
+        t = parse_ts(r.get("ts"))
+        if not eng_since and last is not None and t is not None and 0 <= (t - last).total_seconds() <= DUPLICATE_WINDOW_S:
+            continue
+        n, last, eng_since = n + 1, t, False
+    return n
+
+
+def state_file(kind, project):
+    """<PLANE_FLEET_HOME>/<kind>-<project>.jsonl: the queue, questions and round allowances."""
+    return os.path.join(STATE_HOME, f"{kind}-{project or 'default'}.jsonl")
+
+
+def read_jsonl(path):
+    out = []
+    try:
+        for line in open(path):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(r, dict):
+                out.append(r)
+    except OSError:
+        pass
+    return out
+
+
+def write_jsonl(path, rows):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        for r in rows:
+            f.write(json.dumps(r, separators=(",", ":")) + "\n")
+    os.replace(tmp, path)
+
+
+def add_jsonl(path, row):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a") as f:
+        f.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+
+def next_id(rows, prefix):
+    nums = [int(m.group(1)) for m in (re.match(rf"{prefix}(\d+)$", str(r.get("id") or "")) for r in rows) if m]
+    return f"{prefix}{max(nums, default=0) + 1}"
+
+
+def find_id(rows, given, prefix):
+    want = str(given).strip()
+    want = want if want.startswith(prefix) else prefix + want
+    return next((r for r in rows if str(r.get("id")) == want), None)
+
+
+def age_text(ts, now=None):
+    t = parse_ts(ts)
+    if t is None:
+        return "?"
+    s = max(0, (now or time.time()) - t.timestamp())
+    return f"{s / 3600:.1f}h" if s >= 3600 else f"{s / 60:.0f}m"
+
+
+def rounds_cap(cwd):
+    """fleet.test_rounds_max from the project config (default 2); 0 turns the cap off."""
+    try:
+        v = (project_config(cwd or os.getcwd()).get("fleet") or {}).get("test_rounds_max", TEST_ROUNDS_MAX)
+        return int(v) if v is not None else TEST_ROUNDS_MAX
+    except Exception:
+        return TEST_ROUNDS_MAX
+
+
+def round_state(rows, ticket, project, cap):
+    """Rounds, cap and whether one more rework spawn may start. Under the cap it may. At or past
+    it, it needs an owner allowance that is unused, or one already used at this same round count
+    (a respawn of the same round, after a crash or a refused spawn, needs no second allowance)."""
+    n = failed_rounds(rows, ticket, project)
+    allows = [a for a in read_jsonl(state_file("rounds-allow", project)) if a.get("ticket") == ticket]
+    st = {"ticket": ticket, "project": project, "rounds": n, "cap": cap, "allowances": len(allows),
+          "unused": sum(1 for a in allows if not a.get("used"))}
+    if cap <= 0 or n < cap:
+        st.update(allowed=True, needs_allowance=False)
+    else:
+        same = any(a.get("used") and a.get("used_at_rounds") == n for a in allows)
+        st.update(allowed=bool(same or st["unused"]), needs_allowance=not same)
+    return st
+
+
+def consume_allowance(project, ticket, rounds):
+    """Mark one owner allowance used for this round count. Returns its id, or None."""
+    path = state_file("rounds-allow", project)
+    allows = read_jsonl(path)
+    if any(a.get("ticket") == ticket and a.get("used") and a.get("used_at_rounds") == rounds for a in allows):
+        return None
+    for a in allows:
+        if a.get("ticket") == ticket and not a.get("used"):
+            a.update(used=True, used_ts=now_iso(), used_at_rounds=rounds)
+            write_jsonl(path, allows)
+            return a.get("id")
+    return None
+
+
+def rework_refusal(st):
+    t = st["ticket"]
+    return (f"rework cap: {t} has {st['rounds']} failed test rounds (cap {st['cap']}, fleet.test_rounds_max). Do not start "
+            f"another rework session. Write the rework ledger entry, put the three options to the owner (narrow the ticket, "
+            f"split the leftovers into a follow-up, go on). When the owner allows one more round, record it with: "
+            f"fleet rounds allow {t} --reason \"<the owner's words>\". Off switch, on the owner's word only: "
+            f"touch {STATE_HOME}/rework-cap-off.")
+
+
+def rework_gate(cwd, text):
+    """For the usage-pacer hook: the round state of the first ticket in an engineer prompt, or
+    None when there is no ticket, the cap is off, or the switch file rework-cap-off exists."""
+    if os.path.exists(os.path.join(STATE_HOME, "rework-cap-off")):
+        return None
+    ticket = ticket_in(text)
+    if not ticket:
+        return None
+    cap = rounds_cap(cwd)
+    if cap <= 0:
+        return None
+    reg = load_registry(cwd)
+    return round_state(load_rows(reg), ticket, reg.get("_project"), cap)
+
+
+def heavy_admitted(cwd):
+    """(may a heavy session start now, one line why). No probe or the resources-off switch: yes."""
+    if os.path.exists(os.path.join(STATE_HOME, "resources-off")):
+        return True, "resources-off switch"
+    try:
+        import fleetres
+        cfg, paths, wdirs = fleetres.context(cwd or os.getcwd())
+        sample = fleetres.probe(paths, top_n=8)
+        gate = fleetres.judge(sample, cfg, wdirs)
+        return bool(fleetres.admit(gate, True)), fleetres.summary_line(sample, gate)
+    except Exception as e:
+        return True, f"no machine probe ({type(e).__name__})"
+
+
+def queue_line(r):
+    return (f"{r.get('id')} {r.get('ticket')} {r.get('role')} slot {r.get('slot')} brief {r.get('brief')} "
+            f"queued {age_text(r.get('ts'))} ago" + (f", popped {r.get('popped_ts')}" if r.get("popped") else ""))
+
+
+def question_line(r):
+    return (f"{r.get('id')} {r.get('ticket')}" + (f" PR #{r['pr']}" if r.get("pr") else "") + f" open {age_text(r.get('ts'))}: "
+            + str(r.get("text") or "") + (f" -> answered: {r.get('answer')}" if r.get("closed") else ""))
+
+
+def run_rounds(args, reg, ap):
+    project = args.project or reg.get("_project")
+    cwd = args.cwd or os.getcwd()
+    cap = rounds_cap(cwd)
+    if args.action == "allow":
+        ticket = (args.target or args.ticket or "").strip().upper()
+        if not TICKET_RE.fullmatch(ticket):
+            ap.error("rounds allow needs a ticket id: fleet rounds allow <TICKET> --reason \"<the owner's words>\"")
+        if not (args.reason or "").strip():
+            ap.error("rounds allow needs --reason: the owner's words, as said")
+        path = state_file("rounds-allow", project)
+        rows = read_jsonl(path)
+        row = {"id": next_id(rows, "a"), "ts": now_iso(), "project": project, "ticket": ticket,
+               "reason": args.reason.strip(), "used": False}
+        add_jsonl(path, row)
+        st = round_state(load_rows(reg), ticket, project, cap)
+        print(f"allowed one more rework round for {ticket} ({row['id']}): {st['rounds']} failed rounds, cap {cap}. "
+              "The next engineer spawn for it uses this allowance.")
+        return 0
+    ticket = args.ticket or (args.action if args.action and TICKET_RE.fullmatch(args.action) else None)
+    if args.action and not ticket:
+        ap.error(f"unknown rounds action {args.action!r}: use `fleet rounds [--ticket T]` or `fleet rounds allow <T> --reason ...`")
+    rows = load_rows(reg)
+    tickets = [ticket] if ticket else sorted({r.get("ticket") for r in rows if r.get("outcome") == "verify_fail" and r.get("ticket")
+                                              and (not project or not r.get("project") or r.get("project") == project)})
+    states = [round_state(rows, t, project, cap) for t in tickets]
+    states = [s for s in states if s["rounds"] or ticket]
+    states.sort(key=lambda s: (-s["rounds"], s["ticket"]))
+    if args.json:
+        print(json.dumps(states, indent=2))
+        return 0
+    if not states:
+        print(f"no failed test rounds logged · cap {cap}" + (" (off)" if cap <= 0 else ""))
+        return 0
+    for s in states:
+        at = s["cap"] > 0 and s["rounds"] >= s["cap"]
+        more = "one more round allowed" if s["allowed"] else "AT CAP: one more round needs the owner (`fleet rounds allow`)"
+        print(f"{s['ticket']}: {s['rounds']} failed test round{'s' if s['rounds'] != 1 else ''}, cap "
+              f"{s['cap'] if s['cap'] > 0 else 'off'} · {more}" + (f" · {s['unused']} unused allowance" if at and s["unused"] else ""))
+    return 0
+
+
+def run_queue(args, reg, ap):
+    project = args.project or reg.get("_project")
+    path = state_file("queue", project)
+    rows = read_jsonl(path)
+    if args.action == "add":
+        if not (args.ticket and args.role and args.slot and args.brief):
+            ap.error("queue add needs --ticket, --role engineer|tester, --slot and --brief <file>")
+        brief = os.path.abspath(X(args.brief))
+        if not os.path.isfile(brief):
+            ap.error(f"queue add: brief file {brief} not found; save the brief to a file first")
+        row = {"id": next_id(rows, "s"), "ts": now_iso(), "project": project, "ticket": args.ticket, "role": args.role,
+               "slot": str(args.slot), "brief": brief, "popped": False}
+        add_jsonl(path, row)
+        print(f"queued {row['id']} {args.ticket} {args.role} slot {row['slot']}. Send it when `fleet queue next` prints it.")
+        return 0
+    waiting = sorted((r for r in rows if not r.get("popped")), key=lambda r: r.get("ts") or "")
+    if args.action == "list":
+        shown = sorted(rows, key=lambda r: r.get("ts") or "") if args.all else waiting
+        if args.json:
+            print(json.dumps(shown, indent=2))
+        elif not shown:
+            print("queue empty")
+        else:
+            print("\n".join(queue_line(r) for r in shown))
+        return 0
+    if not waiting:
+        print("queue empty")
+        return 4
+    ok, why = heavy_admitted(args.cwd or os.getcwd())
+    head = waiting[0]
+    if not ok:
+        print(f"held: the machine gate admits no heavy session now ({why}). {len(waiting)} queued, oldest "
+              f"{head.get('id')} {head.get('ticket')} waiting {age_text(head.get('ts'))}.")
+        return 3
+    if args.pop:
+        for r in rows:
+            if r.get("id") == head.get("id"):
+                r.update(popped=True, popped_ts=now_iso())
+                head = r
+        write_jsonl(path, rows)
+    print(json.dumps(head) if args.json else queue_line(head))
+    return 0
+
+
+def run_questions(args, reg, ap):
+    project = args.project or reg.get("_project")
+    path = state_file("questions", project)
+    rows = read_jsonl(path)
+    if args.action == "add":
+        if not (args.ticket and (args.text or "").strip()):
+            ap.error("questions add needs --ticket and --text")
+        row = {"id": next_id(rows, "q"), "ts": now_iso(), "project": project, "ticket": args.ticket,
+               **({"pr": args.pr} if args.pr else {}), "text": args.text.strip(), "closed": False}
+        add_jsonl(path, row)
+        print(f"question {row['id']} open on {args.ticket}" + (f" PR #{args.pr}" if args.pr else ""))
+        return 0
+    if args.action == "close":
+        if not args.target or not (args.answer or "").strip():
+            ap.error("questions close needs the id and --answer \"...\"")
+        q = find_id(rows, args.target, "q")
+        if q is None:
+            ap.error(f"no question {args.target}")
+        q.update(closed=True, closed_ts=now_iso(), answer=args.answer.strip())
+        write_jsonl(path, rows)
+        print(f"closed {q['id']} on {q.get('ticket')} after {age_text(q.get('ts'))}")
+        return 0
+    shown = sorted((r for r in rows if args.all or not r.get("closed")), key=lambda r: r.get("ts") or "")
+    if args.json:
+        print(json.dumps(shown, indent=2))
+    elif not shown:
+        print("no open owner questions")
+    else:
+        print("\n".join(question_line(r) for r in shown))
+    return 0
+
+
+def selftest_214(check, d, reg, base):
+    """2.14: spawn rows, pm_ruling and the finding fields, rounds and allowances, queue, questions."""
+    import contextlib, io
+    q = lambda argv: main(argv, quiet=True)
+    out = io.StringIO()
+    sp = base[:5] + ["ST-20"] + base[6:-1]
+    check("log add: a spawn row then its result row log without --force", (q(sp + ["spawn"]), q(sp + ["pr_opened"])), (0, 0))
+    rows = load_rows(reg)
+    check("a spawn row is not scored as a session",
+          sum(v["n"] for k, v in scoreboard(reg, [r for r in rows if r.get("ticket") == "ST-20"]).items() if k[1] == "*"), 1)
+    q(base[:5] + ["ST-21"] + base[6:-1] + ["verify_fail", "--cause", "pm_ruling", "--reason", "brief moved the rule",
+                                           "--in-list", "no", "--severity", "s2", "--repeat", "yes"])
+    r21 = {r["ticket"]: r for r in load_rows(reg)}.get("ST-21", {})
+    check("--cause pm_ruling stored", r21.get("fail_cause"), "pm_ruling")
+    check("--in-list stored as a bool", r21.get("in_list"), False)
+    check("--severity stored", r21.get("severity"), "s2")
+    check("--repeat stored as a bool", r21.get("repeat"), True)
+    t0 = parse_ts("2026-10-01T10:00:00Z").timestamp()
+    at = lambda m: datetime.datetime.fromtimestamp(t0 + m * 60, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fx = [{"ts": at(0), "ticket": "RX-1", "role": "engineer", "outcome": "pr_opened"},
+          {"ts": at(30), "ticket": "RX-1", "role": "tester", "outcome": "verify_fail", "agent_id": "t1"},
+          {"ts": at(31), "ticket": "RX-1", "role": "tester", "outcome": "verify_fail"},            # written twice
+          {"ts": at(50), "ticket": "RX-1", "role": "engineer", "outcome": "spawn"},
+          {"ts": at(80), "ticket": "RX-1", "role": "tester", "outcome": "verify_fail", "agent_id": "t2"},
+          {"ts": at(200), "ticket": "RX-1", "role": "pm", "outcome": "verify_fail", "agent_id": "t2"},  # same session again
+          {"ts": at(81), "ticket": "RX-2", "role": "tester", "outcome": "verify_fail"},
+          {"ts": at(90), "ticket": "RX-1", "role": "tester", "outcome": "verify_fail", "project": "other"}]
+    check("failed_rounds: a fail written twice counts once", failed_rounds(fx, "RX-1", "st"), 2)
+    check("failed_rounds: another ticket", failed_rounds(fx, "RX-2"), 1)
+    check("failed_rounds: a fail logged on the engineer row counts",
+          failed_rounds([{"ts": at(1), "ticket": "RX-3", "role": "engineer", "outcome": "verify_fail"}], "RX-3"), 1)
+    check("ticket_in skips UTF-8", ticket_in("read UTF-8 notes, then work RX-1 in slot 2"), "RX-1")
+    check("round_state: under the cap", round_state(fx, "RX-2", "st", 2)["allowed"], True)
+    check("round_state: at the cap, no allowance", round_state(fx, "RX-1", "st", 2)["allowed"], False)
+    check("round_state: cap 0 is off", round_state(fx, "RX-1", "st", 0)["allowed"], True)
+    with contextlib.redirect_stderr(io.StringIO()):
+        try:
+            q(["rounds", "allow", "RX-1", "--project", "st"])
+            refused = False
+        except SystemExit:
+            refused = True
+    check("rounds allow without --reason is refused", refused, True)
+    with contextlib.redirect_stdout(out):
+        q(["rounds", "allow", "RX-1", "--project", "st", "--reason", "go on, owner"])
+    st = round_state(fx, "RX-1", "st", 2)
+    check("rounds allow: one more round allowed", (st["allowed"], st["needs_allowance"]), (True, True))
+    consume_allowance("st", "RX-1", st["rounds"])
+    check("allowance used: a respawn of the same round still passes", round_state(fx, "RX-1", "st", 2)["allowed"], True)
+    fx.append({"ts": at(300), "ticket": "RX-1", "role": "tester", "outcome": "verify_fail", "agent_id": "t3"})
+    check("allowance used: the next failed round needs a new one", round_state(fx, "RX-1", "st", 2)["allowed"], False)
+    check("rework_refusal names the allow command", "fleet rounds allow RX-1" in rework_refusal(round_state(fx, "RX-1", "st", 2)), True)
+    open(os.path.join(STATE_HOME, "rework-cap-off"), "w").close()
+    check("rework-cap-off switch turns the gate off", rework_gate(d, "work RX-1"), None)
+    os.remove(os.path.join(STATE_HOME, "rework-cap-off"))
+    brief = os.path.join(d, "brief.md")
+    open(brief, "w").write("brief")
+    global heavy_admitted
+    real = heavy_admitted
+    try:
+        with contextlib.redirect_stdout(out):
+            empty = q(["queue", "next", "--project", "st"])
+            q(["queue", "add", "--project", "st", "--ticket", "RX-5", "--role", "engineer", "--slot", "3", "--brief", brief])
+            q(["queue", "add", "--project", "st", "--ticket", "RX-6", "--role", "tester", "--slot", "4", "--brief", brief])
+            heavy_admitted = lambda cwd: (False, "CRITICAL")
+            held = q(["queue", "next", "--project", "st"])
+            heavy_admitted = lambda cwd: (True, "OK")
+            sent = q(["queue", "next", "--project", "st", "--pop"])
+        check("queue next: empty 4, held 3, admitted 0", (empty, held, sent), (4, 3, 0))
+        qrows = read_jsonl(state_file("queue", "st"))
+        check("queue: the oldest pops first", [(r["ticket"], r["popped"]) for r in qrows], [("RX-5", True), ("RX-6", False)])
+        check("queue: rows carry id, ts, popped_ts", all(k in qrows[0] for k in ("id", "ts", "popped_ts")), True)
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                q(["queue", "add", "--project", "st", "--ticket", "RX-7", "--role", "engineer", "--slot", "1", "--brief", brief + ".none"])
+                refused = False
+            except SystemExit:
+                refused = True
+        check("queue add: a missing brief file is refused", refused, True)
+    finally:
+        heavy_admitted = real
+    with contextlib.redirect_stdout(out):
+        q(["questions", "add", "--project", "st", "--ticket", "RX-8", "--pr", "12", "--text", "ship the empty state as is?"])
+        q(["questions", "add", "--project", "st", "--ticket", "RX-9", "--text", "which rounding?"])
+        q(["questions", "close", "1", "--project", "st", "--answer", "yes"])
+    qs = read_jsonl(state_file("questions", "st"))
+    check("questions: close marks one, keeps the answer", [(r["id"], r["closed"], r.get("answer")) for r in qs],
+          [("q1", True, "yes"), ("q2", False, None)])
+    check("questions: pr stored as a number", qs[0].get("pr"), 12)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        q(["questions", "list", "--project", "st"])
+    check("questions list shows only the open one", ("q2" in buf.getvalue(), "q1" in buf.getvalue()), (True, False))
+
+
 # ---------------------------------------------------------------- project config
 def project_config(cwd):
     """<repo>/.plane/config.json, deep-merged with {state_home}/projects/<repo>.json (the user's
@@ -1374,6 +1797,21 @@ def main(argv=None, quiet=False):
     lg.add_argument("--cause", choices=FAIL_CAUSES, help="why the tester failed it; required with --outcome verify_fail")
     lg.add_argument("--defect", choices=DEFECTS, help="what kind of defect a missed verify_fail was (see DEFECTS)")
     lg.add_argument("--force", action="store_true", help="log it even when a matching row is already logged")
+    lg.add_argument("--in-list", choices=["yes", "no"], help="verify_fail: was the finding in the case list")
+    lg.add_argument("--severity", choices=SEVERITIES, help="verify_fail: s1 blocks (data, money, customer send, security, main path), s2 has a workaround, s3 polish")
+    lg.add_argument("--repeat", choices=["yes", "no"], help="verify_fail: was the same finding raised in an earlier round")
+    rd = sub.add_parser("rounds", description="Failed test rounds per ticket against fleet.test_rounds_max; `allow` records the owner's go-ahead for one more.")
+    rd.add_argument("action", nargs="?", help="allow, or a ticket id"); rd.add_argument("target", nargs="?", help="allow: the ticket")
+    rd.add_argument("--ticket"); rd.add_argument("--reason", help="allow: the owner's words"); rd.add_argument("--cwd")
+    rd.add_argument("--project"); rd.add_argument("--json", action="store_true")
+    qu = sub.add_parser("queue", description="Spawns the machine gate refused, parked until it admits a heavy session.")
+    qu.add_argument("action", choices=["add", "list", "next"]); qu.add_argument("--ticket"); qu.add_argument("--role", choices=QUEUE_ROLES)
+    qu.add_argument("--slot"); qu.add_argument("--brief", help="add: the saved brief file"); qu.add_argument("--pop", action="store_true")
+    qu.add_argument("--all", action="store_true"); qu.add_argument("--cwd"); qu.add_argument("--project"); qu.add_argument("--json", action="store_true")
+    qs = sub.add_parser("questions", description="Open owner decisions, the PR each one holds, and their age.")
+    qs.add_argument("action", nargs="?", default="list", choices=["add", "list", "close"]); qs.add_argument("target", nargs="?", help="close: the id")
+    qs.add_argument("--ticket"); qs.add_argument("--pr", type=int); qs.add_argument("--text"); qs.add_argument("--answer")
+    qs.add_argument("--all", action="store_true"); qs.add_argument("--cwd"); qs.add_argument("--project"); qs.add_argument("--json", action="store_true")
     co = sub.add_parser("cost", description=COST_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     co.add_argument("--cwd"); co.add_argument("--project"); co.add_argument("--since"); co.add_argument("--until")
     co.add_argument("--ticket"); co.add_argument("--json", action="store_true")
@@ -1463,6 +1901,12 @@ def main(argv=None, quiet=False):
                 fields["fail_cause"] = args.cause
             if args.defect:
                 fields["defect"] = args.defect
+            if args.in_list:
+                fields["in_list"] = args.in_list == "yes"
+            if args.severity:
+                fields["severity"] = args.severity
+            if args.repeat:
+                fields["repeat"] = args.repeat == "yes"
             row.update(fields)
             if row["outcome"] not in OUTCOMES:
                 ap.error(f"outcome must be one of {', '.join(OUTCOMES)}")
@@ -1496,6 +1940,12 @@ def main(argv=None, quiet=False):
             append_row(reg, {"type": "backfill", "ts": now_iso(), "project": args.project or reg.get("_project"),
                              "ticket": args.ticket, "role": args.role, "fields": sets})
             print(f"backfilled {args.ticket} {args.role}: {', '.join(sets)}")
+    elif args.cmd == "rounds":
+        return run_rounds(args, reg, ap)
+    elif args.cmd == "queue":
+        return run_queue(args, reg, ap)
+    elif args.cmd == "questions":
+        return run_questions(args, reg, ap)
     elif args.cmd == "report":
         print(report(reg, args.project or reg.get("_project"), args.since, args.until))
     elif args.cmd == "cost":

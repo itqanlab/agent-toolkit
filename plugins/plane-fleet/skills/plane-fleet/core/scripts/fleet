@@ -22,6 +22,13 @@
 #   fleet cache-server start|stop|status|env [--cwd DIR]   one Nx cache shared by every worktree
 #   fleet slot-template build [--cwd DIR] [--ref origin/<trunk>] | clone <slot> [--test] | status
 #                                       one migrated, seeded DB template; a slot clones it in seconds
+#   fleet rounds [--ticket T] [--cwd DIR] | allow <TICKET> --reason "<the owner's words>"
+#                                       failed test rounds per ticket against fleet.test_rounds_max
+#   fleet queue add --ticket T --role engineer|tester --slot S --brief FILE | list | next [--pop]
+#                                       spawns the machine gate refused; next exits 3 when held, 4 when empty
+#   fleet questions add --ticket T [--pr N] --text "..." | list | close <id> --answer "..."
+#                                       open owner decisions and their age
+#   fleet slot verify-clean <S> --cwd DIR | release <S> --cwd DIR   a slot's leftovers (fleettemplate.py)
 #   fleet gate-stamp post --cwd DIR --sha SHA --log FILE | check --pr N
 #                                       stamp a commit the local pre-push gate passed; check a group PR
 #   fleet guard start|stop|status|check [--hours N]   holds off sleep and alerts when the agent login fails
@@ -44,8 +51,9 @@ case "${1:-}" in
   findings) shift; exec python3 "$here/fleetfindings.py" "$@" ;;
   cache-server) shift; exec python3 "$here/fleetcache.py" "$@" ;;
   slot-template) shift; exec python3 "$here/fleettemplate.py" "$@" ;;
+  slot) exec python3 "$here/fleettemplate.py" "$@" ;;
   gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
   guard) shift; exec python3 "$here/fleetguard.py" "$@" ;;
-  pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status|held) exec python3 "$here/fleetctl.py" "$@" ;;
+  pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status|held|rounds|queue|questions) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

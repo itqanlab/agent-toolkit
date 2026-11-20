@@ -22,6 +22,19 @@ checks every row in round 1. Why: measured 2026-11-16 on one project, most faile
 were the same rule breaking on a path nobody had listed yet, found one path per round, and three
 releases of "fix the class" rules did not move the rework rate (39-67% in every run).
 
+### 3b. Build to the case list (trial: `fleet.trials.case_list`)
+
+Only when the trial is on in the project config and the ticket has a `CASE LIST:` comment
+(`engineering/references/case-list.md`). The list is the definition of done.
+- The handoff gives a pass or fail per case number, each from a real run (a command or a
+  browser step), never from reading the code.
+- A rule over a grid ships with ONE parametrised test over the whole grid (every width,
+  language, mode, position and engine in `fleet.client_engines`) before the first push.
+- Self-review passes (`engineering/engineer/skills/open-pr.md` §4.3b) start once the cases are
+  green.
+- Fix the cause, not the case. A fault in one cell of a grid comes back with why that cell
+  differed from the others, and the fix is there.
+
 - Small **logical** commits, conventional style, each one self-contained and building.
   Message references the ticket: `fix(orders): persist item quantities (PROJ-57)`.
 - Follow the repo's own contracts/conventions (CLAUDE.md, `contracts/`, lint boundaries).

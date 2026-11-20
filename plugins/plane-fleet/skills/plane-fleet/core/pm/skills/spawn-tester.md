@@ -14,8 +14,8 @@ that one line of the handoff:
 - no review line, or the last pass has an open P1 → back to the same engineer lane (resume it
   or start a new one with the finding). No tester yet.
 - the report says `needs PM scope call` → read the P1 and the engineer's scope argument in its
-  ticket comment, and decide in a `PM SCOPE DECISION:` comment: fix it in this PR (back to the
-  engineer), or file it as a follow-up with a reason. No tester until you have decided.
+  ticket comment, and decide in a `PM SCOPE DECISION:` comment (`core/pm/skills/ruling.md`): fix
+  it in this PR (back to the engineer), or file it as a follow-up with a reason. No tester until you have decided.
 - a P2 marked "not applicable" with a reason you disagree with → post a `PM SCOPE DECISION:`
   saying it must be fixed, and send it back.
 - the handoff shows no pass count for the brief's focused prompt, or a P2 left open without
@@ -72,36 +72,53 @@ registry or a project override names a lane, start it with `fleet --role tester`
 
 **When the tester reports:**
 
+- **Any report: run `fleet slot verify-clean <slot> --cwd <repo>` before you free the slot.** The
+  report's teardown part is that command's one line, pasted. Exit 3 lists what was left: run
+  `fleet slot release <slot> --cwd <repo>` (it refuses while a live process holds the slot's
+  ports), and the slot stays taken until verify-clean passes. Run it again before you reuse a
+  slot. (2026-11-20, one project: an engineer reported a slot clean that was not.)
 - `APPROVED` → ticket is `Approved`, PR labelled. Queue it for `core/pm/skills/merge-queue.md` §5. Free the slot.
 - `REWORK` → ticket is `Rework`. You route it: it goes back through `core/pm/skills/pick.md` §2 like any pick, at its
   priority, to a **fresh engineer** on the same branch. Free the slot. A ticket sent to Rework
   twice → say so in the pick announcement and escalate the engineer to `opus`.
+  - **Log the first finding the way the tester graded it:** `--in-list yes|no`, `--severity
+    s1|s2|s3` and `--repeat yes|no` on the `verify_fail` row, from the tester's report line.
+    A failure that came from your own ruling or brief is `--cause pm_ruling`.
   - **Every rework brief asks for the class, not the case.** Name the failure, then say: find
     every path, call site, state and entry point with the same shape, fix them all, and list
     each one checked in the handoff. The retest brief hands that list to the tester to try.
   - **Switch executor after one miss.** If a rework comes back and the same class fails again,
     the next round goes to a different, stronger executor. Don't give the same lane a third try.
-  - **Cap at two reworks, and treat hitting it as a fleet defect.** A third failure means one of
-    our steps let it through: the ticket, the build, the test, the review or the PM's own briefs.
-    Before anything else:
-    1. Find the step. Read the ticket against the findings: was each finding in the ticket, or
-       added later? Compare the rework brief with the retest brief: did they name the same cases?
-       Check which executors built and tested each round.
-    2. Write it in the rework ledger: the step, what it missed, and the change to its template,
-       brief or rule so it can't happen the same way again. Apply changes inside the PM routine
-       at once. Propose the rest to the owner. `fleet retro` names these tickets too
-       (`rework_rounds`, `ticket_cause_failures`); its findings go in the same ledger
-       (`core/pm/skills/retro.md`).
-    3. Put round 3 to the owner with that cause: redesign, ship with a follow-up ticket, or drop
-       it. Don't start round 3 on your own. When it goes ahead, it fixes the design, not one more
-       guard (for example, one check computed from everything the result depends on, instead of
-       a check per case), and it runs on a different, stronger executor.
+  - **Rounds cap: `fleet.test_rounds_max` failed test rounds (default 2), and the tool enforces
+    it.** `fleet rounds --ticket <T>` prints the count, the cap and whether one more round is
+    allowed. At the cap the usage-pacer hook refuses the rework spawn (the owner can turn that
+    off with `{state_home}/rework-cap-off`). This rule used to be text
+    only ("cap at two reworks"), and in a real run the PM went past it: one ticket had 10 rework
+    sessions (2026-11-20, one project). So:
+    1. **Before round 2, write the rework ledger entry.** Find the step that let it through: was
+       each finding in the ticket or the case list, or added later? Did the rework brief and the
+       retest brief name the same cases? Which executors built and tested each round? Write the
+       step, what it missed, and the change to its template, brief or rule. Apply changes inside
+       the PM routine at once and propose the rest to the owner. `fleet retro` names these
+       tickets too (`rework_rounds`, `ticket_cause_failures`); its findings go in the same
+       ledger (`core/pm/skills/retro.md`).
+    2. **At the cap, put three options to the owner** with that cause: narrow the ticket, split
+       the leftovers into a follow-up, or go on. Keep it open in `fleet questions`. Don't start
+       another round on your own.
+    3. **Record the answer** with `fleet rounds allow <T> --reason "<the owner's words>"`. It is
+       good for one rework spawn. A round that goes ahead fixes the design, not one more guard
+       (one check computed from everything the result depends on, instead of a check per case),
+       on a different, stronger executor.
   - **A tester finding outside the ticket is a scope decision, not a Rework.** If the ticket
     never asked for the behaviour, decide it yourself in a `PM SCOPE DECISION:` comment: add it
     to this ticket with a written rule for the whole class, or file a follow-up. Never send it
     back as one case to fix.
   - **The rework brief and the retest brief use the same written list of cases.** Write the
-    list once, on the ticket, and point both briefs at it.
+    list once, on the ticket, and point both briefs at it. With `fleet.trials.case_list` on,
+    that list is the `CASE LIST:` comment.
+  - **Closed retest, only when `fleet.trials.closed_retest` is on:** the retest brief names the
+    failed case numbers and the list's regression row, and adds no checks. A new worry of yours
+    becomes a case on a follow-up ticket (`engineering/references/case-list.md` §4).
   (2026-10-30, one project: three tickets went 2 to 4 rounds. Each round fixed only the one call
   site or state the tester named, and one lane missed the same class three times.)
 - The tester stopped because the ticket text changed after the build → scope is your call.
@@ -136,6 +153,11 @@ tell the owner once), and prints the machine gate from `fleet resources`.
   - `run-lane` and the usage-pacer hook enforce the same gate: a lane is `deferred` and a Claude
     spawn is held. Don't route around it; the owner can switch it off with
     `~/.config/plane-fleet/resources-off`.
+  - **Park a refused spawn, don't retry it by hand.** Save the brief to a file and run
+    `fleet queue add --ticket <T> --role engineer|tester --slot <S> --brief <file>`. After each
+    report, `fleet queue next --pop` prints the oldest item when the gate admits a heavy session
+    (exit 3: not yet, exit 4: empty); spawn that one. (2026-11-20, one project: five refused
+    spawns were retried by hand.)
   - **Read the whole machine, not only the fleet.** The worst hog is often not a fleet session.
     (2026-10-29: load 72 and 900 MB of swap left on a 32 GB Mac. watchman, the file watcher
     Jest uses, held 11 GB because its watch on the repo root covered every worktree's
@@ -174,7 +196,8 @@ tell the owner once), and prints the machine gate from `fleet resources`.
 
 **Slot rules that make parallel hold** (each learned from a real collision):
 
-- Never assign the shared row. One slot, one live session. Reuse only after reported teardown.
+- Never assign the shared row. One slot, one live session. Reuse only after `fleet slot
+  verify-clean <slot>` passes, never on the session's word alone.
 - The session checks its slot is free before starting and stops if not. An occupied slot means a
   dead session leaked it: clean it (stop the process on the port, drop the slot DB, remove the
   worktree) before handing that slot out again.

@@ -12,6 +12,12 @@ Held work: the PM records a Todo ticket it skips for its blockers with `fleet he
 relations it already read at pick time. Status then needs no Plane call to say when that ticket
 could start now, stacked on its blockers' pushed branches.
 
+Since 2.14 it also shows failed test rounds per open PR against fleet.test_rounds_max (2026-11,
+one project: a ticket had 10 rework sessions while the PM's cap of two was only text), slots
+whose ports are free but whose databases or scratch folders remain, "required ran: x of y" on a
+group PR from group.must_run, spawns parked in the queue, and open owner questions with their
+age (approved PRs once waited 12 hours on an owner answer nobody was tracking).
+
 Standard library only. Python 3.9.
 """
 import datetime, glob, json, os, re, subprocess, time
@@ -62,11 +68,9 @@ def check_state(c):
     return "fail"
 
 
-def summarize_checks(rollup, required=()):
-    """(text, required_state). Latest run per check name wins, except that a skipped run never
-    hides a real one (a skipped duplicate can sit under the same name while the real run goes).
-    required_state: green, red, running, missing (a required job has not run) or n/a (no
-    required jobs configured)."""
+def latest_states(rollup):
+    """{name: (time, state)}. Latest run per check name wins, except that a skipped run never
+    hides a real one (a skipped duplicate can sit under the same name while the real run goes)."""
     latest = {}
     for c in rollup or []:
         name = c.get("name") or c.get("context") or "?"
@@ -75,6 +79,24 @@ def summarize_checks(rollup, required=()):
         cur = latest.get(name)
         if cur is None or ((st != "skipped", t) >= (cur[1] != "skipped", cur[0])):
             latest[name] = (t, st)
+    return latest
+
+
+def required_ran(rollup, names):
+    """(passed, total, [jobs not passed with their state]) for group.must_run on one PR."""
+    latest = latest_states(rollup)
+    sts = {n: latest.get(n, (None, "missing"))[1] for n in names}
+    return sum(1 for v in sts.values() if v == "pass"), len(names), [f"{n} {v}" for n, v in sts.items() if v != "pass"]
+
+
+def is_group_pr(p):
+    return str(p.get("branch") or p.get("headRefName") or "").startswith(("release/", "group/"))
+
+
+def summarize_checks(rollup, required=()):
+    """(text, required_state). required_state: green, red, running, missing (a required job has
+    not run) or n/a (no required jobs configured)."""
+    latest = latest_states(rollup)
     counts = {}
     for _, st in latest.values():
         counts[st] = counts.get(st, 0) + 1
@@ -174,9 +196,13 @@ def prs_view(repo, cfg, ident_re):
         text, req = summarize_checks(p.get("statusCheckRollup"), required)
         tickets = sorted(set(ident_re.findall((p.get("headRefName") or "") + " " + (p.get("title") or ""))))
         labels = [l.get("name") for l in p.get("labels") or []]
-        rows.append({"number": p["number"], "tickets": tickets, "branch": p.get("headRefName"), "base": p.get("baseRefName"),
-                     "draft": p.get("isDraft"), "labels": labels, "mergeable": p.get("mergeable"), "checks": text,
-                     "required": req, "updated": p.get("updatedAt")})
+        row = {"number": p["number"], "tickets": tickets, "branch": p.get("headRefName"), "base": p.get("baseRefName"),
+               "draft": p.get("isDraft"), "labels": labels, "mergeable": p.get("mergeable"), "checks": text,
+               "required": req, "updated": p.get("updatedAt")}
+        must = [str(x) for x in ((cfg.get("group") or {}).get("must_run") or [])]
+        if must and is_group_pr(row):
+            row["must_run"] = required_ran(p.get("statusCheckRollup"), must)
+        rows.append(row)
     return rows, None
 
 
@@ -348,6 +374,77 @@ def held_cmd(fleetctl, args):
             if not held:
                 print("held: nothing recorded")
     return 0
+# ---------------------------------------------------------------- rounds, queue, questions, dirty slots
+def read_jsonl(path):
+    out = []
+    try:
+        with open(path, errors="replace") as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(r, dict):
+                    out.append(r)
+    except OSError:
+        pass
+    return out
+
+
+def queue_open(state_home, project):
+    """Spawns parked by `fleet queue add` and not popped yet, oldest first."""
+    rows = [r for r in read_jsonl(os.path.join(state_home, f"queue-{project}.jsonl")) if not r.get("popped")]
+    return sorted(rows, key=lambda r: str(r.get("ts") or ""))
+
+
+def questions_open(state_home, project):
+    """Owner questions from `fleet questions add` not closed yet, oldest first."""
+    rows = [r for r in read_jsonl(os.path.join(state_home, f"questions-{project}.jsonl")) if not r.get("closed")]
+    return sorted(rows, key=lambda r: str(r.get("ts") or ""))
+
+
+def _failed_rounds(rows, ticket):
+    """Distinct verify_fail rows for a ticket. The same row written twice (same agent_id, or the
+    same role and executor within 10 minutes) is one round. Used when fleetctl has no
+    failed_rounds of its own."""
+    seen, last, n = set(), {}, 0
+    for r in sorted((r for r in rows if r.get("ticket") == ticket and r.get("outcome") == "verify_fail"),
+                    key=lambda r: str(r.get("ts") or "")):
+        t = epoch(r.get("ts")) or 0
+        if r.get("agent_id"):
+            if r["agent_id"] in seen:
+                continue
+            seen.add(r["agent_id"])
+        key = (r.get("role"), r.get("executor"))
+        if key in last and t - last[key] <= 600:
+            last[key] = t
+            continue
+        last[key] = t
+        n += 1
+    return n
+
+
+def rounds_of(fleetctl, rows, ticket):
+    f = getattr(fleetctl, "failed_rounds", None)
+    if f:
+        try:
+            r = f(rows, ticket)
+            if isinstance(r, bool):
+                pass
+            elif isinstance(r, int):
+                return r
+            elif isinstance(r, dict) and isinstance(r.get("count", r.get("rounds")), int):
+                return r.get("count", r.get("rounds"))
+            elif isinstance(r, (list, tuple)):
+                return len(r)
+        except Exception:
+            pass
+    return _failed_rounds(rows, ticket)
+
+
+def rounds_cap(cfg):
+    v = (cfg.get("fleet") or {}).get("test_rounds_max", 2)
+    return v if isinstance(v, int) and not isinstance(v, bool) else 2
 
 
 # ---------------------------------------------------------------- render
@@ -382,8 +479,24 @@ def collect(fleetctl, cwd):
     free = free_slot_count(slots)
     held_items = held_work(held, prs, free, gate, running) if prs is not None else []
     record_seen(seen_path, held_items, free)
+    rows = []
+    try:
+        rows = [r for r in fleetctl.load_rows(reg) if not reg.get("_project") or r.get("project") in (None, reg.get("_project"))]
+    except Exception:
+        pass
+    cap = rounds_cap(cfg)
+    for p in prs or []:
+        p["rounds"] = {t: rounds_of(fleetctl, rows, t) for t in p["tickets"]}
+    try:
+        import fleettemplate
+        dirty = fleettemplate.dirty_slots(cwd)
+    except Exception as e:
+        dirty = [("?", [f"slot check failed: {e}"])]
+    project = reg.get("_project")
     return {"held_work": held_items, "held_recorded": len(held),
-            "machine": machine, "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),
+            "machine": machine, "rounds_cap": cap, "dirty_slots": dirty,
+            "queue": queue_open(fleetctl.STATE_HOME, project), "questions": questions_open(fleetctl.STATE_HOME, project),
+            "project": reg.get("_project"), "repo": repo, "trunk": trunk, "budget": fleetctl.budget_line(reg),
             "slots": slots, "lanes_running": running, "lanes_ended": ended,
             "prs": prs, "prs_error": pr_err, "trunk_runs": runs, "trunk_error": run_err,
             "worktrees": len(trees), "orphan_worktrees": [t.get("path", "")[len(repo):].lstrip("/") for t in orphan]}
@@ -392,13 +505,28 @@ def collect(fleetctl, cwd):
 def render(s):
     t = datetime.datetime.now().strftime("%H:%M")
     m = s["machine"]
-    L = [f"Fleet status · {s['project']} · {t}", f"machine: {m['summary']}"]
+    L = [f"Fleet status · {s['project']} · {t}"]
+    now = time.time()
+    qs = s.get("questions") or []
+    # every status to the owner starts with the decisions waiting on them
+    L.append(f"owner questions open ({len(qs)}): " + ("none" if not qs else ""))
+    for q in qs[:8]:
+        L.append(f"  {q.get('id', '?')} {q.get('ticket') or '-'}" + (f" PR #{q['pr']}" if q.get("pr") else "")
+                 + f" · {ago(epoch(q.get('ts')), now)} · {str(q.get('text') or '')[:90]}")
+    L.append(f"machine: {m['summary']}")
     L += [f"  {r}" for r in m["reasons"] if not r.startswith("tight")]
     L += [f"  hog pid {h['pid']} {h['name']} {h['mem_gb']} GB: {h.get('what', '?')}, fix: {h.get('fix', 'find its owner')}"
           for h in m["hogs"] if not h["fleet"] and h.get("safe")]
     L += [f"  warning: {w}" for w in m["warnings"]]
     L += [f"budget: {s['budget']}", "slots: " + (" · ".join(s["slots"]) or "none configured")]
     L += held_lines(s.get("held_work"), free_slot_count(s["slots"]))
+    for slot, left in s.get("dirty_slots") or []:
+        L.append(f"  slot {slot} DIRTY (ports free): {', '.join(left)} · `fleet slot verify-clean {slot}`")
+    qu = s.get("queue") or []
+    if qu:
+        L.append(f"queued spawns ({len(qu)}): " + " | ".join(
+            f"{x.get('id', '?')} {x.get('ticket')} {x.get('role') or ''} slot {x.get('slot') or '?'} · {ago(epoch(x.get('ts')), now)}"
+            for x in qu[:6]) + " · `fleet queue next` when the gate opens")
     L.append(f"lanes running ({len(s['lanes_running'])}): " + (" | ".join(s["lanes_running"]) or "none"))
     if s["lanes_ended"]:
         L.append("lanes ended (6h): " + " | ".join(s["lanes_ended"]))
@@ -421,6 +549,14 @@ def render(s):
                 flags.append(p["mergeable"].lower())
             if p["base"] != s["trunk"]:
                 flags.append(f"base {p['base']}")
+            cap = s.get("rounds_cap", 2)
+            for t, n in sorted((p.get("rounds") or {}).items()):
+                if n:
+                    flags.append(f"{t} {n} failed round{'s' if n != 1 else ''}"
+                                 + (f" AT CAP {cap}: owner decides (fleet rounds allow)" if cap and n >= cap else ""))
+            if p.get("must_run"):
+                ran, tot, miss = p["must_run"]
+                flags.append(f"required ran: {ran} of {tot}" + (f" ({', '.join(miss[:4])})" if miss else ""))
             L.append(f"  #{p['number']} {','.join(p['tickets']) or p['branch'][:30]:<12} required {p['required']:<9} "
                      f"{p['checks'][:60]:<62}{' '.join(flags)}" + (f"  [{', '.join(p['labels'])}]" if p["labels"] else ""))
     if s["trunk_error"]:
@@ -501,3 +637,27 @@ def selftest(check):
     check("held: the record round trips", load_held(hp), held)
     record_seen(sp, h, 1, now=1_000_000)
     check("held: a sighting is logged", json.loads(open(sp).readline())["ticket"], "P-12")
+    check("status: required ran on a group PR", required_ran(roll + dup[1:], ["unit", "e2e", "build"]),
+          (1, 3, ["e2e running", "build missing"]))
+    sk = [{"__typename": "CheckRun", "name": "e2e", "status": "COMPLETED", "conclusion": "SKIPPED"}]
+    check("status: a skipped required job did not run", required_ran(sk, ["e2e"]), (0, 1, ["e2e skipped"]))
+    check("status: a group branch is a group PR", (is_group_pr({"branch": "release/group-1"}), is_group_pr({"branch": "feat/P-1"})), (True, False))
+    vf = lambda ts, **k: {"ticket": "P-1", "role": "tester", "executor": "claude", "outcome": "verify_fail", "ts": ts, **k}
+    rows = [vf("2026-11-01T10:00:00Z", agent_id="t1"), vf("2026-11-01T10:02:00Z", agent_id="t1"),
+            vf("2026-11-01T10:03:00Z"), vf("2026-11-01T12:00:00Z", agent_id="t2"),
+            {"ticket": "P-1", "role": "tester", "outcome": "spawn", "ts": "2026-11-01T11:00:00Z"},
+            vf("2026-11-01T13:00:00Z", ticket="P-2")]
+    check("status: failed rounds, a repeat counted once", _failed_rounds(rows, "P-1"), 2)
+    check("status: rounds cap default and config", (rounds_cap({}), rounds_cap({"fleet": {"test_rounds_max": 0}})), (2, 0))
+    with open(os.path.join(d, "queue-st.jsonl"), "w") as f:
+        f.write(json.dumps({"id": "q2", "ts": "2026-11-01T11:00:00Z", "ticket": "P-2"}) + "\n")
+        f.write(json.dumps({"id": "q1", "ts": "2026-11-01T10:00:00Z", "ticket": "P-1", "popped": "2026-11-01T10:30:00Z"}) + "\n")
+        f.write("not json\n")
+    with open(os.path.join(d, "questions-st.jsonl"), "w") as f:
+        f.write(json.dumps({"id": "k1", "ts": "2026-11-01T10:00:00Z", "ticket": "P-1", "pr": 7, "text": "split?", "closed": False}) + "\n")
+        f.write(json.dumps({"id": "k2", "ts": "2026-11-01T09:00:00Z", "ticket": "P-3", "closed": "2026-11-01T09:30:00Z"}) + "\n")
+    check("status: queued spawns not popped", [x["id"] for x in queue_open(d, "st")], ["q2"])
+    check("status: open owner questions", [x["id"] for x in questions_open(d, "st")], ["k1"])
+    check("status: no files, nothing open", (queue_open(d, "none"), questions_open(d, "none")), ([], []))
+    import shutil
+    shutil.rmtree(d, ignore_errors=True)

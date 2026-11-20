@@ -47,6 +47,12 @@ repo lived on an external disk):
    "jest_cache_globs": [],              default ["<tmpdir>/jest_*"]
    "jest_cache_max_gb": 5}              over this, `fleet status` and `fleet resources` name it
 
+"room for N heavy" also counts the heavy sessions already running per the outcomes log: a
+`spawn` row for an engineer or tester with no result row after it, in the last 4 hours. A
+session that just started has not taken its memory yet, so memory alone overcounts the room
+(2026-11, one project: five spawns in one run were refused by the gate and retried by hand).
+No spawn rows in the log = memory alone decides, as before.
+
 Standard library only. Python 3.9.
 """
 import glob, json, os, platform, re, shutil, subprocess, sys, tempfile, time
@@ -372,6 +378,9 @@ def judge(s, cfg=None, worktree_dirs=()):
     avail_gb = (s["mem_avail"] / GB) if s.get("mem_avail") is not None else 0
     room = int(max(0, avail_gb - reserve) // max(0.5, L["per_heavy_gb"]))
     room = min(room, L["max_heavy"], max(1, s["cores"] // 3))
+    running = (cfg or {}).get("_running_heavy")
+    if isinstance(running, int):
+        room = min(room, max(0, L["max_heavy"] - running))
     if lvl >= 2:
         room = 0
 
@@ -405,7 +414,60 @@ def judge(s, cfg=None, worktree_dirs=()):
             warnings.append(f"Jest cache {c['bytes'] / GB:.{0 if c['bytes'] >= 10 * GB else 1}f} GB at {c['path']} (limit {max_gb} GB): it fills the disk and "
                             f"slows every run; sweep it with `engineering/scripts/fleet-sweep.sh --repo <repo> --caches` "
                             f"(dry run) and move TMPDIR to a bigger disk (fleet.tool_caches.tmpdir).")
-    return {"level": LEVELS[lvl], "code": lvl, "reasons": reasons, "room_heavy": room, "hogs": hogs, "warnings": warnings}
+    return {"level": LEVELS[lvl], "code": lvl, "reasons": reasons, "room_heavy": room, "hogs": hogs, "warnings": warnings,
+            "running_heavy": running if isinstance(running, int) else None}
+
+
+HEAVY_ROLES = ("engineer", "tester")
+OPEN_SPAWN_S = 4 * 3600
+
+
+def open_spawns(rows, now=None, project=None, window_s=OPEN_SPAWN_S):
+    """Heavy sessions still running per the log: spawn rows (engineer or tester) in the window
+    with no later result row for the same agent_id, or, without an id, the same ticket and
+    role. None when the window holds no spawn rows (the log does not record spawns)."""
+    now = now or time.time()
+
+    def ts(r):
+        try:
+            import datetime
+            return datetime.datetime.fromisoformat(str(r.get("ts")).replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError):
+            return None
+    rows = [r for r in rows if (not project or r.get("project") in (None, project)) and r.get("type", "spawn") == "spawn"]
+    spawns = [(ts(r), r) for r in rows if r.get("outcome") == "spawn"]
+    spawns = [(t, r) for t, r in spawns if t and now - window_s <= t <= now + 60]
+    if not spawns:
+        return None
+    results = [(ts(r), r) for r in rows if r.get("outcome") and r.get("outcome") != "spawn"]
+    n = 0
+    for t, r in spawns:
+        if r.get("role") not in HEAVY_ROLES:
+            continue
+        if r.get("agent_id"):
+            done = any(x.get("agent_id") == r["agent_id"] and (u or 0) >= t for u, x in results)
+        else:
+            done = any(x.get("ticket") == r.get("ticket") and x.get("role") == r.get("role") and (u or 0) >= t
+                       for u, x in results)
+        n += not done
+    return n
+
+
+def running_from_log(cwd):
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+        import fleetctl
+        reg = fleetctl.load_registry(cwd)
+        rows = []
+        with open(fleetctl.P(reg, "path"), errors="replace") as f:
+            for line in f:
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    pass
+        return open_spawns(rows, project=reg.get("_project"))
+    except Exception:
+        return None
 
 
 def admit(j, heavy):
@@ -434,7 +496,8 @@ def summary_line(s, j):
         parts.append(f"cpu {s['cpu_busy']:.0f}%")
     if s.get("disks"):
         parts.append(f"disk {min(d['free'] for d in s['disks']) / GB:.0f} GB free")
-    parts.append(f"room for {j['room_heavy']} heavy")
+    parts.append(f"room for {j['room_heavy']} heavy"
+                 + (f" ({j['running_heavy']} running per the log)" if j.get("running_heavy") is not None else ""))
     big = max((c["bytes"] for c in s.get("tool_caches") or []), default=0)
     if any("Jest cache" in w for w in j.get("warnings", [])):
         parts.append(f"Jest cache {big / GB:.0f} GB")
@@ -459,6 +522,10 @@ def context(cwd):
         wdirs = sorted({os.path.dirname(t) for t in trees}) or [os.path.join(repo, ".claude", "worktrees")]
     except Exception:
         paths.append(cwd)
+    running = running_from_log(cwd)
+    if running is not None:
+        # judge() reads it from here, so every caller of context() (the hook, status, sweep) counts it
+        cfg = dict(cfg, _running_heavy=running)
     return cfg, paths, wdirs
 
 
@@ -576,6 +643,24 @@ def selftest(check=None):
     check("res: first swap-out sample has no rate", _swapout_rate(vs(1000), 100.0, memo), None)
     check("res: swap-out rate per second", _swapout_rate(vs(1000 + 640), 110.0, memo), 640 * 16384 / 10)
     check("res: a sample under 5 s has no rate", _swapout_rate(vs(1000), 102.0, memo), None)
+    calm = dict(mac_ok)
+    check("res: no spawn rows, memory alone decides", judge(calm, {})["room_heavy"], 4)
+    check("res: running sessions per the log take room", judge(calm, {"_running_heavy": 3})["room_heavy"], 1)
+    check("res: max heavy running leaves none", judge(calm, {"_running_heavy": 5})["room_heavy"], 0)
+    check("res: the summary names the running count", "(3 running per the log)" in summary_line(calm, judge(calm, {"_running_heavy": 3})), True)
+    import datetime as _dt
+    now = time.time()
+    at = lambda m: _dt.datetime.fromtimestamp(now - m * 60, _dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    log = [{"ts": at(30), "ticket": "T-1", "role": "engineer", "outcome": "spawn", "agent_id": "a1"},
+           {"ts": at(10), "ticket": "T-1", "role": "engineer", "outcome": "pr_opened", "agent_id": "a1"},
+           {"ts": at(20), "ticket": "T-2", "role": "tester", "outcome": "spawn"},
+           {"ts": at(15), "ticket": "T-3", "role": "engineer", "outcome": "spawn", "agent_id": "a3"},
+           {"ts": at(14), "ticket": "T-4", "role": "scanner", "outcome": "spawn"},
+           {"ts": at(300), "ticket": "T-5", "role": "engineer", "outcome": "spawn"}]
+    check("res: open spawns: no result row, last 4 hours, heavy roles only", open_spawns(log, now), 2)
+    log.append({"ts": at(5), "ticket": "T-2", "role": "tester", "outcome": "verify_pass"})
+    check("res: a result row closes a spawn without an id", open_spawns(log, now), 1)
+    check("res: a log with no spawn rows has no count", open_spawns(log[1:2], now), None)
     s = probe([os.getcwd()], top_n=3)
     check("res: probe reads this machine", bool(s.get("ram")) and s.get("cores", 0) >= 1, True)
     return 1 if fails else 0

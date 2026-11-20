@@ -93,11 +93,22 @@ by key; lists and plain values replace.
     "register": "friendly, plain language, no jargon"
   },
 
+  "group": {                            // OPTIONAL. The PM's group PR into the trunk (merge-queue.md)
+    "labels": [],                        // labels the group PR must carry, applied when it is opened
+    "must_run": []                       // CI job names that must end in success on a group PR; skipped or
+                                         // missing = not green. `fleet gate-stamp check` and `fleet status` read it
+  },
+
   "roles": ["owner", "admin", "manager", "staff"],
   // roles that must be exercised when verifying a permission/scope ticket
 
   "fleet": {                             // read by the PM role, the engineer role, the tester role
     "merge_train_size": 3,
+    "test_rounds_max": 2,                // OPTIONAL. Failed test rounds per ticket before the owner must allow more
+                                         // (`fleet rounds allow`); the usage-pacer hook refuses the rework spawn. 0 = off
+    "session_soft_cap": 300,             // OPTIONAL. Tool calls after which an engineer or tester stops and reports
+    "client_engines": ["chromium"],      // OPTIONAL. Browser engines UI proofs and case-list grids run on; a project
+                                         // whose phone app is a webview adds "webkit"
     "alert_command": "notify-me \"$FLEET_ALERT\"",   // OPTIONAL: shell command `fleet guard` runs when the agents stop or recover
     "parallel_workers": 2,               // engineers at once
     "parallel_schema": 2,                // schema tickets building at once, on disjoint models (pick.md §2)
@@ -110,6 +121,8 @@ by key; lists and plain values replace.
       "A": { "api": 3010, "client": 4210, "db": "app_slot_a", "nx_cache": "$HOME/.cache/plane-fleet/slot-a/nx-cache" },
       "B": { "api": 3020, "client": 4220, "db": "app_slot_b", "nx_cache": "$HOME/.cache/plane-fleet/slot-b/nx-cache" }
       // add redis / bucket keys per slot if the app uses them
+      // OPTIONAL per slot, read by `fleet slot verify-clean`: "scratch": "/tmp/proj-slot-<slot>" (overrides the
+      // prefix below) and "worktree": ".worktrees/*-<slot>" (a glob relative to the repo; with none, worktrees are not checked)
     },
     "resources": {                       // OPTIONAL. The machine gate (core/scripts/fleetres.py); every key optional.
       "mem_avail_pct": [25, 15, 8],      // tight, closed, critical: memory the OS can still hand out
@@ -161,6 +174,7 @@ by key; lists and plain values replace.
       "rework_rounds": 2,                // rework rounds on one ticket
       "rework_rate": 0.4,                // reworked over tested tickets, checked from 3 tested
       "ticket_cause_failures": 0,        // test failures logged with --cause ticket
+      "pm_ruling_failures": 0,           // test failures logged with --cause pm_ruling
       "duplicate_rows": 0,               // outcome rows written twice
       "missing_agent_id": 0,             // Claude spawn rows without agent_id
       "lane_failures": 1,                // other-CLI lanes failed, timed out or stopped
@@ -182,8 +196,12 @@ by key; lists and plain values replace.
                                          // the tester checks every row in round 1 (engineer build.md §3a)
       "money_ceiling": false,            // planner splits money/stock/state outcomes over 1000 lines (planner role)
       "own_commits_only": false,         // a ticket branch carries only its own ticket's commits (engineer worktree.md)
-      "group_cut_minutes": 0             // cut a merge group no later than this many minutes after the first
+      "group_cut_minutes": 0,            // cut a merge group no later than this many minutes after the first
                                          // approval waiting; 0 = off (PM merge-queue.md)
+      "case_list": false,                // a tester writes the numbered CASE LIST before the build; it is the
+                                         // definition of done (engineering/references/case-list.md)
+      "closed_retest": false             // a retest runs only the failed cases and the list's regression row;
+                                         // new findings are graded s1/s2/s3 (case-list.md §3, §4)
     },
     "slot_recipe": {                     // exact per-repo commands, <placeholders> from the slot
       "prereq": [], "free_check": [], "env": [], "up": [], "down": []

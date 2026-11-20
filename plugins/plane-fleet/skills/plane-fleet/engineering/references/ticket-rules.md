@@ -121,6 +121,9 @@ can still find. A heuristic tool always has one more edge case.
 
 - The PM records that call as a `PM SCOPE DECISION:` comment, so the next tester judges the
   narrower scope.
+- The usage-pacer hook refuses any rework spawn past `fleet.test_rounds_max` failed test rounds
+  until the owner allows one more (`fleet rounds allow`). "As many as it takes" means the PM asks
+  the owner each time, with this table (`core/pm/skills/spawn-tester.md`, rounds cap).
 - A helper script inside a docs or catalog ticket is advisory unless the ticket says it is a
   CI gate. Measured 2026-10-14: a low-priority docs ticket took 7 sessions and about 1.2M tokens,
   mostly review rounds on its scanner, while the catalog itself was right after round 2.

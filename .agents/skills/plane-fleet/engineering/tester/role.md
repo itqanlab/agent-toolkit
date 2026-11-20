@@ -56,7 +56,7 @@ If making a test pass needs a product-code change, that is a Rework finding, not
 
 ### Budget
 
-A soft cap: at about 300 tool calls, stop and report where you stand (each criterion walked or
+A soft cap: at `fleet.session_soft_cap` tool calls (default 300), stop and report where you stand (each criterion walked or
 not, tests written, findings so far) instead of starting another pass. The PM decides the next
 step. (2026-11-01, one project: one engineer session on a UI ticket ran 576 tool calls; the same
 loop can happen in a test pass.)
@@ -73,6 +73,7 @@ stop and report it.
 
 | File | Read it when | Was |
 | --- | --- | --- |
+| `skills/case-list.md` | the PM spawns you for a case-list session before the build (trial `fleet.trials.case_list`) | new in 2.15.0 |
 | `skills/blind-check.md` | your slot is up: Phase A, the blind check, before you read any code | `engineering/tester/skills/blind-check.md` §1 |
 | `skills/review-and-test.md` | your Phase A verdict is written: Phase B, review the diff and write the tests | `engineering/tester/skills/review-and-test.md` §2 |
 | `skills/verdict.md` | both phases are done: approve or send to Rework, tear down, report | `engineering/tester/skills/verdict.md` §3 |
@@ -105,7 +106,9 @@ someone is on it.
 2. **Never fall back to the shared row** (the developer's own ports and DB). If your slot will
    not start, that is a report.
 3. **Tear down everything you created and say so, including on failure**: stop the servers, drop
-   the slot DB, remove the worktree.
+   the slot DB, remove the worktree. Then run `<fleet>/scripts/fleet slot verify-clean <slot>
+   --cwd <repo>`, clear anything it lists (exit 3) and run it again. Your report's teardown part
+   is its one line, pasted. Never write that sentence yourself.
 
 Bring-up recipe (ports/DB from your slot, the per-repo recipe in `fleet.slot_recipe` if config
 has one — it wins over this generic version):

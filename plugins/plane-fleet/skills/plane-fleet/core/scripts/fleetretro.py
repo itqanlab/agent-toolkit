@@ -18,6 +18,13 @@ Thresholds and levels come from config `fleet.retro` (core/references/config-sch
 A finding seen in the previous run too (20 minutes to 3 hours earlier) is marked REPEAT; the
 PM escalates those. Runs are kept in {state_home}/retro/<project>.json unless --no-record.
 
+Since 2.14 it also counts failures caused by a PM ruling (--cause pm_ruling); splits failures
+into new this round against raised before, and in the case list against outside it, when the
+rows carry repeat / in_list; reports how long spawns waited in `fleet queue`; and splits tester
+pass to merge into waiting for a group, CI time and waiting for the owner when the data is there.
+2026-11, one project: 22 of 38 tickets failed their first test, and most rework was a new
+finding each round, not the same bug back.
+
 Exit codes: 0 healthy (no finding at alert level), 3 a finding at alert level.
 Standard library only. Python 3.9.
 """
@@ -41,13 +48,14 @@ DEFAULTS = {
     "codex_pts_per_hour": 4.0,         # Codex weekly meter points used per hour, when readable
     "lost_hours": 0.25,                # hours the machine slept or the agents could not run (fleet guard)
     "held_hours": 0.5,                 # hours tickets sat held behind a pushed blocker while a slot was free
+    "pm_ruling_failures": 0,           # verify_fail rows with cause "pm_ruling" (a PM scope decision or brief)
 }
 LEVELS = {
     "tool_calls_per_session": "alert", "usd_per_ticket": "alert", "pm_share": "alert",
     "pm_ctx_per_call": "alert", "rework_rounds": "alert", "rework_rate": "warn",
     "ticket_cause_failures": "alert", "duplicate_rows": "warn", "missing_agent_id": "warn",
     "lane_failures": "warn", "rewrite_share": "warn", "lane_minutes": "warn", "codex_pts_per_hour": "alert",
-    "lost_hours": "alert", "held_hours": "alert",
+    "lost_hours": "alert", "held_hours": "alert", "pm_ruling_failures": "warn",
 }
 REPEAT_MIN_S, REPEAT_MAX_S = 20 * 60, 3 * 3600
 HELD_GAP_S = 30 * 60   # two held sightings further apart than this count as this much, not the whole gap
@@ -221,11 +229,116 @@ def merge_wait_hours(rows, cost, project):
     return out
 
 
+def read_jsonl(path):
+    """Rows of a JSONL file, or None when the file is not there (not recorded is not zero)."""
+    try:
+        f = open(path, errors="replace")
+    except OSError:
+        return None
+    out = []
+    with f:
+        for line in f:
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(r, dict):
+                out.append(r)
+    return out
+
+
+def when(v, *alts):
+    """A time from a field that may be an ISO string, or True with the time in another field."""
+    for x in (v,) + alts:
+        if isinstance(x, str):
+            t = epoch(x)
+            if t:
+                return t
+    return None
+
+
+def queue_waits(items, t0, t1, now):
+    """Hours spawns waited in `fleet queue`, for items parked in the window. None without the file."""
+    if items is None:
+        return None
+    waited, still = [], []
+    for x in items:
+        t = epoch(x.get("ts"))
+        if not t or not (t0 <= t < t1):
+            continue
+        if not x.get("popped"):
+            still.append((now - t) / 3600)
+            continue
+        end = when(x.get("popped"), x.get("popped_at"), x.get("popped_ts"))
+        if end and end >= t:
+            waited.append((end - t) / 3600)
+    return {"n": len(waited) + len(still), "waited": waited, "waiting": still}
+
+
+def _overlap(iv, a, b):
+    """Hours of [a, b] covered by the intervals iv (merged first)."""
+    if b <= a:
+        return 0.0
+    cut = sorted((max(a, x), min(b, y)) for x, y in iv if min(b, y) > max(a, x))
+    tot, cur = 0.0, None
+    for x, y in cut:
+        if cur and x <= cur[1]:
+            cur[1] = max(cur[1], y)
+        else:
+            if cur:
+                tot += cur[1] - cur[0]
+            cur = [x, y]
+    if cur:
+        tot += cur[1] - cur[0]
+    return tot / 3600
+
+
+def merge_split(rows, cost, prs, questions, project, waits):
+    """{ticket: {"group", "ci", "owner"}} hours between the last tester pass and the merge.
+    group: until the group PR that merged it was opened; ci: from then to the merge; owner: the
+    part of either with an owner question open on the ticket or its PRs. A part is None when
+    its data is not there (no group PR found, no questions file)."""
+    groups = [p for p in prs or [] if str(p.get("headRefName") or "").startswith(("release/", "group/"))
+              and epoch(p.get("mergedAt")) and epoch(p.get("createdAt"))]
+    out = {}
+    for t in waits:
+        x = ((cost or {}).get("tickets") or {}).get(t) or {}
+        m = x.get("merged")
+        passed = [epoch(r.get("ts")) or 0 for r in rows if r.get("ticket") == t and r.get("outcome") == "verify_pass"
+                  and (not project or r.get("project") == project)]
+        if not m or not passed:
+            continue
+        p = max(passed)
+        near = sorted((abs(epoch(g["mergedAt"]) - m), g) for g in groups
+                      if g.get("number") != x.get("pr") and abs(epoch(g["mergedAt"]) - m) <= 900)
+        g = near[0][1] if near else None
+        own_prs = {x.get("pr"), g.get("number") if g else None} - {None}
+        iv = None
+        if questions is not None:
+            iv = []
+            for q in questions:
+                if q.get("ticket") != t and q.get("pr") not in own_prs:
+                    continue
+                a = epoch(q.get("ts"))
+                b = when(q.get("closed"), q.get("closed_at"), q.get("closed_ts")) if q.get("closed") else m
+                if a and b and b > a:
+                    iv.append((a, b))
+        res = {"group": None, "ci": None, "owner": _overlap(iv, p, m) if iv is not None else None}
+        if g:
+            gc = min(max(epoch(g["createdAt"]), p), m)
+            o1, o2 = (_overlap(iv, p, gc), _overlap(iv, gc, m)) if iv is not None else (0.0, 0.0)
+            res["group"] = max(0.0, (gc - p) / 3600 - o1)
+            res["ci"] = max(0.0, (m - gc) / 3600 - o2)
+        out[t] = res
+    return out
+
+
 def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, now=None):
     """Everything the findings read, as one dict. cost is fleetcost.analyse()'s result."""
     now = now or time.time()
     win = lambda ts: (epoch(ts) or 0) >= t0 and (epoch(ts) or 0) < t1
-    is_session = lambda r: r.get("type", "spawn") == "spawn" and not r.get("usage_only") \
+    # an outcome "spawn" row marks a session's start; its result row is the session, so it is not counted twice
+    is_session = lambda r: r.get("type", "spawn") == "spawn" and not r.get("usage_only") and r.get("outcome") != "spawn" \
         and not (r.get("role") == "pm" and r.get("outcome") in ("done", "retro_fix", "decision"))
     wrows = [r for r in rows if r.get("type", "spawn") == "spawn" and not r.get("usage_only") and win(r.get("ts"))
              and (not project or r.get("project") == project)]
@@ -233,7 +346,7 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
     dups, seen_ids, last_by_key = [], {}, {}
     for r in sorted((r for r in raw_rows if r.get("type", "spawn") == "spawn" and not r.get("usage_only")
                      and win(r.get("ts")) and (not project or r.get("project") == project)
-                     and r.get("outcome") not in ("retro_fix", "decision")), key=lambda r: r.get("ts") or ""):
+                     and r.get("outcome") not in ("retro_fix", "decision", "spawn")), key=lambda r: r.get("ts") or ""):
         key = (r.get("ticket"), r.get("role"), r.get("executor"), r.get("outcome"))
         prev = last_by_key.get(key)
         if prev and (epoch(r.get("ts")) or 0) - (epoch(prev.get("ts")) or 0) <= 600:
@@ -277,7 +390,7 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
             hours = (end - start) / 3600
         else:
             hours = sum(r.get("duration_ms") or 0 for r in tr) / 3.6e6 or None
-        last = [r for r in tr if r.get("outcome")]
+        last = [r for r in tr if r.get("outcome") and r.get("outcome") != "spawn"]
         outcome = f"merged #{x['pr']}" if x.get("merged") else (last[-1]["outcome"] if last else "?")
         tickets.append({"ticket": t, "engineer": n_eng, "rework": n_rew, "tester": n_test,
                         "usd": x.get("cost"), "tools": sum(n for _, n in per) if per else None,
@@ -315,8 +428,23 @@ def build(t0, t1, project, rows, raw_rows, cost, agents, lanes, codex, prices, n
             causes[c] = causes.get(c, 0) + 1
     tested = [x for x in tickets if x["tested"]]
     hours = (t1 - t0) / 3600
+    yes = lambda v: None if v is None else (v is True or str(v).strip().lower() in ("yes", "true", "y", "1"))
+    frows = [r for r in sess_rows if r.get("outcome") == "verify_fail"]
+    rep_v = [yes(r.get("repeat")) for r in frows if r.get("repeat") is not None]
+    lst_v = [yes(r.get("in_list")) for r in frows if r.get("in_list") is not None]
+    sev = {}
+    for r in frows:
+        if r.get("severity"):
+            sev[str(r["severity"]).lower()] = sev.get(str(r["severity"]).lower(), 0) + 1
+    failures = {"n": len(frows),
+                "pm_ruling": sum(1 for r in frows if (r.get("fail_cause") or r.get("failure_cause")) == "pm_ruling"),
+                "pm_ruling_where": sorted({r.get("ticket") for r in frows if (r.get("fail_cause") or r.get("failure_cause")) == "pm_ruling"}),
+                "new": rep_v.count(False) if rep_v else None, "before": rep_v.count(True) if rep_v else None,
+                "in_list": lst_v.count(True) if lst_v else None, "outside": lst_v.count(False) if lst_v else None,
+                "unmarked": sum(1 for r in frows if r.get("repeat") is None and r.get("in_list") is None),
+                "severity": sev}
     return {
-        "project": project, "since": iso(t0), "until": iso(t1), "hours": hours, "tickets": tickets,
+        "project": project, "since": iso(t0), "until": iso(t1), "hours": hours, "tickets": tickets, "failures": failures,
         "spend": {"pm": pm_usd, "agents": agent_usd, "claude_agents": claude_agent_usd, "lanes": lanes_usd,
                   "lanes_unpriced": (cost or {}).get("lanes_unpriced") or {},
                   "lanes_no_usage": (cost or {}).get("lanes_no_usage") or {},
@@ -416,6 +544,13 @@ def evaluate(d, th, lv):
             "run the readiness check (pick.md) on every unclaimed ticket in that area, and send the gaps to the "
             "planner's write-ticket skill before claiming.", "pm",
             [x["ticket"] for x in d["tickets"] if "ticket" in x["causes"]])
+    pr_n = (d.get("failures") or {}).get("pm_ruling", 0)
+    if pr_n > th["pm_ruling_failures"]:
+        add("pm_ruling_failures", pr_n, f"{pr_n} test failure(s) caused by a PM ruling or brief",
+            "a scope decision or retest brief made without its source, or one that added checks to a retest",
+            "before the next PM SCOPE DECISION, name and quote the contract or spec line (pm/skills/ruling.md); "
+            "a ruling with no source is a PM guess and gets checked first. Retest briefs add no checks.",
+            "pm", d["failures"].get("pm_ruling_where") or [])
     if len(d["duplicates"]) > th["duplicate_rows"]:
         add("duplicate_rows", len(d["duplicates"]), f"{len(d['duplicates'])} log row(s) written twice",
             "the same report logged again (a repeated agent notification, or a re-log to add a field)",
@@ -491,6 +626,20 @@ def render(d, findings, merge_error=None):
     L.append(f"Tickets: {len(d['tickets'])} · rework on {r['reworked']} of {r['tested']} tested"
              + (f" ({pct(r['rate'])})" if r["rate"] is not None else "") + (f" · causes: {cs}" if cs else "")
              + (f" · {len(d['retro_fixes'])} retro fix(es) applied" if d["retro_fixes"] else ""))
+    fl = d.get("failures") or {}
+    if fl.get("n"):
+        parts = [f"{fl['n']} failed test(s)"]
+        if fl.get("pm_ruling"):
+            parts.append(f"{fl['pm_ruling']} caused by a PM ruling")
+        parts.append(f"{fl['new']} new this round, {fl['before']} raised before" if fl.get("new") is not None
+                     else "new against raised before: not recorded (--repeat)")
+        if fl.get("in_list") is not None:
+            parts.append(f"{fl['in_list']} in the case list, {fl['outside']} outside it")
+        if fl.get("severity"):
+            parts.append("severity " + ", ".join(f"{k} {v}" for k, v in sorted(fl["severity"].items())))
+        if fl.get("unmarked") and (fl.get("new") is not None or fl.get("in_list") is not None):
+            parts.append(f"{fl['unmarked']} without the marks")
+        L.append("Failures: " + " · ".join(parts))
     if merge_error:
         L.append(f"  merges: {merge_error}")
     if d["tickets"]:
@@ -514,12 +663,25 @@ def render(d, findings, merge_error=None):
     parts = [f"asleep {d['lost']['asleep']:.1f}h, agents down {d['lost']['agent_down']:.1f}h" if d.get("lost") is not None
              else "fleet guard did not run, so sleep and login were not checked"]
     if wait:
-        parts.append(f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h")
+        line = f"tester pass to merge: average {sum(wait.values()) / len(wait):.1f}h, longest {max(wait.values()):.1f}h"
+        sp = d.get("merge_split") or {}
+        avg = lambda k: [v[k] for v in sp.values() if v.get(k) is not None]
+        bits = []
+        for k, name in (("group", "waiting for a group"), ("ci", "group PR open, CI and merge"), ("owner", "waiting for the owner")):
+            v = avg(k)
+            bits.append(f"{name} {sum(v) / len(v):.1f}h" if v else f"{name} not recorded")
+        line += " (" + ", ".join(bits) + ")"
+        parts.append(line)
     held = d.get("held")
     if held is None:
         parts.append("held work not recorded (no `fleet held` entries for this project, and the outcome log has no field for it)")
     else:
         parts.append(f"held with a slot free {sum(held.values()):.1f}h" + (f" (longest {max(held, key=held.get)} {max(held.values()):.1f}h)" if held else ""))
+    qw = d.get("queue_wait")
+    if qw and qw["n"]:
+        w = qw["waited"]
+        parts.append(f"queued spawns: {qw['n']}" + (f", waited average {sum(w) / len(w):.1f}h, longest {max(w):.1f}h" if w else "")
+                     + (f", {len(qw['waiting'])} still waiting (oldest {max(qw['waiting']):.1f}h)" if qw["waiting"] else ""))
     L.append("Lost time: " + " · ".join(parts))
     alerts = [f for f in findings if f["level"] == "alert"]
     L.append("")
@@ -584,6 +746,10 @@ def measure(fleetctl, ctx, t0, t1, now, until_given=True):
     d["lost"] = guard_events(fleetctl.STATE_HOME, t0, t1)
     d["merge_wait"] = merge_wait_hours(ctx["proj_rows"], cost, ctx["project"])
     d["held"] = held_hours(fleetctl.STATE_HOME, ctx["project"], t0, t1)
+    home, proj = fleetctl.STATE_HOME, ctx["project"]
+    d["queue_wait"] = queue_waits(read_jsonl(os.path.join(home, f"queue-{proj}.jsonl")), t0, t1, now)
+    d["merge_split"] = merge_split(ctx["proj_rows"], cost, ctx["prs"], read_jsonl(os.path.join(home, f"questions-{proj}.jsonl")),
+                                   proj, d["merge_wait"])
     return d, cost
 
 
@@ -714,5 +880,44 @@ def selftest(check, fleetctl):
     check("retro: held time over the limit is a pm alert", (HF["held_hours"]["level"], HF["held_hours"]["who"]), ("alert", "pm"))
     check("retro: render says held work was not recorded", "held work not recorded" in render(calm, []), True)
     check("retro: render shows held hours", "held with a slot free 1.2h" in render(hdata, []), True)
+    # 2.14: spawn rows, PM rulings, new against raised before, queue waits, the merge split
+    r2 = [{"type": "spawn", "project": "st", "ts": ts(5), "ticket": "ST-7", "role": "tester", "executor": "claude", "outcome": "spawn", "agent_id": "x1"},
+          {"type": "spawn", "project": "st", "ts": ts(9), "ticket": "ST-7", "role": "tester", "executor": "claude", "outcome": "verify_fail",
+           "fail_cause": "pm_ruling", "agent_id": "x1", "repeat": "no", "in_list": "no", "severity": "s2"},
+          {"type": "spawn", "project": "st", "ts": ts(50), "ticket": "ST-7", "role": "tester", "executor": "claude", "outcome": "verify_fail",
+           "fail_cause": "missed", "agent_id": "x2", "repeat": "yes", "in_list": "yes", "severity": "s1"}]
+    d2 = build(t0, t0 + 3600, "st", r2, r2, {"tickets": {}, "pm": {}, "agents": {}}, [], [], None, {}, now=t0 + 3600)
+    x7 = {x["ticket"]: x for x in d2["tickets"]}["ST-7"]
+    check("retro: a spawn row is not a second session", (x7["tester"], x7["outcome"], d2["duplicates"]), (2, "verify_fail", []))
+    f2 = d2["failures"]
+    check("retro: PM ruling failures counted", (f2["pm_ruling"], f2["pm_ruling_where"]), (1, ["ST-7"]))
+    check("retro: new against raised before, in the list against outside",
+          (f2["new"], f2["before"], f2["in_list"], f2["outside"], f2["severity"]), (1, 1, 1, 1, {"s1": 1, "s2": 1}))
+    F2 = {f["key"]: f for f in evaluate(d2, *thresholds({}))}
+    check("retro: a PM ruling failure is a finding", (F2["pm_ruling_failures"]["level"], F2["pm_ruling_failures"]["who"]), ("warn", "pm"))
+    check("retro: the split is in the text", "1 new this round, 1 raised before" in render(d2, []), True)
+    bare = [dict(r2[1], repeat=None, in_list=None)]
+    d3 = build(t0, t0 + 3600, "st", bare, bare, {"tickets": {}, "pm": {}, "agents": {}}, [], [], None, {}, now=t0 + 3600)
+    check("retro: no marks says not recorded", "not recorded (--repeat)" in render(d3, []), True)
+    q = [{"id": "q1", "ts": ts(0), "ticket": "ST-1", "popped": ts(90)},
+         {"id": "q2", "ts": ts(10), "ticket": "ST-2"},
+         {"id": "q3", "ts": ts(20), "ticket": "ST-3", "popped": True, "popped_at": ts(50)},
+         {"id": "q0", "ts": iso(t0 - 7200), "ticket": "ST-0", "popped": ts(0)}]
+    qw = queue_waits(q, t0, t0 + 3600, t0 + 2 * 3600)
+    check("retro: queue waits, popped and still waiting", (qw["n"], [round(h, 2) for h in qw["waited"]], [round(h, 2) for h in qw["waiting"]]),
+          (3, [1.5, 0.5], [1.83]))
+    check("retro: no queue file is not recorded", queue_waits(None, t0, t0 + 3600, t0 + 3600), None)
+    mrows = [{"project": "st", "ticket": "ST-1", "outcome": "verify_pass", "ts": ts(0)}]
+    mcost = {"tickets": {"ST-1": {"merged": t0 + 5 * 3600, "pr": 11}}}
+    gpr = [{"number": 20, "headRefName": "release/group-1", "createdAt": ts(120), "mergedAt": iso(t0 + 5 * 3600 + 60)}]
+    qs = [{"id": "k1", "ts": ts(180), "ticket": "ST-1", "closed": iso(t0 + 4 * 3600)}]
+    sp = merge_split(mrows, mcost, gpr, qs, "st", {"ST-1": 5.0})["ST-1"]
+    check("retro: pass to merge split into group wait, CI and owner",
+          (round(sp["group"], 2), round(sp["ci"], 2), round(sp["owner"], 2)), (2.0, 2.0, 1.0))
+    sp = merge_split(mrows, mcost, [], None, "st", {"ST-1": 5.0})["ST-1"]
+    check("retro: no group PR and no questions file = not recorded", (sp["group"], sp["ci"], sp["owner"]), (None, None, None))
+    dm = dict(calm, merge_wait={"ST-1": 5.0}, merge_split={"ST-1": sp}, queue_wait=qw, lost=None)
+    out = render(dm, [])
+    check("retro: text names the split and the queue", ("waiting for a group not recorded" in out, "queued spawns: 3" in out), (True, True))
     import shutil
     shutil.rmtree(d, ignore_errors=True)

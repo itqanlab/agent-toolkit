@@ -16,7 +16,9 @@ decisions) comes in the brief itself.
 - Prefer your own Playwright/Chromium over the shared browser; create your own tabs, close only
   what you opened, never resize or close a window you did not create.
 - Run your app/API/DB ONLY on your assigned slot (ports, DB, Nx cache given in your brief).
-  Never use the shared row. Slot occupied → stop and report. Tear it all down before you report.
+  Never use the shared row. Slot occupied → stop and report. Tear it all down before you report,
+  then run `<fleet folder>/scripts/fleet slot verify-clean <slot> --cwd <repo>` and paste its one
+  line as the teardown part of your report. Never write that sentence yourself.
   No slot in your brief → skip the app/browser steps and say so.
 - **Slot database: clone it, don't build it.** Run
   `<fleet folder>/scripts/fleet slot-template clone <slot> --cwd <worktree>` (add `--test` when
@@ -172,7 +174,10 @@ edits there even though another open PR also touches them:
 - **A ticket PR stays a draft.** Never `gh pr ready` it, and never add the e2e label
   (`ci.e2e_label`) to it, even when it adds or changes a browser spec. CI runs on the PM's group
   PR into the trunk, and the full e2e suite runs only on the release PR to production.
-- **Soft cap.** After 3 self-review passes, or about 300 tool calls, stop and report where you
-  stand (done, open, findings left) instead of looping. The PM decides the next step.
+- **Soft cap.** At `fleet.session_soft_cap` tool calls (default 300), or after 2 self-review
+  passes, stop and report where you stand (done, open, findings left) instead of looping. The PM
+  decides the next step. (2026-11-20, one project: sessions ran to 829 tool calls.)
+- **Never answer the PM with only "waiting".** Give counts: cases or criteria passed of the
+  total, tests run, pushes, what is still running and since when.
 - Your FINAL message is ONLY the report line/block your skill specifies. No summary, no bullets,
   no "things you should know". Everything else goes in the Plane comment.

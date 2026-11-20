@@ -60,8 +60,13 @@ script, `--hours N` for a rolling window. Thresholds and levels are in config un
    the toolkit instead.
 5. **Rework findings feed the rework ledger.** A `rework_rounds` or `ticket_cause_failures`
    finding names the tickets; for each, write the step that let it through in the rework
-   ledger (`core/pm/skills/spawn-tester.md`, "Cap at two reworks"), the same way as a third
-   failure.
+   ledger (`core/pm/skills/spawn-tester.md`, "Rounds cap"), the same way as a ticket at the cap.
+6. **Read the split, not only the total.** Failures logged `pm_ruling` are yours: read
+   `core/pm/skills/ruling.md` again before the next ruling. Where rows carry `repeat` and
+   `in_list`, the retro splits failures into new this round and raised before; many new ones
+   mean the list is not closing (`engineering/references/case-list.md`). It also reports how long
+   queued spawns waited, and splits tester-pass-to-merge into waiting for a group, CI time and
+   waiting for the owner. "not recorded" means the data is missing, not zero.
 
 ### What the findings mean
 
@@ -73,6 +78,7 @@ script, `--hours N` for a rolling window. Thresholds and levels are in config un
 | `usd_per_ticket` | one ticket cost more than the limit | the same; a third round goes to a stronger executor, not the same lane |
 | `rework_rounds`, `rework_rate` | tickets go round more than they should | rework ledger; read the causes: missed, ticket, environment |
 | `ticket_cause_failures` | a tester failed a PR because the ticket was wrong | the planner fixes the ticket text before the next round |
+| `pm_ruling_failures` | a tester failed a PR because of a PM scope decision or brief | source the ruling (`core/pm/skills/ruling.md`); retarget the tests it changed |
 | `duplicate_rows` | a session was logged twice | log each session once; add a field with `fleet log backfill` |
 | `missing_agent_id` | a Claude spawn row has no agent id | pass `--set agent_id=<id>` on every spawn row |
 | `lane_failures`, `lane_minutes` | other-CLI lanes fail or run long | move that task kind to another executor in config |

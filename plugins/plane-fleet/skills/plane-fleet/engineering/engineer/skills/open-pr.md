@@ -52,7 +52,10 @@
    anything you could not reach.
 
 3. **Tear down the slot** — stop both servers, drop your slot DB, free the ports. A slot you
-   leave running blocks the next session assigned to it.
+   leave running blocks the next session assigned to it. Then run
+   `<fleet>/scripts/fleet slot verify-clean <slot> --cwd <repo>`. Exit 3 lists what is left:
+   clear it and run it again. Its one line (`slot A clean: ...`) is the teardown part of your
+   report, pasted as printed. Never write that sentence yourself.
 
    **3b. Independent code review, before you push.** Commit, then run a fresh review of your
    whole diff against the trunk:
@@ -73,8 +76,9 @@
      Exit 4 means the review did not finish, which is not a clean pass.
    - **Every P1 and every P2: fix it, commit, and run both reviews again.** Repeat until one
      full pass of each reports no P1 and no P2. Report how many passes it took.
-   - **Soft cap: 3 passes, or about 300 tool calls in the session.** If the third self-review
-     pass still has findings, or the session nears 300 tool calls, stop looping. Commit and push
+   - **Soft cap: 2 passes, or `fleet.session_soft_cap` tool calls in the session (default
+     300).** If the second self-review pass still has findings, or the session nears the cap,
+     stop looping. Commit and push
      what you have, post a ticket comment with what is done, what is open and every finding
      left, and report `CAP` (`engineering/engineer/role.md` §6). The PM decides the next step:
      another round, a split, a scope call or a stronger executor. (2026-11-01, one project: one
