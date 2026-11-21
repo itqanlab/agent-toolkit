@@ -40,6 +40,11 @@ it.)
 Read the project config (`core/scripts/fleet config`: `.plane/config.json` plus the per-user override). If missing, build it —
 `core/references/config-schema.md`.
 
+**Executor choice: `fleet apply` right after the config.** It re-ranks the executors from the
+log (`core/references/executors.md`, "Promotion and demotion") and writes each change to the
+decisions log and the user override. Apply it, don't ask. Put each changed line in the opening
+summary. Run it again after each merge group lands, when new verdicts are in.
+
 **Intake sources: `fleet intake check` right after the config.** It lists each feed the fleet
 pulls work from (Sentry when the config has a `sentry` block, and any `fleet.intake_sources`),
 and warns when the repo ships a Sentry SDK with no `sentry` block. Put every `FAIL` and
