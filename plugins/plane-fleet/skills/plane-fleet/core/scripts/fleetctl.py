@@ -1357,6 +1357,12 @@ def selftest():
         import fleetintake
         fleetintake.selftest(check)
         selftest_300(check)
+        import fleetschedule
+        fleetschedule.selftest(check)
+        guard = os.path.join(FLEET_ROOT, "..", "..", "hooks", "unattended-guard.py")
+        if os.path.exists(guard):
+            g = subprocess.run([sys.executable, guard, "--selftest"], capture_output=True, text=True)
+            check("unattended guard selftest", (g.returncode, [l for l in g.stdout.splitlines() if l.startswith("FAIL")]), (0, []))
         w = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fleetwatch.py"), "--selftest"],
                            capture_output=True, text=True, env={**os.environ, "PLANE_FLEET_HOME": tempfile.mkdtemp()})
         check("watch: fleetwatch selftest", (w.returncode, [l for l in w.stdout.splitlines() if l.startswith("FAIL")]), (0, []))

@@ -33,6 +33,8 @@
 #                                       stamp a commit the local pre-push gate passed; check a group PR
 #   fleet intake [check | mark <src> <id> --ticket T | resolve <src> <id> --release SHA] [--cwd DIR]
 #                                       Sentry and other feeds -> ticket candidates (fleetintake.py)
+#   fleet schedule install --every 2h | remove | status | pause | resume | run-once | heartbeat [--cwd DIR]
+#                                       unattended PM runs on a timer, never production (fleetschedule.py)
 #   fleet guard start|stop|status|check [--hours N]   holds off sleep and alerts when the agent login fails
 #   fleet antigravity-setup             register Plane and the read-only rules with agy, once
 #   fleet mcp-exec <name>               start an MCP server from ~/.claude.json (agy runs this)
@@ -57,6 +59,7 @@ case "${1:-}" in
   gate-stamp) shift; exec python3 "$here/fleetgate.py" "$@" ;;
   guard) shift; exec python3 "$here/fleetguard.py" "$@" ;;
   intake) shift; exec python3 "$here/fleetintake.py" "$@" ;;
+  schedule) shift; exec python3 "$here/fleetschedule.py" "$@" ;;
   pick|budget|log|stats|report|cost|retro|review|selftest|apply|seed|config|free-models|status|held|rounds|queue|questions) exec python3 "$here/fleetctl.py" "$@" ;;
 esac
 exec node "$here/run-lane.mjs" "$@"

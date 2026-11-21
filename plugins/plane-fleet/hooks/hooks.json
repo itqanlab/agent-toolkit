@@ -1,5 +1,5 @@
 {
-  "description": "fleet hooks: the usage pacer holds new fleet-role subagents when the Claude budget is ahead of pace or past the hard stop; the cache keeper refuses waits in fleet agents longer than their 5-minute prompt cache. After a PM session compacts, pm-recompact adds the live fleet status and the PM's hard rules to its context.",
+  "description": "fleet hooks: the usage pacer holds new fleet-role subagents when the Claude budget is ahead of pace or past the hard stop; the cache keeper refuses waits in fleet agents longer than their 5-minute prompt cache. After a PM session compacts, pm-recompact adds the live fleet status and the PM's hard rules to its context. In an unattended run (FLEET_UNATTENDED=1) the unattended guard denies anything aimed at production and anything not in fleet.unattended.allow.",
   "hooks": {
     "PreToolUse": [
       {
@@ -17,6 +17,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/cache-keeper.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Skill|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/unattended-guard.py\""
           }
         ]
       }
