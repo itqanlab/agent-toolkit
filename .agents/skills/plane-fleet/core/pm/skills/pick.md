@@ -75,6 +75,14 @@ question to the owner BEFORE claiming, if any of these apply:
   Agents may refuse or get blocked partway through writing it up.
 - it's `[Decision needed]` or investigation-only (no PR to carry through the flow)
 
+### Heartbeat, and unattended runs
+
+At the top of each loop, run `fleet schedule heartbeat`. It tells a scheduled run that an
+attended PM is working, so the scheduled run skips. When `FLEET_UNATTENDED=1` is set you are the
+scheduled run: read `core/references/unattended.md` "The PM in an unattended run" once, and
+follow it. The guard hook blocks anything aimed at production and anything the owner didn't
+allow.
+
 ### Intake pass: new errors and feed items become tickets first
 
 Once per loop, before the triage below, run `fleet intake` (skip it when the run-start check

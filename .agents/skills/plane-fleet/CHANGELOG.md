@@ -4,6 +4,45 @@ Latest: https://agent-toolkit.itqanlab.com/s/plane-fleet/CHANGELOG.md
 
 What changed in `plane-fleet`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed.
 
+## [3.0.0] - 2026-11-21
+
+On one project, tickets waited 30 to 46 percent of their cycle time for someone to open a fleet
+session. Engineers were also judged on failures that were not theirs. This release runs the
+fleet on a timer with production fenced off, re-ranks executors on their own failures without
+anyone asking, and makes the PM's two biggest files hold rules only.
+
+### Breaking
+
+- `scripts/lanes/run-lane.sh` is removed. It only forwarded to the fleet command since 2.0.0.
+  Call `scripts/fleet` (or `core/scripts/fleet`) instead.
+
+### Added
+
+- `fleet schedule install --every 2h`: unattended PM runs from a launchd agent (macOS) or a
+  crontab line (Linux), with `status`, `pause`, `resume` and `remove`. `run-once` takes a lock,
+  skips while paused or while an attended PM's heartbeat is recent, stops after
+  `fleet.unattended.max_hours` and calls `fleet.alert_command` on failure. See
+  `core/references/unattended.md`.
+- The `unattended-guard` hook, on only in an unattended run. It always denies a push, PR, merge
+  or release tag on a production branch and a production deploy command. It allows merging and
+  client messages only when `fleet.unattended.allow` lists them.
+- `fleet schedule heartbeat`, run by an attended PM each loop.
+- `core/references/pm-history.md`: the incidents and measurements behind the PM's rules.
+
+### Changed
+
+- An engineer run is scored only on a fail with cause `missed`. A fail the tester put on the
+  ticket, the spec, the environment or a PM ruling is not scored either way.
+- `selection.demote_window` is 20 (was 5).
+- The PM runs `fleet apply` at preflight and after each merge group, and applies it.
+- `preflight.md` (25.5 to 17.8 KB) and `spawn.md` (27.3 to 19.1 KB) keep every rule, and their
+  history moved to `pm-history.md`.
+
+### Fixed
+
+- `spawn.md` said both "do not log `tokens`" and "pass `tokens`" for a Claude spawn. It now says
+  not to: `tokens` is the last call's size, and `cost --backfill` writes the real usage.
+
 ## [2.16.0] - 2026-11-21
 
 On one project, Sentry emailed every new production issue for five weeks. Of 14 open issues,

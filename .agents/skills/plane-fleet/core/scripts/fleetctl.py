@@ -574,6 +574,13 @@ def fold_usage_rows(rows):
     return out
 
 
+def not_the_models_fault(row):
+    """A verify_fail whose recorded cause is anything but "missed". Rows from before causes were
+    required carry none and still count, as they always did."""
+    cause = row.get("fail_cause") or row.get("failure_cause")
+    return row.get("outcome") == "verify_fail" and bool(cause) and cause != "missed"
+
+
 def derive_quality(rows):
     """'quality' = the signal each role is scored on.
     engineer: verify_first_pass if set, else the first tester verdict after it on the same ticket
@@ -586,11 +593,15 @@ def derive_quality(rows):
     for r in rows:
         role = r.get("role")
         q = r.get("verify_first_pass") if isinstance(r.get("verify_first_pass"), bool) else None
+        if q is False and not_the_models_fault(r):
+            q = None
         if role == "engineer" and q is None and r.get("outcome") in ("pr_opened", "done", "verify_pass", "verify_fail"):
             for t in by_ticket.get((r.get("project"), r.get("ticket")), []):
                 if t.get("role") in ("tester", "verifier-legacy") and (t.get("ts") or "") > (r.get("ts") or "") \
                         and t.get("outcome") in ("verify_pass", "verify_fail"):
-                    q = t.get("outcome") == "verify_pass"
+                    # A fail the tester put on the ticket, the spec, the environment or a PM ruling
+                    # says nothing about the engineer's model, so it is not scored either way.
+                    q = None if not_the_models_fault(t) else t.get("outcome") == "verify_pass"
                     break
         elif role == "tester":
             q = None
@@ -1345,6 +1356,13 @@ def selftest():
         fleetgate.selftest(check)
         import fleetintake
         fleetintake.selftest(check)
+        selftest_300(check)
+        import fleetschedule
+        fleetschedule.selftest(check)
+        guard = os.path.join(FLEET_ROOT, "..", "..", "hooks", "unattended-guard.py")
+        if os.path.exists(guard):
+            g = subprocess.run([sys.executable, guard, "--selftest"], capture_output=True, text=True)
+            check("unattended guard selftest", (g.returncode, [l for l in g.stdout.splitlines() if l.startswith("FAIL")]), (0, []))
         w = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fleetwatch.py"), "--selftest"],
                            capture_output=True, text=True, env={**os.environ, "PLANE_FLEET_HOME": tempfile.mkdtemp()})
         check("watch: fleetwatch selftest", (w.returncode, [l for l in w.stdout.splitlines() if l.startswith("FAIL")]), (0, []))
@@ -1669,6 +1687,25 @@ def run_questions(args, reg, ap):
     else:
         print("\n".join(question_line(r) for r in shown))
     return 0
+
+
+def selftest_300(check):
+    """Only a fail the tester put on the model ("missed") scores against an engineer (3.0.0)."""
+    def rows(cause):
+        return [{"project": "st", "ticket": "ST-90", "role": "engineer", "outcome": "pr_opened", "ts": "2026-11-01T00:00:00Z"},
+                {"project": "st", "ticket": "ST-90", "role": "tester", "outcome": "verify_fail", "ts": "2026-11-01T01:00:00Z",
+                 **({"fail_cause": cause} if cause else {})}]
+    for cause, want in (("missed", False), ("ticket", None), ("environment", None), ("spec_changed", None),
+                        ("pm_ruling", None), (None, False)):
+        rs = rows(cause)
+        derive_quality(rs)
+        check(f"engineer quality after a verify_fail with cause {cause}", rs[0]["quality"], want)
+    own = [{"project": "st", "ticket": "ST-91", "role": "engineer", "outcome": "verify_fail",
+            "verify_first_pass": False, "fail_cause": "environment"}]
+    derive_quality(own)
+    check("an engineer row failed for the environment is not scored", own[0]["quality"], None)
+    sel = (read_json(os.path.join(HERE, "..", "references", "executors.json"), {}) or {}).get("selection", {})
+    check("demote_window is 20", sel.get("demote_window"), 20)
 
 
 def selftest_214(check, d, reg, base):

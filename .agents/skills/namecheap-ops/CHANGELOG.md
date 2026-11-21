@@ -4,6 +4,12 @@ Latest: https://agent-toolkit.itqanlab.com/s/namecheap-ops/CHANGELOG.md
 
 What changed in `namecheap-ops`, newest version first. To see if a newer version exists, open the address above and compare its top version with the one installed. Entries for versions before 1.1.0 were rebuilt from the git history.
 
+## [2.1.2] - 2026-11-21
+
+### Changed
+
+- Code comments and setup examples use a placeholder project name (`acme`) instead of real ones.
+
 ## [2.1.1] - 2026-10-13
 
 ### Fixed
