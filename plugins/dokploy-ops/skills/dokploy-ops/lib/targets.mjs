@@ -9,8 +9,8 @@
 // So a target is named locally, every key is suffixed with that name, and one of
 // them is the default:
 //
-//     HETZNER_DEFAULT=itqanlab
-//     HETZNER_TOKEN_ITQANLAB=...
+//     HETZNER_DEFAULT=acme
+//     HETZNER_TOKEN_ACME=...
 //     HETZNER_TOKEN_CLIENT_A=...
 //
 // The name is ours, not the provider's. Neither provider will tell you what the
