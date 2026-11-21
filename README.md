@@ -100,13 +100,13 @@ Prints per-agent coverage when it finishes.
 | 🟣 | **Claude Code** | Plugin marketplace |
 | ⚫ | **Codex** | `~/.agents/skills/` |
 | 🟠 | **OpenCode** | `~/.agents/skills/` |
-| 🔵 | **Cursor** | `~/.cursor/skills/` |
+| 🔵 | **Cursor** | `~/.agents/skills/` |
 | 🔷 | **Gemini CLI** | `~/.agents/skills/` |
 | 🐙 | **Copilot / VS Code** | `~/.agents/skills/` |
 | 🟡 | **Amp** | `~/.agents/skills/` |
 | 🦆 | **Goose** | `~/.agents/skills/` |
 
-Six read the neutral path. Cursor gets its own folder, `~/.cursor/skills/`, because its docs list no neutral path at user level and we have not been able to test it (it needs a login). Claude Code gets the marketplace, which is better there anyway — versioned, updatable, and able to bundle subagents, hooks and MCP servers.
+Seven read the neutral path (Cursor tested 2026-11-21). Claude Code gets the marketplace, which is better there anyway — versioned, updatable, and able to bundle subagents, hooks and MCP servers.
 
 Verified paths, precedence and sources → [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 

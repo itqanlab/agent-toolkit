@@ -15,7 +15,7 @@ Checked against each vendor's own documentation on 2026-08-11. Paths are quoted 
 | **Claude Code** | **No** | `~/.claude/skills/` | `.claude/skills/` (plus nested, and `--add-dir`) |
 | **Codex** | Yes | `/etc/codex/skills` (admin) | `.agents/skills` in cwd, parent, and repo root |
 | **OpenCode** | Yes | `~/.config/opencode/skills/`, `~/.claude/skills/` | `.agents/skills/`, `.opencode/skills/`, `.claude/skills/` |
-| **Cursor** | Yes | `~/.cursor/skills/`, `~/.claude/skills/`, `~/.codex/skills/` | `.agents/skills/`, `.cursor/skills/`, `.claude/skills/`, `.codex/skills/` |
+| **Cursor** | Yes | `~/.agents/skills/` (tested), `~/.cursor/skills/`, `~/.claude/skills/`, `~/.codex/skills/` | `.agents/skills/`, `.cursor/skills/`, `.claude/skills/`, `.codex/skills/` |
 | **Gemini CLI** | Yes — takes precedence | `~/.gemini/skills/` | `.agents/skills/` (precedence), `.gemini/skills/` |
 | **GitHub Copilot / VS Code** | Yes | `~/.copilot/skills/` | `.agents/skills/`, `.github/skills/`, `.claude/skills/` |
 | **Amp** | Yes | `~/.config/agents/skills/`, `~/.config/amp/skills/` | `.agents/skills/`, `.claude/skills/` |
@@ -36,7 +36,7 @@ The table above comes from each vendor's documentation. This one comes from runn
 | GitHub Copilot CLI 1.0.86 | 7 of 7 in `copilot skill list` | `copilot plugin marketplace add itqanlab/agent-toolkit`: lists all 7, installed one |
 | Amp 0.0.1789934445 | 7 of 7 in `amp skills list`. Its own 12 built-in skills were the only ones in the control | `amp skills add itqanlab/agent-toolkit/plugins/<name>/skills/<name>`: installed `watch-video` from GitHub. The whole-repo command `amp skills add itqanlab/agent-toolkit` installed all 7 from GitHub, because of the copy in `.agents/skills/`. See below |
 | Goose 1.51.0 | 7 of 7 in `goose skills list`. The control showed only its two built-in skills. It also prints each skill's token cost | None used |
-| Cursor CLI 2026.09.18 | Not tested. Every command that could show a skill, including a prompt, stopped with `Authentication required`. It needs a login or `CURSOR_API_KEY`. Logging in on macOS may write to the real keychain, which a scratch home cannot isolate. We did not try it. An API key could not be made from a free account, as far as we could find | Not tested. `agent plugin marketplace add <git url>` exists, but it also needs a login |
+| Cursor CLI 2026.11.19 | Tested 2026-11-21, logged in, one probe skill per folder, asked which it could see. It read `~/.agents/skills/`, `~/.cursor/skills/`, `~/.claude/skills/` and `~/.codex/skills/`, and in the project `.agents/skills/` and `.cursor/skills/`. A probe in `.agents/skills/` one directory up was not read, and it showed when started from that directory, so Cursor does not walk up parent directories. A folder must be trusted first (`--trust` headless) | Not tested. `agent plugin marketplace add <git url>` exists, but it also needs a login |
 
 **OpenCode's debug output is cut when piped.** A first run listed 6 of 7 skills, and it looked like a discovery bug. It was not. `opencode debug skill` prints about 80,000 bytes, because it includes every skill's full text. When its output goes into a pipe, it stops at exactly 65,536 bytes, one pipe buffer, and leaves broken JSON. Which skills get cut depends on scan order. Fifteen runs on fresh homes reproduced it every time when piped, and never when written to a file, where all 7 are present. So OpenCode finds everything, and only its debug printer truncates. Redirect the output to a file when you test it. A tool that waits for the pipe, such as Python, prints 70,000 characters through a pipe without loss.
 
@@ -135,13 +135,13 @@ Measured on a real Windows runner with Codex 0.155.1. It works differently from 
 
 ## Overlap is safe
 
-Several agents read both `~/.agents/skills/` and `~/.claude/skills/`, so installing to both makes the same skill visible twice. This is handled by the agents themselves — Amp, for instance, "uses the first skill with a given frontmatter `name`" in its documented precedence order, and Goose and OpenCode treat their vendor paths as backward-compatible fallbacks behind the neutral path. Cursor is not tested: its docs list `~/.cursor/skills/`, `~/.claude/skills/` and `~/.codex/skills/` at user level, so the installer writes to `~/.cursor/skills/` for it. Names stay unique because the directory name, the frontmatter `name`, and the plugin `name` are all required to match.
+Several agents read both `~/.agents/skills/` and `~/.claude/skills/`, so installing to both makes the same skill visible twice. This is handled by the agents themselves — Amp, for instance, "uses the first skill with a given frontmatter `name`" in its documented precedence order, and Goose and OpenCode treat their vendor paths as backward-compatible fallbacks behind the neutral path. Cursor reads the neutral path too (tested 2026-11-21); the installer writes to `~/.cursor/skills/` for it, which it also reads. Names stay unique because the directory name, the frontmatter `name`, and the plugin `name` are all required to match.
 
 Still, the default install writes to exactly one location. Use `--all` only if you actually want belt and braces.
 
 ## Project-level installs
 
-Every agent except Claude Code reads `.agents/skills/` from the working tree, and Codex, OpenCode and Amp walk up parent directories to find it. Cursor's docs list a project `.agents/skills/`, but whether it walks up parent directories is not tested. Committing a skill to `.agents/skills/` in a repository therefore ships it to everyone who clones that repo, with no install step.
+Every agent except Claude Code reads `.agents/skills/` from the working tree, and Codex, OpenCode and Amp walk up parent directories to find it. Cursor reads the project's `.agents/skills/` but does not walk up parent directories (tested 2026-11-21), so start it from the repository root. Committing a skill to `.agents/skills/` in a repository therefore ships it to everyone who clones that repo, with no install step.
 
 ```bash
 ./scripts/install.sh --project          # writes ./.agents/skills/
