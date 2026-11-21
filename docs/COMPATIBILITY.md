@@ -135,13 +135,13 @@ Measured on a real Windows runner with Codex 0.155.1. It works differently from 
 
 ## Overlap is safe
 
-Several agents read both `~/.agents/skills/` and `~/.claude/skills/`, so installing to both makes the same skill visible twice. This is handled by the agents themselves — Amp, for instance, "uses the first skill with a given frontmatter `name`" in its documented precedence order, and Cursor, Goose and OpenCode treat their vendor paths as backward-compatible fallbacks behind the neutral path. Names stay unique because the directory name, the frontmatter `name`, and the plugin `name` are all required to match.
+Several agents read both `~/.agents/skills/` and `~/.claude/skills/`, so installing to both makes the same skill visible twice. This is handled by the agents themselves — Amp, for instance, "uses the first skill with a given frontmatter `name`" in its documented precedence order, and Goose and OpenCode treat their vendor paths as backward-compatible fallbacks behind the neutral path. Cursor is not tested: its docs list `~/.cursor/skills/`, `~/.claude/skills/` and `~/.codex/skills/` at user level, so the installer writes to `~/.cursor/skills/` for it. Names stay unique because the directory name, the frontmatter `name`, and the plugin `name` are all required to match.
 
 Still, the default install writes to exactly one location. Use `--all` only if you actually want belt and braces.
 
 ## Project-level installs
 
-Every agent except Claude Code reads `.agents/skills/` from the working tree, and Codex, OpenCode, Cursor and Amp walk up parent directories to find it. Committing a skill to `.agents/skills/` in a repository therefore ships it to everyone who clones that repo, with no install step.
+Every agent except Claude Code reads `.agents/skills/` from the working tree, and Codex, OpenCode and Amp walk up parent directories to find it. Cursor's docs list a project `.agents/skills/`, but whether it walks up parent directories is not tested. Committing a skill to `.agents/skills/` in a repository therefore ships it to everyone who clones that repo, with no install step.
 
 ```bash
 ./scripts/install.sh --project          # writes ./.agents/skills/
