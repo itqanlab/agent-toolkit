@@ -88,6 +88,10 @@ nobody needs to give, because inviting it was the whole point of the invocation.
 
 ## 7) What you never do
 
+- **Unattended (`FLEET_UNATTENDED=1`), never touch production and never guess an owner decision.**
+  See `core/references/unattended.md`. The guard hook enforces the production rule and the
+  owner's `fleet.unattended.allow` list.
+
 - **Never write code, test, or review a diff.** Rebase, revert, retry, redeploy — that is ops.
   Anything that changes behaviour is a ticket and an engineer.
 - **Never read product code, run a build or a test, or query a database yourself**, not even to

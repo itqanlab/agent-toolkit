@@ -79,7 +79,7 @@ A plain `add` from real GitHub, with no `--ref` and no `--sparse`, offered all s
 
 **Other plugin sources.** Besides `local`, Codex accepts `git-subdir` and `npm`. A `git-subdir` entry installed our `watch-video` plugin straight from `plugins/watch-video` in this repository, and the model saw it. So another marketplace can list one of our plugins without copying it. An `npm` entry, written `{"source": "npm", "package": "@scope/name"}`, installed a real package as a plugin at the version in the package, and the model saw the skill. That was tested against a local registry, with nothing published. The package name must be a valid npm name. A file path is silently ignored. An unknown source type is also ignored without an error. We use `local`.
 
-**What the plugin card shows.** Codex's app-server `plugin/list` call returns the fields a card is drawn from. For all seven plugins it returned the display name, the short line, the category, the capabilities, the developer, the site link and three starter prompts, exactly as generated. The desktop app reads the same call. Whether the app draws them correctly on screen was not checked, because it cannot be driven from here. One cosmetic point: starter prompts made from questions have no question mark.
+**What the plugin card shows.** Codex's app-server `plugin/list` call returns the fields a card is drawn from. For all seven plugins it returned the display name, the short line, the category, the capabilities, the developer, the site link and three starter prompts, exactly as generated. The desktop app reads the same call. Checked on screen on 2026-11-21 (Codex desktop on macOS, CLI 0.161.0): after `codex plugin marketplace upgrade itqan` and a full quit and reopen, the plugin directory (Customize > Plugins) finds the plugins by name, for example "Plane Fleet" and "Hetzner Ops", each with its drawn icon, the publisher and the short line. Search matches the plugin name, not the publisher. An earlier empty search was the running app holding its old list, so quit it fully after adding or upgrading the marketplace. One cosmetic point: starter prompts made from questions have no question mark.
 
 **Codex plugins also carry more than skills.** A plugin can bundle `.mcp.json` (MCP servers) and `.app.json` (connectors). When those join this catalog, they go in the same plugin folder.
 
@@ -101,7 +101,7 @@ writable_roots = ["/home/you/.itqan-agent-toolkit"]
 
 **Versions.** The local tests used Codex 0.150.0. The compatibility workflow installs the latest Codex from npm on each run, and it passed with 0.155.1 on Windows, macOS and Linux.
 
-**Not checked.** How the desktop app draws the cards, and the Linux sandbox, which the workflow only reaches as far as the config Codex reports.
+**Not checked.** The Linux sandbox, which the workflow only reaches as far as the config Codex reports.
 
 ## Claude Code
 

@@ -106,7 +106,7 @@ async function importExisting({ yes }) {
   const known = listTargets(SPEC);
   const plan = existing.map((entry) => {
     const already = known.find((t) => t.fields.token && t.fields.token === entry.values.token);
-    // "hetzner-7lmna" is a server name; "7lmna" is what the project is called.
+    // "hetzner-acme" is a server name; "acme" is what the project is called.
     const name = entry.suggestedName.replace(/^(hetzner|hcloud)[-_]?/i, '') || entry.suggestedName;
     return { ...entry, name: already ? already.name : name, already: Boolean(already) };
   });

@@ -124,7 +124,7 @@ async function importExisting({ yes }) {
   const plan = existing.map((entry) => {
     const url = normalise(entry.values.url);
     const already = known.find((t) => normalise(t.fields.url) === url);
-    // A tool server called "dokploy-mastudio" is the mastudio instance.
+    // A tool server called "dokploy-acme" is the acme instance.
     const stripped = entry.suggestedName.replace(/^dokploy[-_]?/i, '');
     // Failing that, the hostname is a better name than nothing: dokploy.example.com → example.
     const fromHost = url.replace(/^https?:\/\//, '').split('.').filter((p) => p !== 'dokploy')[0];

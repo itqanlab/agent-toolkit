@@ -423,9 +423,14 @@ whose process is gone is flagged), open PRs with their required checks (`ci.requ
 labels and mergeability, the last trunk CI runs, and worktrees with no open PR. The board
 itself stays a Plane MCP read.
 
-**Promotion and demotion:** `$L apply` (`--dry-run` to preview), at every PM preflight:
+**Promotion and demotion:** `$L apply` (`--dry-run` to preview). The PM runs it itself at
+preflight and again after each merge group lands, and applies what it finds. Nobody has to ask.
+- an engineer run is scored by the first tester verdict after it, and only a fail with cause
+  `missed` counts against its model. A fail put on the ticket, the spec, the environment or a
+  PM ruling is not scored either way. Rows from before causes were required still count
 - a challenger with n ≥ 5, first-pass ≥ the champion's and lower mean cost becomes champion
-- a champion below 70% over its last 5 scored runs swaps with the next candidate
+- a champion below 70% over its last 20 scored runs (`selection.demote_window`) swaps with the
+  next candidate. A short window swung on a handful of tickets
 - a project gets its own champion only when its own runs (≥ 5 for both) disagree with the
   global order; that goes under `projects.<repo>` in the user override
 - kinds with `auto_promote: false` (`schema`, `money-concurrency`) are never changed, only

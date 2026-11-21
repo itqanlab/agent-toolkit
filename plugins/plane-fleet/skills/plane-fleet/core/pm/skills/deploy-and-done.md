@@ -24,6 +24,9 @@ The engineer looked at it and the tester looked at it. What is left is making su
    regression and the next intake pass files a new ticket linked to this one. A failed resolve
    is a line in the Done comment, never a reason to hold `Done`.
 
+   **Then re-rank the executors: `core/scripts/fleet apply`.** The group's verdicts are in the log
+   now. Apply what it finds and name each changed line in your report.
+
    **A watcher waits for the named jobs to EXIST, then for them to finish.** Jobs are created
    one stage at a time, so "every job completed" is true for a moment after the first stage
    passes and before the e2e jobs appear. Check for the jobs by name (`ci.required_jobs`

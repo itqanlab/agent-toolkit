@@ -400,7 +400,7 @@
     "explore_rate": 0.2,
     "min_samples": 5,
     "demote_below": 0.7,
-    "demote_window": 5,
+    "demote_window": 20,
     "proven_min_rate": 0.7,
     "no_explore": "urgent or trunk-red fixes, kinds with allow_explore=false, any second attempt after Rework, and the tester of an experimental engineer",
     "portable_roles": [

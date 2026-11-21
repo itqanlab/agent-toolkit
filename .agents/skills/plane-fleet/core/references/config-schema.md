@@ -111,6 +111,11 @@ by key; lists and plain values replace.
 
   "fleet": {                             // read by the PM role, the engineer role, the tester role
     "merge_train_size": 3,
+    "unattended": {                      // OPTIONAL. Scheduled runs with nobody watching (core/references/unattended.md)
+      "command": "claude -p \"/plane-fleet run\" --permission-mode bypassPermissions",
+      "allow": ["merge", "client_message"],   // [] = build and test only; production is never allowed
+      "max_hours": 3, "attended_grace_minutes": 30
+    },
     "intake_sources": [                  // OPTIONAL. Feeds turned into tickets each pass (core/references/intake-sources.md)
       { "name": "uptime", "command": "node tools/uptime/incidents.mjs", "max_per_run": 3,
         "resolve_command": "node tools/uptime/close.mjs" }
